@@ -66,4 +66,39 @@ mod tests {
     }),
     LayoutCase::new(&[0]).with_size(Size::new(50., 50.))
   );
+
+  widget_layout_test!(
+    min_width_limit,
+    WidgetTester::new(fn_widget! {
+      @Void {
+        min_width: 100.,
+        min_height: 100.,
+      }
+    }),
+    LayoutCase::new(&[0]).with_size(Size::new(100., 100.))
+  );
+
+  widget_layout_test!(
+    max_width_limit,
+    WidgetTester::new(fn_widget! {
+      @MockBox {
+        size: Size::new(200., 200.),
+        max_width: 100.,
+        max_height: 100.,
+      }
+    }),
+    LayoutCase::new(&[0]).with_size(Size::new(100., 100.))
+  );
+
+  widget_layout_test!(
+    min_max_size,
+    WidgetTester::new(fn_widget! {
+      @MockBox {
+        size: Size::new(50., 50.),
+        min_size: Size::new(100., 100.),
+        max_size: Size::new(150., 150.),
+      }
+    }),
+    LayoutCase::new(&[0]).with_size(Size::new(100., 100.))
+  );
 }

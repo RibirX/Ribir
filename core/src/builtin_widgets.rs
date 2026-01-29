@@ -746,6 +746,78 @@ impl<T> FatObj<T> {
     init_sub_widget!(self, constrained_box, clamp, v)
   }
 
+  /// Initializes the minimum width of the widget.
+  pub fn with_min_width<K: ?Sized>(&mut self, v: impl RInto<PipeValue<f32>, K>) -> &mut Self {
+    let mix = self
+      .mix_builtin
+      .get_or_insert_with(MixBuiltin::default);
+    let constrained_box = self
+      .constrained_box
+      .get_or_insert_with(|| Stateful::new(ConstrainedBox::default()));
+    mix.init_sub_widget(v, constrained_box, |w, v| w.clamp.min.width = v);
+    self
+  }
+
+  /// Initializes the maximum width of the widget.
+  pub fn with_max_width<K: ?Sized>(&mut self, v: impl RInto<PipeValue<f32>, K>) -> &mut Self {
+    let mix = self
+      .mix_builtin
+      .get_or_insert_with(MixBuiltin::default);
+    let constrained_box = self
+      .constrained_box
+      .get_or_insert_with(|| Stateful::new(ConstrainedBox::default()));
+    mix.init_sub_widget(v, constrained_box, |w, v| w.clamp.max.width = v);
+    self
+  }
+
+  /// Initializes the minimum height of the widget.
+  pub fn with_min_height<K: ?Sized>(&mut self, v: impl RInto<PipeValue<f32>, K>) -> &mut Self {
+    let mix = self
+      .mix_builtin
+      .get_or_insert_with(MixBuiltin::default);
+    let constrained_box = self
+      .constrained_box
+      .get_or_insert_with(|| Stateful::new(ConstrainedBox::default()));
+    mix.init_sub_widget(v, constrained_box, |w, v| w.clamp.min.height = v);
+    self
+  }
+
+  /// Initializes the maximum height of the widget.
+  pub fn with_max_height<K: ?Sized>(&mut self, v: impl RInto<PipeValue<f32>, K>) -> &mut Self {
+    let mix = self
+      .mix_builtin
+      .get_or_insert_with(MixBuiltin::default);
+    let constrained_box = self
+      .constrained_box
+      .get_or_insert_with(|| Stateful::new(ConstrainedBox::default()));
+    mix.init_sub_widget(v, constrained_box, |w, v| w.clamp.max.height = v);
+    self
+  }
+
+  /// Initializes the minimum size of the widget.
+  pub fn with_min_size<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Size>, K>) -> &mut Self {
+    let mix = self
+      .mix_builtin
+      .get_or_insert_with(MixBuiltin::default);
+    let constrained_box = self
+      .constrained_box
+      .get_or_insert_with(|| Stateful::new(ConstrainedBox::default()));
+    mix.init_sub_widget(v, constrained_box, |w, v| w.clamp.min = v);
+    self
+  }
+
+  /// Initializes the maximum size of the widget.
+  pub fn with_max_size<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Size>, K>) -> &mut Self {
+    let mix = self
+      .mix_builtin
+      .get_or_insert_with(MixBuiltin::default);
+    let constrained_box = self
+      .constrained_box
+      .get_or_insert_with(|| Stateful::new(ConstrainedBox::default()));
+    mix.init_sub_widget(v, constrained_box, |w, v| w.clamp.max = v);
+    self
+  }
+
   /// Initializes a fixed width constraint for the widget.
   ///
   /// When using `Measure::Percent`, the percentage is calculated relative to
@@ -1129,6 +1201,36 @@ impl<T> FatObj<T> {
   pub fn clamp(&mut self) -> impl StateWriter<Value = BoxClamp> {
     let constrained_box = sub_widget!(self, constrained_box);
     part_writer!(&mut constrained_box.clamp)
+  }
+
+  pub fn min_width(&mut self) -> impl StateWriter<Value = f32> {
+    let cb = sub_widget!(self, constrained_box);
+    part_writer!(&mut cb.clamp.min.width)
+  }
+
+  pub fn max_width(&mut self) -> impl StateWriter<Value = f32> {
+    let cb = sub_widget!(self, constrained_box);
+    part_writer!(&mut cb.clamp.max.width)
+  }
+
+  pub fn min_height(&mut self) -> impl StateWriter<Value = f32> {
+    let cb = sub_widget!(self, constrained_box);
+    part_writer!(&mut cb.clamp.min.height)
+  }
+
+  pub fn max_height(&mut self) -> impl StateWriter<Value = f32> {
+    let cb = sub_widget!(self, constrained_box);
+    part_writer!(&mut cb.clamp.max.height)
+  }
+
+  pub fn min_size(&mut self) -> impl StateWriter<Value = Size> {
+    let cb = sub_widget!(self, constrained_box);
+    part_writer!(&mut cb.clamp.min)
+  }
+
+  pub fn max_size(&mut self) -> impl StateWriter<Value = Size> {
+    let cb = sub_widget!(self, constrained_box);
+    part_writer!(&mut cb.clamp.max)
   }
 
   /// Returns a state writer for applying visual transformations.
