@@ -49,26 +49,26 @@ impl Wordle {
       direction: Direction::Vertical,
       item_gap: 5.,
       align_items: Align::Center,
-      justify_content: JustifyContent::Compact,
+      justify_content: JustifyContent::Start,
       @Flex {
         x: AnchorX::center(),
         item_gap: 5.,
         align_items: Align::Center,
-        justify_content: JustifyContent::Compact,
+        justify_content: JustifyContent::Start,
         @Wordle::chars_key(&this, ['Q', 'W', 'E', 'R','T', 'Y', 'U', 'I','O', 'P'])
       }
       @Flex {
         x: AnchorX::center(),
         item_gap: 5.,
         align_items: Align::Center,
-        justify_content: JustifyContent::Compact,
+        justify_content: JustifyContent::Start,
         @Wordle::chars_key(&this, ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L' ])
       }
       @Flex {
         x: AnchorX::center(),
         item_gap: 5.,
         align_items: Align::Center,
-        justify_content: JustifyContent::Compact,
+        justify_content: JustifyContent::Start,
         @FilledButton {
           providers: [Provider::new(gray)],
           on_tap: move |_| $write(this).guessing.delete_back_char(),
@@ -96,14 +96,14 @@ impl Wordle {
         direction: Direction::Vertical,
         item_gap: 5.,
         align_items: Align::Center,
-        justify_content: JustifyContent::Compact,
+        justify_content: JustifyContent::Start,
         @ {
           (0..$read(this).max_rounds()).map(move |row| {
             @Flex {
               y: AnchorY::center(),
               item_gap: 5.,
               align_items: Align::Center,
-              justify_content: JustifyContent::Compact,
+              justify_content: JustifyContent::Start,
               @pipe! {
                 (0..$read(this).len_hint())
                   .map(move |col| fn_widget! { $read(this).char_grid(row, col) })
@@ -215,7 +215,7 @@ impl Compose for Wordle {
           x: AnchorX::center(),
           y: AnchorY::center(),
           align_items: Align::Center,
-          justify_content: JustifyContent::Compact,
+          justify_content: JustifyContent::Start,
           item_gap: 5.,
           @H1 { text: "Wordle" }
           @Divider { }

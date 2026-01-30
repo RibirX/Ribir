@@ -322,9 +322,9 @@ impl TabPos {
 impl TabsInlineIcon {
   fn align_header_widget(self) -> XMultiChild<'static> {
     if self.0 {
-      Row { align_items: Align::Center, justify_content: JustifyContent::Compact }.into()
+      Row { align_items: Align::Center, justify_content: JustifyContent::Start }.into()
     } else {
-      Column { align_items: Align::Center, justify_content: JustifyContent::Compact }.into()
+      Column { align_items: Align::Center, justify_content: JustifyContent::Start }.into()
     }
   }
 }
