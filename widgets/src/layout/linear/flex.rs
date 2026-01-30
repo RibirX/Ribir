@@ -203,7 +203,7 @@ impl FlexLayouter {
     let &mut Self { wrap, dir, .. } = self;
     let mut children = children.peekable();
     while let Some(c) = children.next() {
-      let gap = if children.peek().is_some() && !self.justify_content.is_space_layout() {
+      let gap = if children.peek().is_some() && !self.justify_content.is_spacing_distributed() {
         self.main_axis_gap
       } else {
         0.
@@ -257,7 +257,7 @@ impl FlexLayouter {
     let &mut Self { wrap, dir, .. } = self;
     let mut children = children.peekable();
     while let Some(c) = children.next() {
-      let gap = if children.peek().is_some() && !self.justify_content.is_space_layout() {
+      let gap = if children.peek().is_some() && !self.justify_content.is_spacing_distributed() {
         self.main_axis_gap
       } else {
         0.
@@ -364,7 +364,7 @@ impl FlexLayouter {
     self.for_each_line(|line| {
       let (mut main, mut step) =
         justify_content.item_offset_and_step(container - line.main, line.items_info.len());
-      if !justify_content.is_space_layout() {
+      if !justify_content.is_spacing_distributed() {
         step += main_axis_gap;
       }
 
@@ -699,11 +699,29 @@ mod tests {
 
   widget_layout_test!(
     start_main_align,
-    main_align(JustifyContent::Compact),
+    main_align(JustifyContent::Start),
     LayoutCase::new(&[0, 0]).with_size(Size::new(300., 20.)),
     LayoutCase::new(&[0, 0, 0]).with_x(0.),
     LayoutCase::new(&[0, 0, 1]).with_x(100.),
     LayoutCase::new(&[0, 0, 2]).with_x(200.)
+  );
+
+  widget_layout_test!(
+    center_main_align,
+    main_align(JustifyContent::Center),
+    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 20.)),
+    LayoutCase::new(&[0, 0, 0]).with_x(100.),
+    LayoutCase::new(&[0, 0, 1]).with_x(200.),
+    LayoutCase::new(&[0, 0, 2]).with_x(300.)
+  );
+
+  widget_layout_test!(
+    end_main_align,
+    main_align(JustifyContent::End),
+    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 20.)),
+    LayoutCase::new(&[0, 0, 0]).with_x(200.),
+    LayoutCase::new(&[0, 0, 1]).with_x(300.),
+    LayoutCase::new(&[0, 0, 2]).with_x(400.)
   );
 
   widget_layout_test!(

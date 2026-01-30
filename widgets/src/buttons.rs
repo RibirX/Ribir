@@ -303,7 +303,7 @@ impl<'c> ButtonChild<'c> {
           class: btn,
           x: AnchorX::center(),
           align_items: Align::Center,
-          justify_content: JustifyContent::Compact,
+          justify_content: JustifyContent::Start,
           @ { items }
         }
       }
