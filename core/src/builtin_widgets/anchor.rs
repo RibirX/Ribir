@@ -8,8 +8,9 @@ use crate::{prelude::*, wrap_render::WrapRender};
 
 /// A widget that positions its child.
 ///
-/// Use `x` and `y` to position the child. The value can be a fixed pixel value,
-/// a percentage of the parent size, or a calculated value.
+/// Use `x` and `y` to specify additional offsets for the child's position.
+/// The value can be a fixed pixel value, a percentage of the parent's maximum
+/// constraint (max size), or a calculated value.
 ///
 /// # Example, with fixed pixel value
 ///
@@ -47,22 +48,21 @@ impl Declare for Anchor {
 impl_compose_child_for_wrap_render!(Anchor);
 
 impl WrapRender for Anchor {
-  fn place_children(&self, size: Size, host: &dyn Render, ctx: &mut PlaceCtx) {
-    host.place_children(size, ctx);
-
+  fn adjust_position(&self, _host: &dyn Render, pos: Point, ctx: &mut PlaceCtx) -> Point {
     let clamp = ctx.clamp();
+    let size = ctx
+      .widget_box_size(ctx.widget_id())
+      .unwrap_or_default();
     let max_width = clamp.container_width(size.width);
     let max_height = clamp.container_height(size.height);
 
-    let pos = self.calculate(Size::new(max_width, max_height), size);
-    ctx.update_position(ctx.widget_id(), pos);
+    let anchor_pos = self.calculate(Size::new(max_width, max_height), size);
+
+    pos + anchor_pos.to_vector()
   }
 
   #[inline]
   fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Position }
-
-  #[inline]
-  fn self_positioned(&self, _host: &dyn Render) -> bool { true }
 }
 
 /// Type alias for the custom anchor function.
@@ -162,14 +162,16 @@ impl<T: 'static> ObjDeclarer for CustomAnchorDeclarer<T> {
 }
 
 impl<T: 'static> WrapRender for CustomAnchor<T> {
-  fn place_children(&self, size: Size, host: &dyn Render, ctx: &mut PlaceCtx) {
-    host.place_children(size, ctx);
+  fn adjust_position(&self, _host: &dyn Render, pos: Point, ctx: &mut PlaceCtx) -> Point {
     let id = ctx.widget_id();
     let clamp = ctx
       .tree()
       .store
       .layout_info(id)
       .map_or(BoxClamp::default(), |i| i.clamp);
+
+    let size = ctx.widget_box_size(id).unwrap_or_default();
+
     let anchor = (self.anchor)(&self.data, size, clamp, ctx);
 
     let parent_size = id
@@ -177,17 +179,12 @@ impl<T: 'static> WrapRender for CustomAnchor<T> {
       .and_then(|p| ctx.tree().store.layout_box_size(p))
       .unwrap_or(clamp.max);
 
-    let current_pos = ctx.position(id).unwrap_or_default();
-    let pos = anchor.calculate(parent_size, size);
-
-    ctx.update_position(id, pos + current_pos.to_vector());
+    let offset = anchor.calculate(parent_size, size);
+    pos + offset.to_vector()
   }
 
   #[inline]
   fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Position }
-
-  #[inline]
-  fn self_positioned(&self, _host: &dyn Render) -> bool { true }
 }
 
 impl<'c, T: 'static> ComposeChild<'c> for CustomAnchor<T> {

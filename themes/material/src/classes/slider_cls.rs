@@ -81,7 +81,6 @@ pub(super) fn init(classes: &mut Classes) {
   );
 
   named_style_impl! { base_tick => {
-    y: AnchorY::center(),
     radius: md::RADIUS_2,
     clamp: BoxClamp::fixed_size(md::SIZE_4),
   } }

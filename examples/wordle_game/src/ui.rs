@@ -51,21 +51,18 @@ impl Wordle {
       align_items: Align::Center,
       justify_content: JustifyContent::Start,
       @Flex {
-        x: AnchorX::center(),
         item_gap: 5.,
         align_items: Align::Center,
         justify_content: JustifyContent::Start,
         @Wordle::chars_key(&this, ['Q', 'W', 'E', 'R','T', 'Y', 'U', 'I','O', 'P'])
       }
       @Flex {
-        x: AnchorX::center(),
         item_gap: 5.,
         align_items: Align::Center,
         justify_content: JustifyContent::Start,
         @Wordle::chars_key(&this, ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L' ])
       }
       @Flex {
-        x: AnchorX::center(),
         item_gap: 5.,
         align_items: Align::Center,
         justify_content: JustifyContent::Start,

@@ -727,6 +727,14 @@ impl Render for ProvidersRender {
     providers.restore_providers(ctx.as_mut());
   }
 
+  fn adjust_position(&self, pos: Point, ctx: &mut PlaceCtx) -> Point {
+    let Self { render, providers } = self;
+    providers.setup_providers(ctx.as_mut());
+    let pos = render.adjust_position(pos, ctx);
+    providers.restore_providers(ctx.as_mut());
+    pos
+  }
+
   fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> { self.render.visual_box(ctx) }
 
   fn paint(&self, ctx: &mut PaintingCtx) {

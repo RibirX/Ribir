@@ -60,7 +60,12 @@ pub trait Render: 'static {
   ///
   /// Default implementation does nothing (children will be in the top-left of
   /// the widget).
-  fn place_children(&self, _size: Size, _ctx: &mut PlaceCtx) {}
+  fn place_children(&self, _size: Size, ctx: &mut PlaceCtx) {
+    let (ctx, children) = ctx.split_children();
+    for child in children {
+      ctx.update_position(child, Point::zero());
+    }
+  }
 
   /// Custom painting implementation
   ///
@@ -112,10 +117,13 @@ pub trait Render: 'static {
   /// Used for widgets with custom positioning or transformation effects.
   fn get_transform(&self) -> Option<Transform> { None }
 
-  /// Whether this widget implements its own position logic in `place_children`.
+  /// Adjust the position assigned by the parent's `place_children` method.
   ///
-  /// Return `true` if this widget modifies its own position (e.g., `Anchor`).
-  fn self_positioned(&self) -> bool { false }
+  /// Override this to apply custom position adjustments (e.g., anchor-based
+  /// positioning) after the parent has placed this widget. In most cases, the
+  /// position should be determined by the parent's layout logic, and you should
+  /// not modify it.
+  fn adjust_position(&self, pos: Point, _ctx: &mut PlaceCtx) -> Point { pos }
 }
 
 /// Result of a hit testing operation
