@@ -77,9 +77,11 @@ impl<'a> MeasureCtx<'a> {
         let info = self.tree.store.layout_info_or_default(id);
         info.size = Some(size);
 
-        let mut layout_ctx = PlaceCtx { id, tree: self.tree, provider_ctx: &mut self.provider_ctx };
-        id.assert_get(tree2)
-          .place_children(size, &mut layout_ctx);
+        {
+          let mut layout_ctx =
+            PlaceCtx { id, tree: self.tree, provider_ctx: &mut self.provider_ctx };
+          layout_ctx.perform_place(size);
+        }
 
         {
           VisualCtx::from_layout_ctx(self).update_visual_box();
@@ -97,10 +99,6 @@ impl<'a> MeasureCtx<'a> {
     self
       .get_calculated_size(child, clamp)
       .unwrap_or_else(|| {
-        // The position needs to be reset, as some parent render widgets may not have
-        // set the position.
-        self.tree.store.layout_info_or_default(child).pos = Point::zero();
-
         let id = std::mem::replace(&mut self.id, child);
         let size = self.perform_layout(clamp);
         self.id = id;
@@ -183,8 +181,58 @@ impl<'a> MeasureCtx<'a> {
 }
 
 impl<'a> PlaceCtx<'a> {
-  /// Adjust the position of the widget where it should be placed relative to
-  /// its parent.
+  /// Perform the complete placement flow for a widget:
+  /// 1. Reset all children positions to zero
+  /// 2. Call `Render::place_children` to let the parent place children
+  /// 3. Apply `adjust_position` to all children to finalize their positions
+  ///
+  /// This ensures that even if the parent doesn't explicitly call
+  /// `update_position` for some children, their `adjust_position` will still be
+  /// triggered.
+  pub(crate) fn perform_place(&mut self, size: Size) {
+    // Safety: The widget tree structure is immutable during the layout phase.
+    let tree2 = unsafe { &*(self.tree as *mut WidgetTree) };
+    let id = self.id;
+
+    // Step 1: Reset all children positions to zero before calling place_children
+    for child in id.children(tree2) {
+      self.tree.store.layout_info_or_default(child).pos = Point::zero();
+    }
+
+    // Step 2: Let the widget place its children
+    id.assert_get(tree2).place_children(size, self);
+
+    // Step 3: Apply adjust_position to all children
+    // We need to push parent's (id) providers back because they were restored
+    // after place_children completed. Child's adjust_position may need to
+    // access parent's providers.
+    let mut buffer = smallvec::SmallVec::new();
+    self
+      .provider_ctx
+      .push_providers_for(id, tree2, &mut buffer);
+
+    for child in id.children(tree2) {
+      // Temporarily set id to child for the adjust_position call
+      self.id = child;
+
+      // Safety: we need two mutable accesses to the tree - one through self for
+      // the PlaceCtx needed by adjust_position, and one for accessing store.
+      // These accesses are to different parts of the tree and don't overlap.
+      let store = unsafe { &mut (*(&mut *self.tree as *mut WidgetTree)).store };
+      let pos = store.layout_info_or_default(child).pos;
+      let pos = child.assert_get(tree2).adjust_position(pos, self);
+      store.layout_info_or_default(child).pos = pos;
+    }
+
+    // Pop parent's providers and restore original id
+    self.provider_ctx.pop_providers_for(id);
+    self.id = id;
+  }
+
+  /// Place the child at the given position.
+  ///
+  /// Note: The position will be further adjusted by `adjust_position` after
+  /// `place_children` completes.
   #[inline]
   pub fn update_position(&mut self, child: WidgetId, pos: Point) {
     self.tree.store.layout_info_or_default(child).pos = pos;

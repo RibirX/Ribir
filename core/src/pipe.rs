@@ -585,6 +585,10 @@ impl Render for PipeNode {
   fn get_transform(&self) -> Option<Transform> { self.as_ref().data.get_transform() }
 
   fn dirty_phase(&self) -> DirtyPhase { self.as_ref().data.dirty_phase() }
+
+  fn adjust_position(&self, pos: Point, ctx: &mut PlaceCtx) -> Point {
+    self.as_ref().data.adjust_position(pos, ctx)
+  }
 }
 
 #[derive(Clone)]

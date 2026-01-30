@@ -2,8 +2,7 @@ use std::{cell::RefCell, cmp::Reverse, collections::BTreeSet, mem::MaybeUninit};
 
 pub mod widget_id;
 use indextree::Arena;
-use widget_id::RenderQueryable;
-pub use widget_id::{TrackId, WidgetId};
+pub use widget_id::{RenderQueryable, TrackId, WidgetId};
 mod layout_info;
 pub use layout_info::*;
 
@@ -101,6 +100,7 @@ impl WidgetTree {
           continue;
         }
         if self.store.layout_box_size(wid).is_none() {
+          needs_position.push(wid);
           let clamp = self
             .store
             .layout_info(wid)
@@ -125,7 +125,8 @@ impl WidgetTree {
         if wid.is_dropped(self) {
           continue;
         }
-        self.update_position_only(wid, laid_out_queue);
+        laid_out_queue.push(wid);
+        self.update_position_only(wid);
       }
 
       while let Some(wid) = needs_paint.pop() {
@@ -151,30 +152,30 @@ impl WidgetTree {
 
   /// Update widget position only, without re-measuring.
   /// This is called for widgets marked with `DirtyPhase::Position`.
-  fn update_position_only(&mut self, wid: WidgetId, laid_out_queue: &mut Vec<WidgetId>) {
-    // 1. If widget has self_positioned, call its place_children
-    if wid.assert_get(self).self_positioned() {
-      self.call_place_children(wid, laid_out_queue);
-    }
-
-    // 2. Walk up ancestors and call place_children on each until one doesn't have
-    //    self_positioned
-    for ancestor in wid.ancestors(self).skip(1).collect::<Vec<_>>() {
-      self.call_place_children(ancestor, laid_out_queue);
-      if !ancestor.assert_get(self).self_positioned() {
-        break;
-      }
+  fn update_position_only(&mut self, wid: WidgetId) {
+    // The position of `wid` is determined by its parent.
+    // So to update `wid`'s position, we need to call `place_children` on its
+    // parent.
+    if let Some(parent) = wid.parent(self) {
+      self.call_place_children(parent);
+    } else {
+      // For root widget, just apply adjust_position
+      let tree2 = unsafe { &*(self as *mut WidgetTree) };
+      let mut provider_ctx = ProviderCtx::default();
+      let mut layout_ctx = PlaceCtx { id: wid, tree: self, provider_ctx: &mut provider_ctx };
+      let pos = wid
+        .assert_get(tree2)
+        .adjust_position(Point::zero(), &mut layout_ctx);
+      self.store.layout_info_or_default(wid).pos = pos;
     }
   }
 
   /// Helper to call place_children on a widget with proper context setup.
-  fn call_place_children(&mut self, wid: WidgetId, laid_out_queue: &mut Vec<WidgetId>) {
+  fn call_place_children(&mut self, wid: WidgetId) {
     let Some(size) = self.store.layout_box_size(wid) else {
       return;
     };
 
-    // Safety: same pattern as in perform_layout
-    let tree2 = unsafe { &*(self as *mut WidgetTree) };
     let mut provider_ctx = if let Some(p) = wid.parent(self) {
       ProviderCtx::collect_from(p, self)
     } else {
@@ -182,10 +183,7 @@ impl WidgetTree {
     };
 
     let mut layout_ctx = PlaceCtx { id: wid, tree: self, provider_ctx: &mut provider_ctx };
-    wid
-      .assert_get(tree2)
-      .place_children(size, &mut layout_ctx);
-    laid_out_queue.push(wid);
+    layout_ctx.perform_place(size);
   }
 
   pub(crate) fn alloc_node(&mut self, node: Box<dyn RenderQueryable>) -> WidgetId {

@@ -41,6 +41,10 @@ where
     self.proxy().place_children(size, ctx)
   }
 
+  fn adjust_position(&self, pos: Point, ctx: &mut PlaceCtx) -> Point {
+    self.proxy().adjust_position(pos, ctx)
+  }
+
   #[inline]
   fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> { self.proxy().visual_box(ctx) }
 

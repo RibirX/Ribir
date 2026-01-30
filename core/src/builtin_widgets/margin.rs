@@ -58,9 +58,8 @@ impl Render for Margin {
   fn place_children(&self, _size: Size, ctx: &mut PlaceCtx) {
     let Some(child) = ctx.single_child() else { return };
 
-    let pos = ctx.position(child).unwrap_or_default();
     // Reset child position before layout and add margin offset
-    ctx.update_position(child, pos + Size::new(self.margin.left, self.margin.top));
+    ctx.update_position(child, Point::new(self.margin.left, self.margin.top));
   }
 }
 
