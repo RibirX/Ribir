@@ -25,7 +25,7 @@ class_names! {
 /// # Example
 ///
 /// ```
-/// # use ribir_core::prelude::*;
+/// use ribir_core::prelude::*;
 /// # use ribir_widgets::prelude::*;
 ///
 /// let _radio = radio! { selected: true, value: 1, };
@@ -80,12 +80,9 @@ impl ComposeChild<'static> for Radio {
     fat_obj! {
       on_action: move |_| $write(this).selected = true,
       @ {
-        let select_state_cls = distinct_pipe!($read(this).radio_class_name());
-        let icon = @ClassChain {
-          class_chain: [select_state_cls.r_into(), RADIO.r_into()],
-          @Icon {
-            @Void { class: distinct_pipe!($read(this).radio_icon_class_name()) }
-          }
+        let icon = @Icon {
+          class: distinct_pipe!([$read(this).radio_class_name(), RADIO]),
+          @Void { class: distinct_pipe!($read(this).radio_icon_class_name()) }
         };
         icon_with_label(icon.into_widget(), child)
       }

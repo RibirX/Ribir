@@ -7,7 +7,7 @@ use crate::prelude::*;
 /// # Example
 ///
 /// ```
-/// # use ribir_core::prelude::*;
+/// use ribir_core::prelude::*;
 /// # use ribir_widgets::prelude::*;
 ///
 /// let _switch = switch! { checked: true };
@@ -81,18 +81,12 @@ impl ComposeChild<'static> for Switch {
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     fn_widget! {
-      let state_cls = distinct_pipe!($read(this).state_class_name());
-      let thumb_state_cls = distinct_pipe!($read(this).thumb_class_name());
-      let switch_widget = @ClassChain {
-        class_chain: [SWITCH.r_into(), state_cls.r_into()],
-        @Stack {
-          @ClassChain {
-            class_chain: [SWITCH_THUMB.r_into(), thumb_state_cls.r_into()],
-            @Void {
-              clamp: BoxClamp::fixed_size(Size::new(40., 20.)),
-            }
+      let switch_widget = @Stack {
+          class: distinct_pipe!([SWITCH, $read(this).state_class_name()]),
+          @Container {
+            size: Size::new(40., 20.),
+            class: distinct_pipe!([SWITCH_THUMB, $read(this).thumb_class_name()]),
           }
-        }
       };
 
       @FatObj {

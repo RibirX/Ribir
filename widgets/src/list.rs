@@ -346,16 +346,20 @@ impl ListItem {
   }
 
   /// Generates classes based on the item's state
-  fn item_classes(item: &impl StateWatcher<Value = Self>) -> ClassChain<3> {
-    ClassChain {
-      class_chain: [
-        distinct_pipe! {
-          if $read(item).is_selected() { LIST_ITEM_SELECTED } else { LIST_ITEM_UNSELECTED }
-        }
-        .r_into(),
-        distinct_pipe! { $read(item).is_interactive().then_some(LIST_ITEM_INTERACTIVE) }.r_into(),
-        LIST_ITEM.r_into(),
-      ],
+  fn item_classes(item: &impl StateWatcher<Value = Self>) -> Pipe<ClassList> {
+    distinct_pipe! {
+      let item = $read(item);
+      let mut classes = ClassList::new();
+      if item.is_selected() {
+        classes.push(LIST_ITEM_SELECTED);
+      } else {
+        classes.push(LIST_ITEM_UNSELECTED);
+      }
+      if item.is_interactive() {
+        classes.push(LIST_ITEM_INTERACTIVE);
+      }
+      classes.push(LIST_ITEM);
+      classes
     }
   }
 }
@@ -409,7 +413,10 @@ impl<'c> ComposeChild<'c> for ListItem {
 
     providers! {
       providers: [Provider::new(item_struct_info)],
-      @(item_classes) { @ { child.compose_sections() } }
+      @Class {
+        class: item_classes,
+        @{ child.compose_sections() }
+      }
     }
     .into_widget()
   }
@@ -419,17 +426,18 @@ impl<'c> ComposeChild<'c> for ListCustomItem {
   type Child = Widget<'c>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    let item_classes = ListItem::item_classes(&this.read().0);
-    item_classes
-      .with_child(unconstrained_box! {
+    class! {
+      class: ListItem::item_classes(&this.read().0),
+      @unconstrained_box! {
         clamp_dim: ClampDim::Max,
         dir: UnconstrainedDir::Y,
         @Row {
           align_items: ListItemAlignItems::get_align(BuildCtx::get()),
           @ { child }
         }
-      })
-      .into_widget()
+      }
+    }
+    .into_widget()
   }
 }
 

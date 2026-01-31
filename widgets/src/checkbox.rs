@@ -13,7 +13,7 @@ use crate::prelude::*;
 /// # Example
 ///
 /// ```
-/// # use ribir_core::prelude::*;
+/// use ribir_core::prelude::*;
 /// # use ribir_widgets::prelude::*;
 ///
 /// let _check = checkbox! { checked: true };
@@ -109,12 +109,9 @@ impl ComposeChild<'static> for Checkbox {
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     fn_widget! {
-      let icon = @ClassChain {
-        class_chain: [
-          distinct_pipe!($read(this).state_class_name()).r_into(),
-          CHECKBOX.r_into()
-        ],
-        @Icon { @Void { class: distinct_pipe!($read(this).icon_class_name())} }
+      let icon = @Icon {
+        class: distinct_pipe!([CHECKBOX, $read(this).state_class_name()]),
+        @Void { class: distinct_pipe!($read(this).icon_class_name())}
       };
       let icon_with_label = icon_with_label(icon.into_widget(), child);
       @FatObj {
