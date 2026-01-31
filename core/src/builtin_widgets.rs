@@ -606,9 +606,7 @@ impl<T> FatObj<T> {
   }
 
   /// Initializes the `Class` that should be applied to the widget.
-  pub fn with_class<K: ?Sized>(
-    &mut self, cls: impl RInto<PipeValue<Option<ClassName>>, K>,
-  ) -> &mut Self {
+  pub fn with_class<K: ?Sized>(&mut self, cls: impl RInto<PipeValue<ClassList>, K>) -> &mut Self {
     init_sub_widget!(self, class, class, cls)
   }
 
@@ -947,13 +945,13 @@ impl<T> FatObj<T> {
 
 impl<T> FatObj<T> {
   /// Creates and returns a state writer for managing the widget's CSS class
-  /// name.
+  /// chain.
   ///
   /// The returned writer allows:
-  /// - Modifying the class name dynamically
-  /// - Observing changes to the class name
+  /// - Modifying the class chain dynamically
+  /// - Observing changes to the class chain
   /// - Composing with other reactive operations
-  pub fn class(&mut self) -> impl StateWriter<Value = Option<ClassName>> {
+  pub fn class(&mut self) -> impl StateWriter<Value = ClassList> {
     let class = sub_widget!(self, class);
     part_writer!(&mut class.class)
   }

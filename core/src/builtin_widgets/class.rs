@@ -54,7 +54,7 @@ pub struct Classes {
 /// of the built-in widget fields.
 #[macro_export]
 macro_rules! style_class {
-($($field: ident: $value: expr),* $(,)?) => {
+  ($($field: ident: $value: expr),* $(,)?) => {
     (move |widget: $crate::prelude::Widget| {
       rdl! {
         @FatObj {
@@ -161,28 +161,6 @@ macro_rules! class_chain_impl {
   };
 }
 
-/// Applies multiple class names in order, closest to the child last.
-///
-/// Use `class_chain!` in DSL contexts, or `@ClassChain { ... }` in
-/// `rdl!`/`fn_widget!`.
-///
-/// # Example
-/// ```
-/// use ribir::prelude::*;
-///
-/// class_names!(RED_BORDER, BLUE_BG);
-///
-/// let _w = class_chain! {
-///   class_chain: [RED_BORDER.r_into(), BLUE_BG.r_into()],
-///   @Container { size: Size::new(100., 100.) }
-/// };
-/// ```
-#[declare[simple, stateless]]
-pub struct ClassChain<const N: usize> {
-  #[declare(strict)]
-  pub class_chain: [PipeValue<Option<ClassName>>; N],
-}
-
 /// A empty class implementation that returns the input widget as is.
 pub fn empty_cls(w: Widget) -> Widget { w }
 
@@ -213,10 +191,57 @@ pub struct ClassName(&'static str);
 // previous version's binary. See `[`ClassName::type_info`]`.
 pub type ClassImpl = fn(Widget) -> Widget;
 
+#[derive(Default, Clone, PartialEq, Debug)]
+pub struct ClassList {
+  classes: SmallVec<[ClassName; 1]>,
+}
+
+impl ClassList {
+  #[inline]
+  pub fn new() -> Self { Self::default() }
+
+  #[inline]
+  pub fn push(&mut self, class: ClassName) { self.classes.push(class); }
+
+  #[inline]
+  pub fn pop(&mut self) -> Option<ClassName> { self.classes.pop() }
+
+  #[inline]
+  pub fn len(&self) -> usize { self.classes.len() }
+
+  #[inline]
+  pub fn is_empty(&self) -> bool { self.classes.is_empty() }
+
+  #[inline]
+  pub fn iter(&self) -> std::slice::Iter<'_, ClassName> { self.classes.iter() }
+}
+
+impl IntoIterator for ClassList {
+  type Item = ClassName;
+  type IntoIter = smallvec::IntoIter<[ClassName; 1]>;
+
+  #[inline]
+  fn into_iter(self) -> Self::IntoIter { self.classes.into_iter() }
+}
+
+impl<'a> IntoIterator for &'a ClassList {
+  type Item = &'a ClassName;
+  type IntoIter = std::slice::Iter<'a, ClassName>;
+
+  #[inline]
+  fn into_iter(self) -> Self::IntoIter { self.classes.iter() }
+}
+
+impl FromIterator<ClassName> for ClassList {
+  fn from_iter<T: IntoIterator<Item = ClassName>>(iter: T) -> Self {
+    Self { classes: iter.into_iter().collect() }
+  }
+}
+
 /// This widget is used to apply class to its child widget by the `ClassName`.
 #[derive(Default, Clone, PartialEq)]
 pub struct Class {
-  pub class: Option<ClassName>,
+  pub class: ClassList,
 }
 
 /// This macro is used to generate a function widget using `Class` as the root
@@ -238,7 +263,6 @@ macro_rules! class_names {
       $(#[$outer])?
       pub const $name: ClassName = ClassName::new(stringify!($name));
     )*
-
   };
 }
 
@@ -329,67 +353,77 @@ impl<'c> ComposeChild<'c> for Class {
   type Child = Widget<'c>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    let f = move || match this.try_into_value() {
-      Ok(c) => c.apply_style(child),
-      Err(this) => {
-        let ctx = BuildCtx::get();
-        let this2 = this.clone_watcher();
-        let dummy = GenRange::Single(ctx.tree().dummy_id());
-        let cls_child = ClassNode::empty_node(dummy.clone());
-        let orig_child = ClassNode::empty_node(dummy);
-        let orig_child2 = orig_child.clone();
-        let child = child.on_build(move |orig_id| orig_child2.init_for_single(orig_id));
+    let f = move || {
+      match this.try_into_value() {
+        Ok(c) => compose_with_classes(c.class, child),
+        Err(writer) => {
+          // Dynamic case: the whole Class is stateful
 
-        let cls_child2 = cls_child.clone();
-        let orig_child2 = orig_child.clone();
-        let wnd_id = ctx.window().id();
-        let sampler = ctx
-          .window()
-          .frame_tick_stream()
-          .filter(|msg| matches!(msg, FrameMsg::NewFrame(_)));
+          let ctx = BuildCtx::get();
+          let dummy = GenRange::Single(ctx.tree().dummy_id());
+          let cls_child = ClassNode::empty_node(dummy.clone());
+          let orig_child = ClassNode::empty_node(dummy);
+          let orig_child2 = orig_child.clone();
+          let child = child.on_build(move |orig_id| orig_child2.init_for_single(orig_id));
 
-        let u = this2
-          .raw_modifies()
-          .filter(|s| s.contains(ModifyEffect::FRAMEWORK))
-          .merge(Local::of(ModifyInfo::default()))
-          .map(move |_| this2.read().clone())
-          .distinct_until_changed()
-          .skip(1)
-          .sample(sampler)
-          .subscribe(move |class| class_update(&cls_child2, &orig_child2, &class, wnd_id))
-          .unsubscribe_when_dropped();
+          let cls_child2 = cls_child.clone();
+          let orig_child2 = orig_child.clone();
+          let wnd_id = ctx.window().id();
+          let sampler = ctx
+            .window()
+            .frame_tick_stream()
+            .filter(|msg| matches!(msg, FrameMsg::NewFrame(_)));
 
-        this
-          .read()
-          .apply_style(child)
-          .on_build(move |child_id| cls_child.init_for_single(child_id))
-          .attach_anonymous_data(u)
+          let u = pipe!($read(writer).class.clone())
+            .with_effect(ModifyEffect::FRAMEWORK)
+            .into_observable()
+            .distinct_until_changed()
+            .skip(1)
+            .sample(sampler)
+            .subscribe(move |new_classes| {
+              classes_update(&cls_child2, &orig_child2, new_classes, wnd_id);
+            })
+            .unsubscribe_when_dropped();
+
+          compose_with_classes(writer.read().class.clone(), child)
+            .on_build(move |child_id| cls_child.init_for_single(child_id))
+            .attach_anonymous_data(u)
+        }
       }
     };
     FnWidget::new(f).into_widget()
   }
 }
 
-impl<'w, const M: usize> ComposeChild<'w> for ClassChain<M> {
-  type Child = Widget<'w>;
-
-  fn compose_child(this: impl StateWriter<Value = Self>, mut widget: Self::Child) -> Widget<'w> {
-    let class_chain = this
-      .try_into_value()
-      .unwrap_or_else(|_| panic!("ClassChain only supports stateless."));
-
-    for cls in class_chain.class_chain.into_iter().rev() {
-      widget = match cls {
-        PipeValue::Value(class) => Class { class }.with_child(widget).into_widget(),
-        cls @ PipeValue::Pipe { .. } => {
-          let mut widget = FatObj::new(widget);
-          widget.with_class(cls);
-          widget.into_widget()
-        }
-      };
-    }
-    widget
+/// Compose a widget with multiple classes, chaining them in reverse order.
+fn compose_with_classes(classes: ClassList, child: Widget) -> Widget {
+  let mut widget = child;
+  for cls in classes.classes.into_iter().rev() {
+    widget = apply_class(Some(cls), widget);
   }
+  widget
+}
+
+fn apply_class(class: Option<ClassName>, w: Widget) -> Widget {
+  if let Some(cls_impl) = class_impl(class) { cls_impl(w) } else { w }
+}
+
+fn class_impl(class: Option<ClassName>) -> Option<ClassImpl> {
+  let cls = class?;
+  let ctx = BuildCtx::get();
+  let override_cls = ctx
+    .as_ref()
+    .get_raw_provider(&cls.type_info())
+    .and_then(|q| q.query(&QueryId::of::<ClassImpl>()))
+    .and_then(QueryHandle::into_ref::<ClassImpl>)
+    .map(|i| *i);
+
+  override_cls.or_else(|| {
+    Provider::of::<Classes>(ctx)?
+      .store
+      .get(&cls)
+      .copied()
+  })
 }
 
 impl Class {
@@ -420,33 +454,12 @@ impl Class {
     let setup = Setup::custom(name.type_info(), Box::new(Queryable(cls_impl)));
     Provider::Setup(Box::new(setup))
   }
-
-  fn apply_style<'a>(&self, w: Widget<'a>) -> Widget<'a> {
-    if let Some(cls_impl) = self.class_impl() { cls_impl(w) } else { w }
-  }
-
-  fn class_impl(&self) -> Option<ClassImpl> {
-    let cls = self.class?;
-    let ctx = BuildCtx::get();
-    let override_cls = ctx
-      .as_ref()
-      .get_raw_provider(&cls.type_info())
-      .and_then(|q| q.query(&QueryId::of::<ClassImpl>()))
-      .and_then(QueryHandle::into_ref::<ClassImpl>)
-      .map(|i| *i);
-
-    override_cls.or_else(|| {
-      Provider::of::<Classes>(ctx)?
-        .store
-        .get(&cls)
-        .copied()
-    })
-  }
 }
 
 type ClassNode = PipeNode;
 
-fn class_update(node: &ClassNode, orig: &ClassNode, class: &Class, wnd_id: WindowId) {
+/// Update the class chain when the whole Class is changed.
+fn classes_update(node: &ClassNode, orig: &ClassNode, classes: ClassList, wnd_id: WindowId) {
   let wnd =
     AppCtx::get_window(wnd_id).expect("This handle is not valid because the window is closed");
 
@@ -458,25 +471,19 @@ fn class_update(node: &ClassNode, orig: &ClassNode, class: &Class, wnd_id: Windo
 
   let child_holder = child_id.place_holder(wnd.tree_mut());
 
-  // Extract the child from this node, retaining only the external information
-  // linked from the parent to create a clean context for applying the class.
   let old_child_node = node.take_data();
   let _guard = BuildCtx::init_for(child_id, wnd.tree);
   let ctx = BuildCtx::get_mut();
 
-  // Place the inner child node within the old ID for disposal, then utilize the
-  // class node to wrap the new child in the new ID.
   let class_node =
     std::mem::replace(child_id.get_node_mut(ctx.tree_mut()).unwrap(), old_child_node);
 
-  // Revert the original node to its original state to apply the class.
   *orig_id.get_node_mut(ctx.tree_mut()).unwrap() = Box::new(orig.clone());
-  let new_id = ctx.build(class.apply_style(Widget::from_id(orig_id)));
+  let new_id = ctx.build(compose_with_classes(classes, Widget::from_id(orig_id)));
 
   let tree = ctx.tree_mut();
 
   if child_id != new_id {
-    // update the DynamicWidgetId out of the class node when id changed.
     class_node.update_track_id(new_id);
   }
 
@@ -486,9 +493,6 @@ fn class_update(node: &ClassNode, orig: &ClassNode, class: &Class, wnd_id: Windo
   });
 
   if new_id != child_id {
-    // If a pipe widget generates a widget with a class, we place the pipe node
-    // outside of the class node. However, since its widget ID is altered, we must
-    // notify the pipe node accordingly.
     new_id
       .query_all_iter::<PipeNode>(tree)
       .for_each(|node| node.dyn_info_mut().replace(child_id, new_id));
@@ -514,6 +518,23 @@ fn class_update(node: &ClassNode, orig: &ClassNode, class: &Class, wnd_id: Windo
   if new_id != orig_id && new_id.ancestor_of(orig_id, tree) {
     marker.mark(orig_id, DirtyPhase::Layout);
   }
+}
+
+impl From<ClassName> for ClassList {
+  #[inline]
+  fn from(v: ClassName) -> Self { ClassList { classes: smallvec![v] } }
+}
+
+impl From<Option<ClassName>> for ClassList {
+  #[inline]
+  fn from(v: Option<ClassName>) -> Self {
+    if let Some(v) = v { ClassList { classes: smallvec![v] } } else { ClassList::default() }
+  }
+}
+
+impl<const N: usize> From<[ClassName; N]> for ClassList {
+  #[inline]
+  fn from(v: [ClassName; N]) -> Self { ClassList::from_iter(v) }
 }
 
 #[cfg(test)]
@@ -626,11 +647,9 @@ mod tests {
     let wnd = TestWindow::from_widget(fn_widget! {
       @Providers {
         providers: smallvec![initd_classes().into_provider()],
-        @ClassChain {
-          class_chain: [ MARGIN.r_into(), CLAMP_50.r_into()],
-          @Container {
-            size: Size::new(100., 100.),
-          }
+        @Container {
+          size: Size::new(100., 100.),
+          class: [MARGIN, CLAMP_50],
         }
       }
     });
