@@ -57,7 +57,7 @@ impl Compose for Recursive {
 }
 
 fn bench_widget_inflate(b: &mut Bencher, w: impl Compose + Clone + 'static) {
-  let wnd = TestWindow::from_widget(fn_widget!(Void));
+  let wnd = TestWindow::from_widget(fn_widget!(Void::default()));
   b.iter(|| {
     let w = w.clone();
     wnd.0.init(fn_widget! { w.clone() }.r_into());

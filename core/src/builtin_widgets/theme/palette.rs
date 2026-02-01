@@ -20,7 +20,7 @@ use super::*;
 ///   @ {
 ///     // Every widget created in this scope can access the `Palette`.
 ///     let _primary = Palette::of(BuildCtx::get()).primary();
-///     Void
+///     Void::default()
 ///   }
 /// };
 /// ````

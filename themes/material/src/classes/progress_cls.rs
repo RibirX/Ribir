@@ -112,14 +112,14 @@ pub(super) fn init(classes: &mut Classes) {
         class: LINEAR_PROGRESS,
         align_items: Align::Stretch,
         @(indicator1) { @md_base_linear_indicator(host) }
-        @(track1) { @linear_base_track(Void.into_widget()) }
+        @(track1) { @linear_base_track(Void::default().into_widget()) }
         @(indicator2) {
           @Margin {
             margin: EdgeInsets::only_left(4.),
-            @md_base_linear_indicator(Void.into_widget())
+            @md_base_linear_indicator(Void::default().into_widget())
           }
         }
-        @(track2) { @linear_base_track(Void.into_widget()) }
+        @(track2) { @linear_base_track(Void::default().into_widget()) }
       }
     }
     .into_widget()

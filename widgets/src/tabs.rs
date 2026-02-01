@@ -277,7 +277,7 @@ impl<'w> Tab<'w> {
       class: TAB_PANE,
       @ {
         pane.as_ref()
-          .map_or_else(|| Void.into_widget(), GenWidget::gen_widget)
+          .map_or_else(|| Void::default().into_widget(), GenWidget::gen_widget)
       }
     })
   }

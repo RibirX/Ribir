@@ -249,7 +249,7 @@ mod tests {
               providers: [Provider::new(palette)],
               @ {
                 $write(writer).push(Palette::of(BuildCtx::get()).brightness);
-                Void
+                Void::default()
               }
             }
           }

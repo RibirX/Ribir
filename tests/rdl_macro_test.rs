@@ -39,7 +39,7 @@ widget_layout_test!(
   rdl_with_child,
   WidgetTester::new(fn_widget! {
     let single_p = rdl!{ Container { size: Size::new(500., 500.) }};
-    rdl!{ (single_p) { rdl!{ Void } } }
+    rdl!{ (single_p) { rdl!{ Void::default() } } }
   }),
   LayoutCase::default().with_size(Size::new(500., 500.))
 );
@@ -51,7 +51,7 @@ widget_layout_test!(
       size: Size::new(500., 500.),
       margin: EdgeInsets::all(10.)
     }};
-    rdl!{ (single_p) { rdl!{ Void } } }
+    rdl!{ (single_p) { rdl!{ Void::default() } } }
   }),
   LayoutCase::default().with_size(Size::new(520., 520.))
 );
@@ -62,7 +62,7 @@ widget_layout_test!(
     let multi_p = rdl!{ Flex {
       margin: EdgeInsets::all(10.)
     } };
-    rdl!{ (multi_p) { rdl!{ Void } } }
+    rdl!{ (multi_p) { rdl!{ Void::default() } } }
   }),
   LayoutCase::default().with_size(Size::new(20., 20.))
 );
@@ -115,7 +115,7 @@ widget_layout_test!(
   dollar_as_rdl_parent,
   WidgetTester::new(fn_widget! {
     let b = rdl!{Container { size: Size::new(500.,500.) }};
-    rdl!{ (b) { rdl!{ Void {}} } }
+    rdl!{ (b) { rdl!{ Void {} } } }
   }),
   LayoutCase::default().with_size(Size::new(500., 500.))
 );
@@ -532,13 +532,13 @@ fn widget_wrap_bind_work() {
 
 #[test]
 fn expression_parent() {
-  fn parent() -> FatObj<Container> { FatObj::new(Container {}) }
+  fn parent() -> FatObj<Container> { FatObj::new(Container::default()) }
 
   let _x = fn_widget! {
     @(parent()) {
       size: Size::new(50., 50.),
       background: Color::RED,
-      @ { Void }
+      @ { Void::default() }
     }
   };
 }

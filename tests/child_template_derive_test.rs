@@ -20,7 +20,7 @@ impl ComposeChild<'static> for P {
   type Child = ChildTemplateOfP;
 
   fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'static> {
-    Void.into_widget()
+    Void::default().into_widget()
   }
 }
 
@@ -35,7 +35,7 @@ impl ComposeChild<'static> for P2 {
   type Child = TupleStructTemplate;
 
   fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'static> {
-    Void.into_widget()
+    Void::default().into_widget()
   }
 }
 
@@ -53,7 +53,7 @@ impl ComposeChild<'static> for P3 {
   type Child = EnumTml;
 
   fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'static> {
-    Void.into_widget()
+    Void::default().into_widget()
   }
 }
 
