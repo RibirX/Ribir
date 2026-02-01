@@ -288,7 +288,11 @@ pub struct PairOf<'c, W: ComposeChild<'c>>(
 );
 
 impl<'w> OptionWidget<'w> {
-  pub fn unwrap_or_void(self) -> Widget<'w> { self.0.unwrap_or_else(|| Void.into_widget()) }
+  pub fn unwrap_or_void(self) -> Widget<'w> {
+    self
+      .0
+      .unwrap_or_else(|| Void::default().into_widget())
+  }
 }
 
 impl<W, C> Pair<W, C> {
@@ -476,7 +480,7 @@ mod tests {
       type Child = PageTml<'c>;
 
       fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'c> {
-        Void.into_widget()
+        Void::default().into_widget()
       }
     }
 
@@ -502,13 +506,13 @@ mod tests {
       type Child = Option<Pair<Child, Widget<'c>>>;
 
       fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'c> {
-        Void.into_widget()
+        Void::default().into_widget()
       }
     }
 
     let _ = fn_widget! {
       @Parent {
-        @ { Pair::new(Child, Void) }
+        @ { Pair::new(Child, Void::default()) }
       }
     };
   }
@@ -519,7 +523,7 @@ mod tests {
 
     let _ = fn_widget! {
       let p = Some(MockBox { size: Size::zero() });
-      @(p) { @ { Void } }
+      @(p) { @ { Void::default() } }
     };
   }
 
@@ -537,7 +541,7 @@ mod tests {
       type Child = Vec<B>;
 
       fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'static> {
-        Void.into_widget()
+        Void::default().into_widget()
       }
     }
     let a = A;
@@ -587,7 +591,7 @@ mod tests {
       let p = pipe!(($read(size).area() > 0.).then(|| {
         fn_widget! { @MockBox { size: Size::zero() }}
       }));
-      @(p) { @ { Void }}
+      @(p) { @ { Void::default() }}
     };
   }
 
@@ -618,7 +622,7 @@ mod tests {
     }
 
     let _ = |_: &BuildCtx| -> Widget {
-      let child = MockBox { size: ZERO_SIZE }.with_child(Void);
+      let child = MockBox { size: ZERO_SIZE }.with_child(Void::default());
       X.with_child(child).into_widget()
     };
   }

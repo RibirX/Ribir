@@ -207,7 +207,7 @@ impl Provider {
   ///   providers: [Provider::new(1i32)],
   ///   @ {
   ///     assert_eq!(*Provider::of::<i32>(BuildCtx::get()).unwrap(), 1);
-  ///     Void
+  ///     Void::default()
   ///   }
   /// };
   /// ```
@@ -241,7 +241,7 @@ impl Provider {
   ///     // Access boxed reader
   ///     let boxed_reader = Provider::reader_of::<i32>(ctx);
   ///     assert_eq!(*boxed_reader.unwrap().read(), 1);
-  ///     Void
+  ///     Void::default()
   ///   }
   /// };
   /// ```
@@ -277,7 +277,7 @@ impl Provider {
   ///     // Access boxed watcher
   ///     let boxed_watcher = Provider::watcher_of::<i32>(ctx);
   ///     assert_eq!(*boxed_watcher.unwrap().read(), 1);
-  ///     Void
+  ///     Void::default()
   ///   }
   /// };
   /// ```
@@ -325,7 +325,7 @@ impl Provider {
   ///     // Access boxed writer
   ///     let boxed_writer = Provider::writer_of::<i32>(ctx);
   ///     *boxed_writer.unwrap().write() = 3;
-  ///     Void
+  ///     Void::default()
   ///   }
   /// };
   /// ```
@@ -880,7 +880,7 @@ mod tests {
           @MockMulti {
             @fn_widget!{
               assert_eq!(BuildCtx::color().snapshot(), Color::RED);
-              Void
+              Void::default()
             }
           }
         }
@@ -888,7 +888,7 @@ mod tests {
       @ {
         let color = BuildCtx::color();
         assert_eq!(color.snapshot(), Palette::of(BuildCtx::get()).primary());
-        Void
+        Void::default()
       }
     });
     wnd.draw_frame();
@@ -907,7 +907,7 @@ mod tests {
           assert_eq!(container_color.snapshot(), Color::GREEN);
           let color = BuildCtx::color();
           assert_eq!(color.snapshot(), Color::RED);
-          Void
+          Void::default()
         }
       }
     });
@@ -925,7 +925,7 @@ mod tests {
       @{
         let v = Provider::of::<i32>(BuildCtx::get()).unwrap();
         *w_value.write() = *v;
-        Void
+        Void::default()
       }
     });
     wnd.draw_frame();
@@ -944,7 +944,7 @@ mod tests {
         @ {
           let v = Provider::of::<i32>(BuildCtx::get()).unwrap();
           *$write(w_value) = *v;
-          Void
+          Void::default()
         }
       }
     };
@@ -967,7 +967,7 @@ mod tests {
         @ {
           let v = Provider::of::<i32>(BuildCtx::get()).unwrap();
           *$write(w_value1) = *v;
-          Void
+          Void::default()
         }
       }
 
@@ -976,7 +976,7 @@ mod tests {
         @ {
           let v = Provider::of::<i32>(BuildCtx::get()).unwrap();
           *$write(w_value2) = *v;
-          Void
+          Void::default()
         }
       }
     };
@@ -1084,7 +1084,7 @@ mod tests {
 
           let v = Provider::state_of::<Box<dyn StateReader<Value = i32>>>(BuildCtx::get()).unwrap();
           assert_eq!(*v.read(), 1);
-          Void
+          Void::default()
         }
       }
     };
@@ -1111,7 +1111,7 @@ mod tests {
             )
             .unwrap();
           assert_eq!(*v.read(), 1);
-          Void
+          Void::default()
         }
       }
     };
@@ -1138,7 +1138,7 @@ mod tests {
             )
             .unwrap();
           assert_eq!(*v.read(), 1);
-          Void
+          Void::default()
         }
       }
     };

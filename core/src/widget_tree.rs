@@ -333,8 +333,8 @@ impl WidgetTree {
 impl WidgetTree {
   pub fn new(wnd_id: WindowId) -> Self {
     let mut arena = TreeArena::new();
-    let root = new_node(&mut arena, Box::new(PureRender(Void)));
-    let dummy_id = new_node(&mut arena, Box::new(PureRender(Void)));
+    let root = new_node(&mut arena, Box::new(PureRender(Void::default())));
+    let dummy_id = new_node(&mut arena, Box::new(PureRender(Void::default())));
     dummy_id.0.remove(&mut arena);
 
     Self { root, dummy_id, wnd_id, arena, store: <_>::default(), dirty_set: <_>::default() }
@@ -342,7 +342,7 @@ impl WidgetTree {
 
   pub fn disposed(&mut self) {
     let root = self.root();
-    let dummy = new_node(&mut self.arena, Box::new(PureRender(Void)));
+    let dummy = new_node(&mut self.arena, Box::new(PureRender(Void::default())));
     root.insert_after(dummy, self);
 
     self.root = dummy;
@@ -400,7 +400,9 @@ mod tests {
     pub(crate) fn content_root(&self) -> WidgetId { self.root.first_child(self).unwrap() }
   }
 
-  fn empty_node(arena: &mut TreeArena) -> WidgetId { new_node(arena, Box::new(PureRender(Void))) }
+  fn empty_node(arena: &mut TreeArena) -> WidgetId {
+    new_node(arena, Box::new(PureRender(Void::default())))
+  }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
@@ -456,7 +458,7 @@ mod tests {
               @ { pipe!($read(child).then(|| fn_widget!{ @Void {}})) }
             }.into_widget()
           } else {
-            Void.into_widget()
+            Void::default().into_widget()
           }
         })
       }

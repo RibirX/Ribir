@@ -135,7 +135,7 @@ impl<V: 'static> Pipe<V> {
       .with_priority(priority);
 
     let tree_ptr = BuildCtx::get().tree_ptr();
-    Void.into_widget().on_build(move |w| {
+    Void::default().into_widget().on_build(move |w| {
       pipe_node.init_for_single(w);
 
       let c_pipe_node = pipe_node.clone();
@@ -180,7 +180,7 @@ impl<V: 'static> Pipe<V> {
 
     let tree_ptr = BuildCtx::get().tree_ptr();
     let pipe_node = node.clone();
-    let first = Void.into_widget().on_build(move |id| {
+    let first = Void::default().into_widget().on_build(move |id| {
       pipe_node.init(id, GenRange::Multi { first: id, last: id });
 
       let c_pipe_node = pipe_node.clone();
@@ -203,12 +203,12 @@ impl<V: 'static> Pipe<V> {
         }
 
         if new.is_empty() {
-          new.push(ctx.build(Void.into_widget()));
+          new.push(ctx.build(Void::default().into_widget()));
         }
         let n_first = new[0];
         let n_last = new[new.len() - 1];
 
-        let dummy = ctx.build(Void {}.into_widget());
+        let dummy = ctx.build(Void::default().into_widget());
         let tree = ctx.tree_mut();
 
         if n_first != first {
@@ -320,7 +320,7 @@ impl<V: 'static> Pipe<V> {
       .with_priority(priority);
 
     assert!(!children.is_empty());
-    let first_child = std::mem::replace(&mut children[0], Void.into_widget());
+    let first_child = std::mem::replace(&mut children[0], Void::default().into_widget());
     let first_child = first_child.on_build({
       let node = node.clone();
       move |leaf| {
@@ -442,7 +442,7 @@ impl DynWidgetsInfo {
 impl PipeNode {
   pub(crate) fn empty_node(gen_range: GenRange) -> Self {
     let dyn_info = DynWidgetsInfo::new(gen_range);
-    let inner = InnerPipeNode { data: Box::new(PureRender(Void)), dyn_info };
+    let inner = InnerPipeNode { data: Box::new(PureRender(Void::default())), dyn_info };
     Self(Rc::new(UnsafeCell::new(inner)))
   }
 
@@ -464,7 +464,7 @@ impl PipeNode {
   // Remove the old widget so that the new widget build logic cannot access it
   // anymore.
   pub(crate) fn take_data(&self) -> Box<dyn RenderQueryable> {
-    self.replace_data(Box::new(PureRender(Void)))
+    self.replace_data(Box::new(PureRender(Void::default())))
   }
 
   pub(crate) fn replace_data(&self, new: Box<dyn RenderQueryable>) -> Box<dyn RenderQueryable> {
@@ -505,7 +505,7 @@ impl PipeNode {
     // if the subscription is closed, we can cancel and unwrap the `PipeNode`
     // immediately.
     if u.is_closed() {
-      let v = std::mem::replace(&mut node.data, Box::new(PureRender(Void)));
+      let v = std::mem::replace(&mut node.data, Box::new(PureRender(Void::default())));
       *id.get_node_mut(tree).unwrap() = v;
     } else {
       id.attach_anonymous_data(u.unsubscribe_when_dropped(), tree)
@@ -1249,7 +1249,7 @@ mod tests {
       pipe!($read(parent);).map(move |_| fn_widget!{
         pipe!($read(child);).map(move |_| fn_widget!{
           *$write(hit_count) += 1;
-          Void
+          Void::default()
         })
       })
     };
@@ -1349,7 +1349,7 @@ mod tests {
 
           pipe!($read(m_watcher);).map(move |_| {
             [
-              Void.into_widget() ,
+              Void::default().into_widget() ,
               pipe!($read(son_watcher);).map(|_| fn_widget! {@Void{}}).into_widget(),
             ]
           })
@@ -1384,7 +1384,7 @@ mod tests {
         })
       };
       @(p) {
-        @{ Void }
+        @{ Void::default() }
       }
     };
 

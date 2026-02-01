@@ -191,10 +191,10 @@ mod tests {
 
       @Flex {
         clamp: BoxClamp::EXPAND_X,
-        @(expanded) { @ { Void } }
+        @(expanded) { @ { Void::default() } }
         @Expanded {
           flex: 1.,
-          @ { Void }
+          @ { Void::default() }
         }
         @Container { size: Size::new(100., 100.) }
       }

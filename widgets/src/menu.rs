@@ -664,7 +664,7 @@ mod tests {
       },
       @ MenuItem {
         @ { "Sub Item 1" }
-        @ { Void {} }
+        @ { Void::default() }
       }
     });
 

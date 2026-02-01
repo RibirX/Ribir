@@ -99,7 +99,7 @@ impl<T: EditText + 'static> BasicEditor<T> {
           @TextClamp {
             rows: Some(1.),
             class: TEXT_CARET,
-            @ { Void }
+            @ { Void::default() }
           }
         }
       }

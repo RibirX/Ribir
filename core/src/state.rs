@@ -543,7 +543,9 @@ mod tests {
   struct C;
 
   impl Compose for C {
-    fn compose(_: impl StateWriter<Value = Self>) -> Widget<'static> { Void.into_widget() }
+    fn compose(_: impl StateWriter<Value = Self>) -> Widget<'static> {
+      Void::default().into_widget()
+    }
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -577,7 +579,7 @@ mod tests {
   impl<'c> ComposeChild<'c> for CC {
     type Child = Option<Widget<'c>>;
     fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'c> {
-      Void.into_widget()
+      Void::default().into_widget()
     }
   }
 
@@ -588,7 +590,7 @@ mod tests {
 
     let _state_with_child = fn_widget! {
       let cc = Stateful::new(CC);
-      @(cc) { @{ Void } }
+      @(cc) { @{ Void::default() } }
     };
 
     let _state_without_child = fn_widget! {
@@ -597,7 +599,7 @@ mod tests {
 
     let _stateful_with_child = fn_widget! {
       let cc = Stateful::new(CC);
-      @(cc) { @{ Void } }
+      @(cc) { @{ Void::default() } }
     };
 
     let _stateful_without_child = fn_widget! {
@@ -606,7 +608,7 @@ mod tests {
 
     let _writer_with_child = fn_widget! {
       let cc = Stateful::new(CC).clone_writer();
-      @(cc) { @{ Void } }
+      @(cc) { @{ Void::default() } }
     };
 
     let _writer_without_child = fn_widget! {
@@ -616,7 +618,7 @@ mod tests {
     let _part_writer_with_child = fn_widget! {
       let w = Stateful::new((CC, 0))
         .part_writer(PartialId::any(), |v| PartMut::new(&mut v.0));
-      @(w) { @{ Void } }
+      @(w) { @{ Void::default() } }
     };
 
     let _part_writer_without_child = fn_widget! {
@@ -627,7 +629,7 @@ mod tests {
     let _part_writer_with_child = fn_widget! {
       let w = Stateful::new((CC, 0))
         .part_writer("".into(), |v| PartMut::new(&mut v.0));
-      @(w) { @{ Void } }
+      @(w) { @{ Void::default() } }
     };
 
     let _part_writer_without_child = fn_widget! {
@@ -642,24 +644,24 @@ mod tests {
     reset_test_env!();
 
     let _stateful_render_widget = fn_widget! {
-      Stateful::new(Void)
+      Stateful::new(Void::default())
     };
 
     let _writer_render_widget = fn_widget! {
-      Stateful::new(Void).clone_writer()
+      Stateful::new(Void::default()).clone_writer()
     };
 
     let _part_reader_render_widget = fn_widget! {
-      Stateful::new((Void, 0)).part_reader(|v| PartRef::new(&v.0))
+      Stateful::new((Void::default(), 0)).part_reader(|v| PartRef::new(&v.0))
     };
 
     let _part_writer_render_widget = fn_widget! {
-      Stateful::new((Void, 0))
+      Stateful::new((Void::default(), 0))
         .part_writer(PartialId::any(), |v| PartMut::new(&mut v.0))
     };
 
     let _part_writer_render_widget = fn_widget! {
-      Stateful::new((Void, 0))
+      Stateful::new((Void::default(), 0))
         .part_writer("".into(), |v| PartMut::new(&mut v.0))
     };
   }

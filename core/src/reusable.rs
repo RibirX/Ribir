@@ -244,12 +244,12 @@ impl ReusableRenderWrapper {
   }
 
   fn take(&self) -> Box<dyn RenderQueryable> {
-    unsafe { std::mem::replace(&mut *self.0.get(), Box::new(PureRender(Void))) }
+    unsafe { std::mem::replace(&mut *self.0.get(), Box::new(PureRender(Void::default()))) }
   }
 }
 
 impl Default for ReusableRenderWrapper {
-  fn default() -> Self { Self(Rc::new(UnsafeCell::new(Box::new(PureRender(Void))))) }
+  fn default() -> Self { Self(Rc::new(UnsafeCell::new(Box::new(PureRender(Void::default()))))) }
 }
 
 impl Drop for Reusable {
@@ -294,7 +294,7 @@ mod tests {
           if *$read(w_trigger) < 3 {
             f.gen_widget()
           } else {
-            Void {}.into_widget()
+            Void::default().into_widget()
           }
         }
       }

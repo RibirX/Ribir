@@ -212,7 +212,7 @@ mod tests {
                 @ {
                   fn_widget! {
                     *$write(build_w) += 1;
-                    Void {}.into_widget()
+                    Void::default().into_widget()
                   }
                 }
               }

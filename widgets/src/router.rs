@@ -156,7 +156,7 @@ impl Router {
       })
       .unwrap_or_else(|| {
         log::warn!("No route found for: {}", path);
-        Void.into_widget()
+        Void::default().into_widget()
       })
   }
 }

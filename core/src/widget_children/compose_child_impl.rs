@@ -211,6 +211,7 @@ mod tests {
 
   #[derive(Template)]
   enum PTml {
+    #[allow(unused)]
     Void(Void),
   }
 
@@ -219,7 +220,7 @@ mod tests {
   impl ComposeChild<'static> for P {
     type Child = PTml;
     fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'static> {
-      Void.into_widget()
+      Void::default().into_widget()
     }
   }
 
@@ -230,18 +231,20 @@ mod tests {
     type Child = Widget<'c>;
 
     fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'c> {
-      Void.into_widget()
+      Void::default().into_widget()
     }
   }
 
   #[test]
-  fn template_fill_template() { let _ = |_: &BuildCtx| P.with_child(Void).into_widget(); }
+  fn template_fill_template() {
+    let _ = |_: &BuildCtx| P.with_child(Void::default()).into_widget();
+  }
 
   #[test]
   fn pair_compose_child() {
     let _ = |_: &BuildCtx| -> Widget {
       MockBox { size: ZERO_SIZE }
-        .with_child(XX.with_child(Void {}))
+        .with_child(XX.with_child(Void::default()))
         .into_widget()
     };
   }
@@ -253,7 +256,7 @@ mod tests {
     type Child = PipeValue<usize>;
 
     fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'static> {
-      Void.into_widget()
+      Void::default().into_widget()
     }
   }
 
@@ -293,7 +296,7 @@ mod tests {
       let v = Stateful::new(true);
       let w = EnumTml::Widget(fn_widget! { @Void {} }.into_widget());
       @EnumTest {
-        @ Void {}
+        @Void {}
         @ { "test" }
         @ { pipe!(*$read(v)).map(|_| fn_widget! { @Void {} }) }
         @ MockStack { @Void {} }
@@ -341,9 +344,9 @@ mod tests {
     let _ = move || {
       let builder = BuilderX;
       let builder = builder.with_child("Hello");
-      let _builder = builder.with_child(Void);
+      let _builder = builder.with_child(Void::default());
       let _builder: BuilderX = "hello".r_into();
-      let _builder: BuilderX = Void.r_into();
+      let _builder: BuilderX = Void::default().r_into();
     };
   }
 }
