@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use ribir_core::prelude::*;
+use ribir_core::prelude::{anchor::Anchor, *};
 
 use super::{
   CaretPosition,

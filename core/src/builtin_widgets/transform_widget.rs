@@ -57,6 +57,22 @@ impl WrapRender for TransformWidget {
 
   #[inline]
   fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
+
+  #[cfg(feature = "debug")]
+  fn debug_type(&self) -> Option<&'static str> { Some("transform") }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> Option<serde_json::Value> {
+    let t = self.transform;
+    Some(serde_json::json!({
+      "m11": t.m11,
+      "m12": t.m12,
+      "m21": t.m21,
+      "m22": t.m22,
+      "m31": t.m31,
+      "m32": t.m32
+    }))
+  }
 }
 
 impl TransformWidget {

@@ -599,6 +599,9 @@ impl Texture for WgpuTexture {
     let slice = buffer.slice(..);
     slice.map_async(wgpu::MapMode::Read, move |v| sender.send(v).unwrap());
 
+    // Capture texture format for color conversion logic
+    let texture_format = self.format();
+
     async move {
       let _ = receiver.await?;
 
@@ -609,8 +612,9 @@ impl Texture for WgpuTexture {
       (0..height as usize).for_each(|r| {
         let padded_start = r * padded_row_bytes as usize;
         let row_start = r * row_bytes;
-        data[row_start..row_start + row_bytes]
-          .copy_from_slice(&slice[padded_start..padded_start + row_bytes]);
+        let src = &slice[padded_start..padded_start + row_bytes];
+        let dst = &mut data[row_start..row_start + row_bytes];
+        copy_row_data(src, dst, texture_format);
       });
 
       Ok(PixelImage::new(data.into(), width as u32, height as u32, format))
@@ -620,7 +624,7 @@ impl Texture for WgpuTexture {
   fn color_format(&self) -> ColorFormat {
     match self.format() {
       wgpu::TextureFormat::R8Unorm => ColorFormat::Alpha8,
-      wgpu::TextureFormat::Rgba8Unorm => ColorFormat::Rgba8,
+      wgpu::TextureFormat::Rgba8Unorm | wgpu::TextureFormat::Bgra8Unorm => ColorFormat::Rgba8,
       _ => panic!("not a valid texture as image"),
     }
   }
@@ -629,6 +633,19 @@ impl Texture for WgpuTexture {
 
   fn clear_areas(&mut self, areas: &[DeviceRect], backend: &mut Self::Host) {
     backend.clear_tex_areas(areas, self);
+  }
+}
+
+fn copy_row_data(src: &[u8], dst: &mut [u8], format: wgpu::TextureFormat) {
+  if format == wgpu::TextureFormat::Bgra8Unorm {
+    for (s, d) in src.chunks_exact(4).zip(dst.chunks_exact_mut(4)) {
+      d[0] = s[2];
+      d[1] = s[1];
+      d[2] = s[0];
+      d[3] = s[3];
+    }
+  } else {
+    dst.copy_from_slice(src);
   }
 }
 

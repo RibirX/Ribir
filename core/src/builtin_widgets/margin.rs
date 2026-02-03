@@ -61,6 +61,9 @@ impl Render for Margin {
     // Reset child position before layout and add margin offset
     ctx.update_position(child, Point::new(self.margin.left, self.margin.top));
   }
+
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> { std::borrow::Cow::Borrowed("margin") }
 }
 
 impl Margin {

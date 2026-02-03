@@ -1,5 +1,5 @@
 [workspace]
-exclude = ["examples/attachments"]
+exclude = ["examples/attachments", "tools/mcp-adapter"]
 members = [
   "core",
   "gpu",
@@ -82,7 +82,7 @@ guillotiere = "0.6.0"
 image = { version = "0.25.6", default-features = false, features = ["rayon"] }
 image-webp = "0.2"
 webp-animation = "0.9"
-indextree = "4.7.3"
+indextree = { version = "4.7.3", features = ["deser"] }
 log = "0.4.27"
 lyon_algorithms = "1.0.5"
 lyon_geom = "1.0.6"
@@ -118,6 +118,12 @@ zerocopy = "0.7.3"
 quick-xml = "0.38.4"
 macos-accessibility-client = { version = "0.0.1" }
 tokio = { version = "1.0" }
+
+# Logging / telemetry (used by debug server)
+tracing = "0.1.41"
+tracing-log = "0.2.0"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter", "fmt", "registry"] }
+tokio-stream = { version = "0.1.17", features = ["sync", "time"] }
 
 priority-queue = "2.1.1"
 web-sys = { version = "0.3.69", features = ["HtmlCollection"] }

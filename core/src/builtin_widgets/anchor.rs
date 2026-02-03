@@ -63,6 +63,16 @@ impl WrapRender for Anchor {
 
   #[inline]
   fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Position }
+
+  #[cfg(feature = "debug")]
+  fn debug_type(&self) -> Option<&'static str> { Some("anchor") }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> Option<serde_json::Value> {
+    let x = format!("{:?}", self.x);
+    let y = format!("{:?}", self.y);
+    Some(serde_json::json!({ "x": x, "y": y }))
+  }
 }
 
 /// Type alias for the custom anchor function.

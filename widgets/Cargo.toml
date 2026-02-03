@@ -31,3 +31,7 @@ ribir_dev_helper = {path = "../dev-helper"}
 ribir_material = {path = "../themes/material"}
 ribir_slim = {path = "../themes/ribir_slim"}
 ribir = { path = "../ribir", features = ["material"] }
+
+[features]
+default = []
+debug = ["ribir_core/debug"]

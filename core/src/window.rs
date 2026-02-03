@@ -222,6 +222,7 @@ bitflags! {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WindowId(u64);
 
 pub trait Shell {
@@ -263,7 +264,9 @@ pub trait ShellWindow {
 
   fn close(&self);
 
-  fn request_draw(&self);
+  /// Request a redraw. If `force` is true, the window will be redrawn even
+  /// if nothing has changed.
+  fn request_draw(&self, force: bool);
 
   fn draw_commands(
     &mut self, wnd_size: Size, viewport: Rect, surface_color: Color, commands: &[PaintCommand],
@@ -408,10 +411,15 @@ impl Window {
       self.tree().draw();
       self.draw_delay_drop_widgets();
 
-      let mut shell = self.shell_wnd.borrow_mut();
-
       let mut painter = self.painter.borrow_mut();
+
+      #[cfg(feature = "debug")]
+      {
+        crate::debug_tool::paint_debug_overlays(self.id(), self.tree(), &mut painter);
+      }
       let cmds = painter.finish();
+
+      let mut shell = self.shell_wnd.borrow_mut();
 
       shell.draw_commands(wnd_size, Rect::from_size(wnd_size), surface, &cmds);
     }

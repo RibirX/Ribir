@@ -22,4 +22,7 @@ impl Render for Void {
   fn measure(&self, clamp: BoxClamp, _: &mut MeasureCtx) -> Size { clamp.min }
 
   fn paint(&self, _: &mut PaintingCtx) {}
+
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> { std::borrow::Cow::Borrowed("void") }
 }

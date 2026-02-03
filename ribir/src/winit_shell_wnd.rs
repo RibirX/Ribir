@@ -2,7 +2,7 @@ use std::{future::Future, sync::Arc};
 
 use ribir_core::{
   prelude::*,
-  window::{BoxShellWindow, Shell, ShellWindow, WindowAttributes, WindowId, WindowLevel},
+  window::{BoxShellWindow, Shell, ShellWindow, UiEvent, WindowAttributes, WindowId, WindowLevel},
 };
 use winit::dpi::{LogicalPosition, LogicalSize};
 
@@ -10,6 +10,9 @@ use winit::dpi::{LogicalPosition, LogicalSize};
 pub const RIBIR_CANVAS: &str = "ribir_canvas";
 #[cfg(target_arch = "wasm32")]
 pub const RIBIR_CONTAINER: &str = "ribir_container";
+
+#[cfg(feature = "debug")]
+use ribir_core::debug_tool::{FRAME_TX, FramePacket};
 
 use crate::{
   app::{App, CmdSender},
@@ -20,6 +23,7 @@ pub enum ShellCmd {
   Exit,
   RequestDraw {
     id: WindowId,
+    force: bool,
   },
   Draw {
     id: WindowId,
@@ -46,7 +50,7 @@ pub enum ShellCmd {
 impl ShellCmd {
   pub fn wnd_id(&self) -> Option<WindowId> {
     match self {
-      ShellCmd::RequestDraw { id } | ShellCmd::Draw { id, .. } | ShellCmd::Close { id } => {
+      ShellCmd::RequestDraw { id, .. } | ShellCmd::Draw { id, .. } | ShellCmd::Close { id } => {
         Some(*id)
       }
       ShellCmd::RunAsync { .. } | ShellCmd::Exit | ShellCmd::NewWindow { .. } => None,
@@ -99,6 +103,10 @@ pub trait WinitBackend<'a>: Sized {
   );
 
   fn end_frame(&mut self);
+
+  /// Capture the current frame from the GPU surface.
+  #[cfg(feature = "debug")]
+  fn capture_screenshot(&mut self) -> Option<BoxFuture<'static, Option<PixelImage>>>;
 }
 
 pub(crate) struct WinitShellWnd {
@@ -118,7 +126,13 @@ impl WinitShellWnd {
 
   pub(crate) fn deal_cmd(&mut self, cmd: ShellCmd) {
     match cmd {
-      ShellCmd::RequestDraw { .. } => self.winit_wnd.request_redraw(),
+      ShellCmd::RequestDraw { force, .. } => {
+        if force {
+          App::send_event(UiEvent::RedrawRequest { wnd_id: self.id(), force: true });
+        } else {
+          self.winit_wnd.request_redraw();
+        }
+      }
       ShellCmd::Draw { viewport, surface_color, commands, wnd_size, .. } => {
         if wnd_size == window_size(&self.winit_wnd) {
           self.backend.begin_frame(surface_color);
@@ -135,6 +149,10 @@ impl WinitShellWnd {
             &Transform::scale(scale_factor, scale_factor),
             &commands,
           );
+
+          #[cfg(feature = "debug")]
+          self.capture_debug_frame();
+
           self.backend.end_frame();
         } else {
           self.winit_wnd.request_redraw();
@@ -148,6 +166,30 @@ impl WinitShellWnd {
   }
 
   pub(crate) fn on_resize(&mut self, size: DeviceSize) { self.backend.on_resize(size); }
+
+  /// Capture and send frame to debug server if enabled.
+  #[cfg(feature = "debug")]
+  fn capture_debug_frame(&mut self) {
+    if FRAME_TX.get().is_some()
+      && let Some(fut) = self.backend.capture_screenshot()
+    {
+      let wnd_id = self.id();
+      App::spawn_local(async move {
+        if let Some(img) = fut.await
+          && let Some(frame_tx) = FRAME_TX.get()
+        {
+          let ts_unix_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+          static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+          let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+          let _ = frame_tx.send(FramePacket { wnd_id, ts_unix_ms, seq, image: Arc::new(img) });
+        }
+      });
+    }
+  }
 }
 
 impl ShellWindow for ShellWndHandle {
@@ -221,7 +263,7 @@ impl ShellWindow for ShellWndHandle {
     if size.is_some()
       && let Some(wnd) = AppCtx::get_window(self.id())
     {
-      wnd.shell_wnd().borrow().request_draw();
+      wnd.shell_wnd().borrow().request_draw(false);
     }
   }
 
@@ -237,10 +279,10 @@ impl ShellWindow for ShellWndHandle {
     });
   }
 
-  fn request_draw(&self) {
+  fn request_draw(&self, force: bool) {
     self
       .sender
-      .send(ShellCmd::RequestDraw { id: self.id() });
+      .send(ShellCmd::RequestDraw { id: self.id(), force });
   }
 
   fn position(&self) -> Point {

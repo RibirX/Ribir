@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use ribir_core::prelude::*;
+use ribir_core::prelude::{anchor::Anchor, *};
 use smallvec::smallvec;
 
 use crate::prelude::*;

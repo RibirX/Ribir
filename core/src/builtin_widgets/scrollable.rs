@@ -281,6 +281,9 @@ impl Render for Viewport {
 
     size
   }
+
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> { std::borrow::Cow::Borrowed("viewport") }
 }
 
 #[cfg(test)]

@@ -198,6 +198,9 @@ impl Render for FittedBox {
     ctx.painter().scale(scale.x, scale.y);
   }
 
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> { std::borrow::Cow::Borrowed("fittedBox") }
+
   fn get_transform(&self) -> Option<Transform> {
     let scale = self.scale_factor.get();
     Some(Transform::scale(scale.x, scale.y))

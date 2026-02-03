@@ -1,4 +1,7 @@
-use ribir_core::{class_names, prelude::*};
+use ribir_core::{
+  class_names,
+  prelude::{anchor::Anchor, *},
+};
 
 use crate::prelude::*;
 

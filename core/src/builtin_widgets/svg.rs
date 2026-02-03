@@ -33,6 +33,9 @@ impl Render for Svg {
 
     painter.draw_svg(self);
   }
+
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> { std::borrow::Cow::Borrowed("svg") }
 }
 
 /// A global registry for managing named SVG assets.

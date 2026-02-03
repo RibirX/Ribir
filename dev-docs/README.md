@@ -9,6 +9,7 @@ This directory contains internal documentation for Ribir project maintainers and
 | Topic | Description |
 |-------|-------------|
 | [Interactive Widget Design](interactive-widget-design.md) | Design standard for interactive widgets: data flow, events, controlled protocol, and best practices |
+| [Debug Features](debug-features.md) | How to use the debug server, MCP integration, and HTTP API for debugging |
 | [Release System](release-system/) | Complete release workflow: changelog automation, versioning strategy, social cards, and CI/CD workflows |
 
 ---

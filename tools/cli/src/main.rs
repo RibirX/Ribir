@@ -1,4 +1,5 @@
 mod bundle;
+mod mcp;
 mod program_check;
 mod run_wasm;
 mod util;
@@ -13,7 +14,7 @@ use env_logger::{
 use log::Level;
 use run_wasm::run_wasm;
 
-use crate::bundle::bundle;
+use crate::{bundle::bundle, mcp::mcp};
 
 trait CliCommand {
   fn name(&self) -> &str;
@@ -57,7 +58,7 @@ fn init_log(log_level: Level) {
 fn main() {
   let mut cli = clap::Command::new("cli").bin_name("cli");
 
-  let commands = [run_wasm(), bundle()];
+  let commands = [run_wasm(), bundle(), mcp()];
 
   for cmd in &commands {
     cli = cli.subcommand(cmd.command());

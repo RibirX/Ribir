@@ -1,4 +1,4 @@
-use ribir_core::prelude::{smallvec::SmallVec, *};
+use ribir_core::prelude::{anchor::Anchor, smallvec::SmallVec, *};
 use ribir_widgets::{in_parent_layout, tabs::*};
 use smallvec::smallvec;
 

@@ -1,0 +1,1404 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ribir Debug Server</title>
+    <style>
+        :root {
+            color-scheme: light dark;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+            margin: 0;
+        }
+
+        header {
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(127, 127, 127, .25);
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        header h1 {
+            font-size: 16px;
+            margin: 0;
+            font-weight: 600;
+        }
+
+        .pill {
+            padding: 2px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(127, 127, 127, .35);
+            font-size: 12px;
+        }
+
+        main {
+            display: grid;
+            grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+            gap: 8px;
+            padding: 8px;
+        }
+
+        /* A full-width row inside main that hosts two panels side-by-side. */
+        .pair {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 8px;
+        }
+
+        /* Let a section span both main columns. */
+        .span-all {
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 980px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+
+            .pair,
+            .inner-row {
+                grid-template-columns: 1fr !important;
+            }
+        }
+
+        .inner-row {
+            display: grid;
+            grid-template-columns: 420px minmax(0, 1fr);
+            gap: 8px;
+            align-items: start;
+        }
+
+        section {
+            border: 1px solid rgba(127, 127, 127, .25);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        section>.hd {
+            padding: 6px 10px;
+            border-bottom: 1px solid rgba(127, 127, 127, .25);
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+
+        section>.bd {
+            padding: 8px;
+        }
+
+        .row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .grow {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        input[type=text],
+        input[type=number] {
+            padding: 6px 8px;
+            border-radius: 8px;
+            border: 1px solid rgba(127, 127, 127, .35);
+            min-width: 120px;
+            max-width: 100%;
+        }
+
+        button {
+            padding: 7px 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(127, 127, 127, .35);
+            background: rgba(127, 127, 127, .12);
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: rgba(127, 127, 127, .18);
+        }
+
+        button.primary {
+            background: rgba(0, 122, 255, .18);
+            border-color: rgba(0, 122, 255, .35);
+        }
+
+        button.danger {
+            background: rgba(255, 59, 48, .15);
+            border-color: rgba(255, 59, 48, .35);
+        }
+
+        button.active {
+            background: rgba(34, 197, 94, .15);
+            border-color: rgba(34, 197, 94, .35);
+        }
+
+        small.muted {
+            color: rgba(127, 127, 127, .9);
+        }
+
+        pre {
+            margin: 0;
+            padding: 10px;
+            background: rgba(127, 127, 127, .10);
+            border-radius: 10px;
+            overflow: auto;
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        /* Keep the logs window size stable so it won't push other panels. */
+        #logs {
+            height: clamp(180px, 35vh, 420px);
+        }
+
+        .log-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+
+        @media (max-width: 980px) {
+            .log-controls {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .tiny {
+            font-size: 12px;
+            color: rgba(127, 127, 127, .9);
+        }
+
+        .inline {
+            display: inline-flex;
+            gap: 6px;
+            align-items: center;
+            white-space: nowrap;
+        }
+
+        select {
+            padding: 6px 8px;
+            border-radius: 8px;
+            border: 1px solid rgba(127, 127, 127, .35);
+            background: rgba(127, 127, 127, .10);
+        }
+
+        .kv {
+            display: grid;
+            grid-template-columns: 160px 1fr;
+            gap: 6px 10px;
+            align-items: baseline;
+        }
+
+        .kv div.k {
+            color: rgba(127, 127, 127, .95);
+        }
+
+        .warn {
+            color: #b45309;
+        }
+
+        .layout-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: nowrap;
+            margin-bottom: 10px;
+            min-width: 0;
+        }
+
+        .layout-controls>label {
+            white-space: nowrap;
+        }
+
+        .layout-controls>#layoutId {
+            flex: 1;
+            min-width: 180px;
+        }
+
+        .layout-show {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            min-width: 0;
+            margin-left: auto;
+        }
+
+        #showPreview {
+            max-width: 44vw;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .layout-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 980px) {
+            .layout-controls {
+                flex-wrap: wrap;
+            }
+
+            .layout-show {
+                width: 100%;
+                justify-content: space-between;
+                margin-left: 0;
+            }
+        }
+
+        .layout-split {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 10px;
+        }
+
+        @media (max-width: 980px) {
+            .layout-split {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .pane-hd {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            margin: 0 0 6px 0;
+        }
+
+        #layoutTreeOut,
+        #layoutInfoOut {
+            height: clamp(140px, 22vh, 280px);
+        }
+
+        .field-grid {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 8px;
+            align-items: end;
+        }
+
+        .field {
+            display: grid;
+            gap: 4px;
+            min-width: 0;
+        }
+
+        .field label {
+            font-size: 12px;
+            color: rgba(127, 127, 127, .95);
+        }
+
+        @media (max-width: 980px) {
+            .field-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        .check {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .check label {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            padding: 4px 8px;
+            border: 1px solid rgba(127, 127, 127, .25);
+            border-radius: 999px;
+        }
+
+        details.inline {
+            position: relative;
+            display: inline-block;
+        }
+
+        details.inline>summary {
+            cursor: pointer;
+            user-select: none;
+            list-style: none;
+            padding: 4px 8px;
+            border: 1px solid rgba(127, 127, 127, .25);
+            border-radius: 999px;
+            font-size: 12px;
+            color: rgba(127, 127, 127, .95);
+        }
+
+        details.inline>summary::-webkit-details-marker {
+            display: none;
+        }
+
+        details.inline .popover {
+            display: none;
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            z-index: 20;
+            min-width: min(560px, 90vw);
+            padding: 10px;
+            border: 1px solid rgba(127, 127, 127, .25);
+            border-radius: 10px;
+            background: rgba(20, 20, 20, .92);
+            backdrop-filter: blur(10px);
+        }
+
+        details.inline[open] .popover {
+            display: block;
+        }
+
+        .show-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        @media (max-width: 980px) {
+            .show-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #999;
+            display: inline-block;
+            margin-right: 6px;
+        }
+
+        .status-dot.active {
+            background-color: #22c55e;
+            box-shadow: 0 0 4px #22c55e;
+        }
+
+        .status-dot.inactive {
+            background-color: #ef4444;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Ribir Debug Server</h1>
+        <select id="windowSelector" style="max-width: 200px; padding: 2px 8px; font-size: 14px;">
+            <option value="">(Default Window)</option>
+        </select>
+        <span class="pill" id="pillSse">SSE: Disconnected</span>
+        <span class="pill" id="pillRecording">Recording: ?</span>
+        <span class="pill" id="pillRing">Ring: ?</span>
+        <span class="pill" id="pillDropped">Dropped: ?</span>
+    </header>
+
+    <main>
+        <!-- Column 1: Workspace & Status Sidebar -->
+        <!-- Column 1: Workspace & Status Sidebar -->
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <section>
+                <div class="hd">
+                    <span>Status</span>
+                    <div class="row">
+                        <button id="btnRefreshStatus">Refresh</button>
+                    </div>
+                </div>
+                <div class="bd">
+                    <div class="kv" id="statusKv"></div>
+                </div>
+            </section>
+
+            <section>
+                <div class="hd">
+                    <span>Overlay</span>
+                    <div class="row">
+                        <button id="btnOverlayRefresh">Refresh</button>
+                        <button class="danger" id="btnOverlayClear">Clear</button>
+                    </div>
+                </div>
+                <div class="bd">
+                    <div class="row" style="align-items: end;">
+                        <div class="field" style="flex: 2; min-width: 220px;">
+                            <label for="overlayId" class="inline">WidgetId</label>
+                            <input id="overlayId" class="grow" type="text" placeholder="e.g.: 42" />
+                        </div>
+                        <div class="field" style="flex: 1; min-width: 180px;">
+                            <label for="overlayColor">Color (#RRGGBB or #RRGGBBAA)</label>
+                            <input id="overlayColor" type="text" value="#FF000080" />
+                        </div>
+                        <div class="row" style="align-items: end;">
+                            <button class="primary" id="btnOverlaySet">Set / Update</button>
+                        </div>
+                    </div>
+                    <div style="height:6px"></div>
+                    <!-- Overlay List -->
+                    <div id="overlayList"
+                        style="display: flex; flex-direction: column; gap: 4px; max-height: 150px; min-height: 40px; overflow-y: auto; margin-bottom: 6px; border: 1px solid rgba(127, 127, 127, .25); border-radius: 6px; padding: 4px; background: rgba(0, 0, 0, 0.1);">
+                        <small class="muted tiny" style="padding: 4px;">(Loading...)</small>
+                    </div>
+                    <label class="inline tiny"><input id="overlayAutoShot" type="checkbox" checked /> Auto-refresh
+                        screenshot after setting</label>
+                    <div style="height:6px"></div>
+                    <small class="muted">Call <code>POST /overlay</code> to write global
+                        overlay (drawn into frames during rendering), <code>DELETE /overlay/{id}</code>
+                        to remove, <code>DELETE /overlays</code> to clear all.</small>
+                </div>
+            </section>
+            <section>
+                <div class="hd">
+                    <span>Capture</span>
+                    <div class="row">
+                        <button class="primary" id="btnCaptureStart">Start</button>
+                        <button class="danger" id="btnCaptureStop">Stop</button>
+                        <button id="btnCaptureOneShot">One-Shot</button>
+                    </div>
+                </div>
+                <div class="bd">
+                    <div class="check">
+                        <label><input id="capLogs" type="checkbox" checked /> Logs</label>
+                        <label><input id="capImages" type="checkbox" checked /> Images</label>
+                    </div>
+                    <div style="height:8px"></div>
+                    <div class="field-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr));">
+                        <div class="field">
+                            <label for="capPre">Pre-process MS (pre_ms)</label>
+                            <input id="capPre" type="number" value="2000" min="0" />
+                        </div>
+                        <div class="field">
+                            <label for="capPost">Post-process MS (post_ms)</label>
+                            <input id="capPost" type="number" value="1000" min="0" />
+                        </div>
+                        <div class="field">
+                            <label for="capSettle">Settle MS (settle_ms)</label>
+                            <input id="capSettle" type="number" value="150" min="0" />
+                        </div>
+                        <div class="field">
+                            <label for="capOut">Output Dir</label>
+                            <input id="capOut" type="text" placeholder="Default: captures/" />
+                        </div>
+                    </div>
+                    <div style="height:8px"></div>
+                    <pre id="captureOut" style="max-height: 18vh"></pre>
+                    <small class="muted">Use
+                        <code>/capture/start</code>, <code>/capture/stop</code>, <code>/capture/one_shot</code></small>
+                </div>
+            </section>
+        </div>
+
+        <!-- Column 2: Main Content (Layout, Logs, Screenshot) -->
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+
+            <section>
+                <div class="hd">
+                    <span>Layout</span>
+                </div>
+                <div class="bd">
+                    <div class="layout-controls">
+                        <label>WidgetId</label>
+                        <input id="layoutId" class="grow" type="text" placeholder="e.g.: 42" />
+                        <div class="layout-show" title="Tree defaults to needing only id; details commonly use all">
+                            <small class="muted tiny" id="showPreview"></small>
+                            <details class="inline" id="showMenu">
+                                <summary>options</summary>
+                                <div class="popover">
+                                    <div class="show-grid">
+                                        <div>
+                                            <div class="muted tiny" style="margin-bottom: 6px;">Tree (/inspect/tree)
+                                            </div>
+                                            <div class="check">
+                                                <label><input id="treeShowId" type="checkbox" checked /> id</label>
+                                                <label><input id="treeShowLayout" type="checkbox" /> layout</label>
+                                                <label><input id="treeShowGlobalPos" type="checkbox" />
+                                                    global_pos</label>
+                                                <label><input id="treeShowClamp" type="checkbox" /> clamp</label>
+                                                <label><input id="treeShowProps" type="checkbox" /> props</label>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="muted tiny" style="margin-bottom: 6px;">Details (/inspect/{id})
+                                            </div>
+                                            <div class="check">
+                                                <label><input id="infoShowId" type="checkbox" checked /> id</label>
+                                                <label><input id="infoShowLayout" type="checkbox" checked />
+                                                    layout</label>
+                                                <label><input id="infoShowGlobalPos" type="checkbox" checked />
+                                                    global_pos</label>
+                                                <label><input id="infoShowClamp" type="checkbox" checked />
+                                                    clamp</label>
+                                                <label><input id="infoShowProps" type="checkbox" checked />
+                                                    props</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
+                        </div>
+
+                        <div class="layout-actions">
+                            <button id="btnLayoutTree">Get Tree</button>
+                            <button id="btnLayoutOpenTree" title="Open /inspect/tree in new tab">Open Tree</button>
+                            <button id="btnLayoutInfo">Query Details</button>
+                            <button id="btnLayoutOpenInfo" title="Open /inspect/{id} in new tab">Open Details</button>
+                        </div>
+                    </div>
+
+                    <div class="layout-split">
+                        <div>
+                            <div class="pane-hd">
+                                <small class="muted">Tree (<code>/inspect/tree</code>)</small>
+                            </div>
+                            <pre id="layoutTreeOut"></pre>
+                        </div>
+                        <div>
+                            <div class="pane-hd">
+                                <small class="muted">Details (<code>/inspect/{id}</code>)</small>
+                            </div>
+                            <pre id="layoutInfoOut"></pre>
+                        </div>
+                    </div>
+
+                    <small class="muted">WidgetId is usually a number; you can also paste values that can be parsed by
+                        JSON (the server uses JSON to parse this path).</small>
+                </div>
+            </section>
+            <!-- Row 2: Logs & View Details -->
+            <div class="pair">
+                <section>
+                    <div class="hd">
+                        <span><span id="logStatusDot" class="status-dot"></span>Logs (SSE)</span>
+                        <div class="row">
+                            <button id="btnConnection">Connect</button>
+                            <button id="btnPause">Pause</button>
+                            <button id="btnClear">Clear</button>
+                        </div>
+                    </div>
+                    <div class="bd">
+                        <div class="log-controls">
+                            <!-- Server Filter -->
+                            <span class="inline" id="serverFilterGroup">
+                                <span class="tiny">Server Filter</span>
+
+                                <!-- Simple Mode Controls -->
+                                <span id="simpleFilterCtrl" class="inline">
+                                    <select id="filtModule" style="max-width: 110px;">
+                                        <option value="">(All)</option>
+                                        <option value="ribir_core">ribir_core</option>
+                                        <option value="ribir_widgets">ribir_widgets</option>
+                                        <option value="ribir_painter">ribir_painter</option>
+                                        <option value="ribir_algo">ribir_algo</option>
+                                        <option value="winit">winit</option>
+                                        <option value="wgpu">wgpu</option>
+                                    </select>
+                                    <select id="filtLevel" style="min-width: 70px;">
+                                        <option value="off">Off</option>
+                                        <option value="error">Error</option>
+                                        <option value="warn">Warn</option>
+                                        <option value="info" selected>Info</option>
+                                        <option value="debug">Debug</option>
+                                        <option value="trace">Trace</option>
+                                    </select>
+                                </span>
+
+                                <!-- Advanced Mode Input (Hidden by default) -->
+                                <input id="filterInput" style="width: 180px; display: none;"
+                                    placeholder="info,ribir_core=debug" />
+
+                                <button id="btnToggleFiltMode" class="tiny"
+                                    style="border:none; background:none; padding: 2px; text-decoration: underline; cursor: pointer;">Advanced</button>
+                                <button id="btnSetFilter" title="Apply Config">Set</button>
+                            </span>
+
+                            <div style="width: 1px; height: 16px; background: rgba(127,127,127,0.3);"></div>
+
+                            <input id="logSearch" class="grow" type="text"
+                                placeholder="Search (keywords; regex supported)" />
+                            <span class="inline">
+                                <span class="tiny">Field</span>
+                                <select id="logSearchField">
+                                    <option value="raw" selected>Full Line</option>
+                                    <option value="message">message</option>
+                                    <option value="target">target</option>
+                                    <option value="level">level</option>
+                                </select>
+                            </span>
+                            <label class="inline tiny"><input id="logSearchRegex" type="checkbox" /> Regex</label>
+                            <label class="inline tiny"><input id="logSearchCase" type="checkbox" />
+                                Case-sensitive</label>
+                            <button id="btnSearchClear">Clear Search</button>
+                        </div>
+                        <div class="row" style="justify-content: space-between; margin-bottom: 8px;">
+                            <small class="muted" id="logStats">Showing: 0 lines (Cache: 0)</small>
+                            <small class="muted" id="logSearchError"></small>
+                        </div>
+                        <pre id="logs"></pre>
+                        <small class="muted">Events from <code>/logs/stream</code>; each <code>log</code> is a JSON
+                            line.</small>
+                    </div>
+                </section>
+
+                <section>
+                    <div class="hd">
+                        <span>Screenshot</span>
+                        <div class="row">
+                            <button class="primary" id="btnShot">Refresh</button>
+                        </div>
+                    </div>
+                    <div class="bd">
+                        <div class="row" style="align-items:flex-start">
+                            <img id="shotImg" alt="screenshot"
+                                style="max-width:100%; border-radius:10px; border:1px solid rgba(127,127,127,.25)" />
+                        </div>
+                        <small class="muted">Load <code>/screenshot</code> (cache-busted).</small>
+                    </div>
+                </section>
+            </div>
+    </main>
+
+    <script>
+        const $ = (id) => document.getElementById(id);
+        const logsEl = $('logs');
+        const capOutEl = $('captureOut');
+        const pillSse = $('pillSse');
+        const pillRecording = $('pillRecording');
+        const pillRing = $('pillRing');
+        const pillDropped = $('pillDropped');
+        let es = null;
+        let paused = false;
+
+        const MAX_LOG_BUFFER = 20_000;
+        const MAX_LOG_VIEW = 4_000;
+        const logBuf = [];
+        let viewLineCount = 0;
+        let searchTimer = null;
+
+        function setLogStats() {
+            const stats = $('logStats');
+            stats.textContent = `Showing: ${viewLineCount} lines (Cache: ${logBuf.length})`;
+        }
+
+        function setSearchError(msg) {
+            const el = $('logSearchError');
+            el.textContent = msg || '';
+        }
+
+        function getSearchConfig() {
+            return {
+                q: ($('logSearch')?.value || '').trim(),
+                field: $('logSearchField')?.value || 'raw',
+                regex: !!$('logSearchRegex')?.checked,
+                caseSensitive: !!$('logSearchCase')?.checked,
+            };
+        }
+
+        function extractField(line, field) {
+            if (field === 'raw') return line;
+            try {
+                const obj = JSON.parse(line);
+                if (field === 'level') return String(obj.level ?? '');
+                if (field === 'target') return String(obj.target ?? obj?.fields?.['log.target'] ?? '');
+                if (field === 'message') {
+                    return String(
+                        obj?.fields?.message ??
+                        obj?.fields?.['log.message'] ??
+                        obj?.message ??
+                        ''
+                    );
+                }
+                return line;
+            } catch (_) {
+                return '';
+            }
+        }
+
+        function makeMatcher() {
+            const cfg = getSearchConfig();
+            if (!cfg.q) return { ok: true, fn: () => true };
+
+            if (cfg.regex) {
+                try {
+                    const flags = cfg.caseSensitive ? '' : 'i';
+                    const re = new RegExp(cfg.q, flags);
+                    return {
+                        ok: true,
+                        fn: (line) => re.test(extractField(line, cfg.field))
+                    };
+                } catch (e) {
+                    return { ok: false, err: `Regex Error: ${e.message || String(e)}` };
+                }
+            }
+
+            const needle = cfg.caseSensitive ? cfg.q : cfg.q.toLowerCase();
+            return {
+                ok: true,
+                fn: (line) => {
+                    const hay = extractField(line, cfg.field);
+                    if (!hay) return false;
+                    const s = cfg.caseSensitive ? hay : hay.toLowerCase();
+                    return s.includes(needle);
+                }
+            };
+        }
+
+        function rebuildLogsView() {
+            const m = makeMatcher();
+            if (!m.ok) {
+                setSearchError(m.err);
+                // Keep the current view when matcher is invalid.
+                return;
+            }
+            setSearchError('');
+
+            const cfg = getSearchConfig();
+            const lines = [];
+            for (let i = logBuf.length - 1; i >= 0 && lines.length < MAX_LOG_VIEW; i--) {
+                const line = logBuf[i];
+                if (!cfg.q || m.fn(line)) lines.push(line);
+            }
+            lines.reverse();
+            logsEl.textContent = lines.join('\n') + (lines.length ? '\n' : '');
+            viewLineCount = lines.length;
+            setLogStats();
+            logsEl.scrollTop = logsEl.scrollHeight;
+        }
+
+        function appendLog(line) {
+            // Always keep a bounded in-memory buffer for search.
+            logBuf.push(line);
+            while (logBuf.length > MAX_LOG_BUFFER) {
+                logBuf.shift();
+            }
+
+            if (paused) return;
+
+            const cfg = getSearchConfig();
+            const m = makeMatcher();
+            if (!m.ok) {
+                setSearchError(m.err);
+                return;
+            }
+            setSearchError('');
+
+            if (cfg.q && !m.fn(line)) {
+                // Search is active; ignore non-matching new lines.
+                return;
+            }
+
+            logsEl.textContent += line + "\n";
+            viewLineCount++;
+            if (viewLineCount > MAX_LOG_VIEW) {
+                rebuildLogsView();
+                return;
+            }
+            setLogStats();
+            logsEl.scrollTop = logsEl.scrollHeight;
+        }
+
+        function sortKeys(val) {
+            if (Array.isArray(val)) {
+                return val.map(sortKeys);
+            } else if (val !== null && typeof val === 'object') {
+                const priority = { name: 1, id: 2, properties: 3, layout: 4, children: 5 };
+                const keys = Object.keys(val).sort((a, b) => {
+                    const pA = priority[a] || 99;
+                    const pB = priority[b] || 99;
+                    if (pA !== pB) return pA - pB;
+                    // Keep other keys alphabetical
+                    return a.localeCompare(b);
+                });
+                const res = {};
+                for (const k of keys) {
+                    res[k] = sortKeys(val[k]);
+                }
+                return res;
+            }
+            return val;
+        }
+
+        function prettyTextMaybeJson(txt) {
+            try {
+                const obj = JSON.parse(txt);
+                return JSON.stringify(sortKeys(obj), null, 2);
+            } catch (_) {
+                return txt;
+            }
+        }
+
+        function prettyJson(obj) {
+            try {
+                return JSON.stringify(sortKeys(obj), null, 2);
+            } catch (_) {
+                return String(obj);
+            }
+        }
+
+        function renderStatusKV(obj) {
+            const kv = $('statusKv');
+            kv.innerHTML = '';
+            const entries = [
+                ['recording', obj.recording],
+                ['log_sink_connected', obj.log_sink_connected],
+                ['filter_reload_installed', obj.filter_reload_installed],
+                ['filter', obj.filter],
+                ['dropped_total', obj.dropped_total],
+                ['ring_len', obj.ring_len],
+                ['capture_root', obj.capture_root],
+                ['active_capture', obj.active_capture ? (obj.active_capture.capture_id + ' @ ' + obj.active_capture.capture_dir) : null],
+            ];
+            for (const [k, v] of entries) {
+                const dk = document.createElement('div'); dk.className = 'k'; dk.textContent = k;
+                const dv = document.createElement('div'); dv.textContent = (v === null || v === undefined) ? '-' : String(v);
+                kv.appendChild(dk); kv.appendChild(dv);
+            }
+        }
+
+        async function refreshStatus() {
+            const res = await fetch('/status');
+            const obj = await res.json();
+            renderStatusKV(obj);
+            pillRecording.textContent = 'Recording: ' + obj.recording;
+            pillRing.textContent = 'Ring: ' + obj.ring_len;
+            pillDropped.textContent = 'Dropped: ' + obj.dropped_total;
+            if (obj.filter) $('filterInput').value = obj.filter;
+        }
+
+        async function setFilter() {
+            const filter = $('filterInput').value;
+            const res = await fetch('/logs/filter', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ filter }),
+            });
+            if (!res.ok) {
+                const msg = await res.text();
+                alert('set filter failed: ' + msg);
+            }
+            await refreshStatus();
+        }
+
+        function toggleConnection() {
+            if (es) disconnectSse();
+            else connectSse();
+        }
+
+        function updateConnectionUI(connected) {
+            const btn = $('btnConnection');
+            const dot = $('logStatusDot');
+            if (connected) {
+                btn.textContent = 'Disconnect';
+                btn.classList.add('active');
+                dot.className = 'status-dot active';
+                pillSse.textContent = 'SSE: Connected';
+            } else {
+                btn.textContent = 'Connect';
+                btn.classList.remove('active');
+                dot.className = 'status-dot inactive';
+            }
+        }
+
+        function connectSse() {
+            if (es) return;
+            // Optimistic UI update
+            $('btnConnection').textContent = 'Connecting...';
+            pillSse.textContent = 'SSE: Connecting...';
+
+            es = new EventSource('/logs/stream');
+
+            es.onopen = () => {
+                updateConnectionUI(true);
+            };
+
+            es.onerror = () => {
+                // If error occurs, we often want to close and let user retry manually
+                // or just show error state. For now, let's close to be safe.
+                disconnectSse();
+                pillSse.textContent = 'SSE: Error';
+            };
+
+            es.addEventListener('log', (ev) => appendLog(ev.data));
+            es.addEventListener('lagged', (ev) => appendLog('[lagged] ' + ev.data));
+            es.addEventListener('stats', (ev) => {
+                try {
+                    const s = JSON.parse(ev.data);
+                    if (typeof s.ring_len !== 'undefined') pillRing.textContent = 'Ring: ' + s.ring_len;
+                    if (typeof s.dropped_total !== 'undefined') pillDropped.textContent = 'Dropped: ' + s.dropped_total;
+                    if (typeof s.recording !== 'undefined') pillRecording.textContent = 'Recording: ' + s.recording;
+                    if (typeof s.filter !== 'undefined' && s.filter) $('filterInput').value = s.filter;
+                } catch (_) { }
+            });
+        }
+
+        function disconnectSse() {
+            if (!es) return;
+            es.close();
+            es = null;
+            updateConnectionUI(false);
+            pillSse.textContent = 'SSE: Disconnected';
+        }
+
+        function refreshScreenshot() {
+            const img = $('shotImg');
+            img.onerror = () => {
+                // Remove handler to avoid infinite loop if persistent error
+                img.onerror = null;
+                setTimeout(() => {
+                    const wid = getSelectedWindowId();
+                    const qs = wid ? `&window_id=${wid}` : '';
+                    img.src = '/screenshot?cb=' + Date.now() + qs;
+                }, 1000);
+            };
+            const wid = getSelectedWindowId();
+            const qs = wid ? `&window_id=${wid}` : '';
+            img.src = '/screenshot?cb=' + Date.now() + qs;
+        }
+
+        function parseWidgetIdInput(raw) {
+            const s = (raw || '').trim();
+            return s || null;
+        }
+
+        async function refreshOverlays() {
+            try {
+                const wid = getSelectedWindowId();
+                const url = '/overlays' + (wid ? `?window_id=${wid}` : '');
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(res.statusText);
+                const list = await res.json();
+                renderOverlayList(list);
+            } catch (e) {
+                const el = $('overlayList');
+                el.innerHTML = '';
+                const small = document.createElement('small');
+                small.className = 'warn tiny';
+                small.textContent = '(Fetch failed: ' + e.message + ')';
+                el.appendChild(small);
+            }
+        }
+
+        function renderOverlayList(list) {
+            console.log('renderOverlayList', list);
+            const el = $('overlayList');
+            try {
+                el.innerHTML = '';
+                if (!list || !list.length) {
+                    const small = document.createElement('small');
+                    small.className = 'muted tiny';
+                    small.textContent = '(No active overlays)';
+                    small.style.padding = '4px';
+                    el.appendChild(small);
+                    return;
+                }
+
+                for (const [id, color] of list) {
+                    const row = document.createElement('div');
+                    row.className = 'row tiny inline';
+                    row.style.justifyContent = 'space-between';
+                    row.style.background = 'rgba(127,127,127,0.1)';
+                    row.style.padding = '2px 6px';
+                    row.style.borderRadius = '4px';
+
+                    // Color indicator + ID
+                    const left = document.createElement('span');
+                    left.className = 'inline';
+                    const dot = document.createElement('span');
+                    dot.style.display = 'inline-block';
+                    dot.style.width = '10px';
+                    dot.style.height = '10px';
+                    dot.style.backgroundColor = color;
+                    dot.style.border = '1px solid #777';
+                    dot.style.borderRadius = '2px';
+
+                    let displayId = id;
+                    let rawId = id; // For sending to delete
+                    if (typeof id === 'object' && id !== null) {
+                        if (typeof id.index1 !== 'undefined') displayId = '#' + id.index1;
+                        else if (typeof id.index !== 'undefined') displayId = '#' + id.index;
+                        else displayId = JSON.stringify(id);
+
+                        rawId = JSON.stringify(id);
+                    } else {
+                        displayId = '#' + id;
+                        rawId = String(id);
+                    }
+
+                    left.appendChild(dot);
+                    left.appendChild(document.createTextNode(displayId + ' (' + color + ')'));
+
+                    // Delete button
+                    const btnDel = document.createElement('span');
+                    btnDel.textContent = '✕';
+                    btnDel.style.cursor = 'pointer';
+                    btnDel.style.color = '#ef4444';
+                    btnDel.onclick = () => overlayRemove(rawId);
+
+                    row.appendChild(left);
+                    row.appendChild(btnDel);
+                    el.appendChild(row);
+                }
+            } catch (err) {
+                console.error('Render overlay list error:', err);
+                const el = $('overlayList');
+                el.innerHTML = '<small class="warn tiny">(Render Error)</small>';
+            }
+        }
+
+        async function overlayRemove(id) {
+            // If ID matches current input, maybe clear it? Nah.
+            // Just send delete request.
+            // Special handling: if ID is complex JSON string, we need to pass it properly?
+            // Our current `clear_overlays` handles `?id=...`. It uses fuzzy resolver.
+            // If we pass the full JSON string from the list, it should resolve exactly.
+            // Our current `clear_overlays` handles `?id=...`. It uses fuzzy resolver.
+            // If we pass the full JSON string from the list, it should resolve exactly.
+            let url = '/overlay/' + encodeURIComponent(id);
+            const wid = getSelectedWindowId();
+            if (wid) url += `?window_id=${wid}`;
+            const res = await fetch(url, { method: 'DELETE' });
+            if (res.ok) {
+                await refreshOverlays();
+                if ($('overlayAutoShot')?.checked) refreshScreenshot();
+            } else {
+                alert('Delete failed');
+            }
+        }
+
+        async function overlaySet() {
+            const idRaw = ($('overlayId').value || '').trim();
+            const id = parseWidgetIdInput(idRaw);
+            const color = ($('overlayColor').value || '').trim();
+            // ... (validation)
+            if (id === null) { alert('Invalid WidgetId'); return; }
+            if (!color) { alert('Please enter color'); return; }
+
+            const res = await fetch('/overlay', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ id, color, window_id: getSelectedWindowId() }),
+            });
+            if (!res.ok) {
+                const msg = await res.text();
+                alert('Set overlay failed: ' + msg);
+                return;
+            }
+            await refreshOverlays();
+            if ($('overlayAutoShot')?.checked) refreshScreenshot();
+        }
+
+        async function overlayClear() {
+            let url = '/overlays';
+            const wid = getSelectedWindowId();
+            if (wid) url += `?window_id=${wid}`;
+            const res = await fetch(url, { method: 'DELETE' }); // DELETE /overlays = clear all
+            if (!res.ok) {
+                const msg = await res.text();
+                alert('Clear overlay failed: ' + msg);
+                return;
+            }
+            await refreshOverlays();
+            if ($('overlayAutoShot')?.checked) refreshScreenshot();
+        }
+
+        function showTokens(prefix) {
+            const wantId = !!$(prefix + 'ShowId')?.checked;
+            const wantLayout = !!$(prefix + 'ShowLayout')?.checked;
+            const wantProps = !!$(prefix + 'ShowProps')?.checked;
+            const wantGlobalPos = !!$(prefix + 'ShowGlobalPos')?.checked;
+            const wantClamp = !!$(prefix + 'ShowClamp')?.checked;
+
+            const show = [];
+            if (wantId) show.push('id');
+            if (wantProps) show.push('props');
+
+            // Layout-related fields.
+            if (wantLayout || wantGlobalPos || wantClamp) {
+                show.push('layout');
+
+                if (wantLayout) {
+                    // Keep backward compat: `layout` implies clamp/global_pos on server.
+                    // Use explicit `no_*` tokens to disable when user unchecks them.
+                    if (!wantGlobalPos) show.push('no_global_pos');
+                    if (!wantClamp) show.push('no_clamp');
+                } else {
+                    // If user only wants a subset, request it explicitly.
+                    if (wantGlobalPos) show.push('global_pos');
+                    if (wantClamp) show.push('clamp');
+                }
+            }
+
+            return show;
+        }
+
+        function showParam(prefix) {
+            const show = showTokens(prefix);
+            const params = new URLSearchParams();
+            if (show.length) params.set('options', show.join(','));
+            const wid = getSelectedWindowId();
+            if (wid) params.set('window_id', wid);
+            const qs = params.toString();
+            return qs ? ('?' + qs) : '';
+        }
+
+        function updateShowPreview() {
+            const el = $('showPreview');
+            if (!el) return;
+            const tree = showTokens('tree');
+            const info = showTokens('info');
+            const treeTxt = tree.length ? tree.join(',') : '(none)';
+            const infoTxt = info.length ? info.join(',') : '(none)';
+            el.textContent = `Tree options=${treeTxt} ｜ Details options=${infoTxt}`;
+        }
+
+        async function fetchLayoutTree() {
+            const out = $('layoutTreeOut');
+            const url = '/inspect/tree' + showParam('tree');
+            out.textContent = `GET ${url}\n\nLoading...`;
+            try {
+                // Tree usually needs id for drill-down; user can tune via checkboxes.
+                const res = await fetch(url);
+                const txt = await res.text();
+                out.textContent = `GET ${url}\n\n` + prettyTextMaybeJson(txt);
+            } catch (e) {
+                out.textContent = `GET ${url}\n\nRequest failed: ` + (e?.message || String(e));
+            }
+        }
+
+        async function fetchLayoutInfo() {
+            const out = $('layoutInfoOut');
+            const raw = ($('layoutId').value || '').trim();
+            if (!raw) {
+                out.textContent = 'Please enter WidgetId (e.g.: 42)';
+                return;
+            }
+            const url = '/inspect/' + encodeURIComponent(raw) + showParam('info');
+            out.textContent = `GET ${url}\n\nLoading...`;
+            try {
+                const res = await fetch(url);
+                const txt = await res.text();
+                out.textContent = `GET ${url}\n\n` + prettyTextMaybeJson(txt);
+            } catch (e) {
+                out.textContent = `GET ${url}\n\nRequest failed: ` + (e?.message || String(e));
+            }
+        }
+
+        function capturePayload() {
+            const include = [];
+            if ($('capLogs').checked) include.push('logs');
+            if ($('capImages').checked) include.push('images');
+            const pre_ms = Number($('capPre').value || 0);
+            const post_ms = Number($('capPost').value || 0);
+            const settle_ms = Number($('capSettle').value || 0);
+            const output_dir = $('capOut').value.trim();
+            const payload = { include, pre_ms, post_ms, settle_ms };
+            if (output_dir) payload.output_dir = output_dir;
+            return payload;
+        }
+
+        async function capStart() {
+            const p = capturePayload();
+            // /capture/start doesn't accept settle_ms; strip it.
+            const { settle_ms, ...body } = p;
+            const res = await fetch('/capture/start', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            const txt = await res.text();
+            capOutEl.textContent = prettyTextMaybeJson(txt);
+            await refreshStatus();
+        }
+
+        async function capStop() {
+            const res = await fetch('/capture/stop', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({}),
+            });
+            const txt = await res.text();
+            capOutEl.textContent = prettyTextMaybeJson(txt);
+            await refreshStatus();
+        }
+
+        async function capOneShot() {
+            const body = capturePayload();
+            const res = await fetch('/capture/one_shot', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            const txt = await res.text();
+            capOutEl.textContent = prettyTextMaybeJson(txt);
+            await refreshStatus();
+        }
+
+        async function fetchWindows() {
+            const sel = $('windowSelector');
+            try {
+                const res = await fetch('/windows');
+                const list = await res.json();
+
+                // Keep selection if possible
+                const current = sel.value;
+                sel.innerHTML = '<option value="">(Default Window)</option>';
+
+                for (const win of list) {
+                    const opt = document.createElement('option');
+                    // WindowId is serialized as number
+                    opt.value = win.id;
+                    opt.textContent = `[${win.id}] ${win.title} (${win.width}x${win.height})`;
+                    sel.appendChild(opt);
+                }
+
+                if (current) sel.value = current;
+            } catch (e) {
+                console.error('Fetch windows failed', e);
+            }
+        }
+
+        function getSelectedWindowId() {
+            const val = $('windowSelector').value;
+            return val ? Number(val) : null;
+        }
+
+        $('windowSelector').onchange = () => {
+            refreshScreenshot();
+            refreshOverlays();
+            // Layout tree/info will update on next click
+        };
+
+        $('btnRefreshStatus').onclick = refreshStatus;
+        $('btnSetFilter').onclick = setFilter;
+        $('btnConnection').onclick = toggleConnection;
+        $('btnPause').onclick = () => {
+            paused = !paused;
+            const b = $('btnPause');
+            b.textContent = paused ? 'Resume' : 'Pause';
+            b.classList.toggle('active', paused);
+            if (!paused) rebuildLogsView();
+        };
+        $('btnClear').onclick = () => {
+            logsEl.textContent = '';
+            logBuf.length = 0;
+            viewLineCount = 0;
+            setSearchError('');
+            setLogStats();
+        };
+        $('btnSearchClear').onclick = () => {
+            $('logSearch').value = '';
+            $('logSearchError').textContent = '';
+            rebuildLogsView();
+        };
+
+        function scheduleSearch() {
+            if (searchTimer) clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => {
+                rebuildLogsView();
+            }, 150);
+        }
+
+        $('logSearch').addEventListener('input', scheduleSearch);
+        $('logSearchField').addEventListener('change', scheduleSearch);
+        $('logSearchRegex').addEventListener('change', scheduleSearch);
+        $('logSearchCase').addEventListener('change', scheduleSearch);
+        $('btnShot').onclick = refreshScreenshot;
+        $('btnLayoutTree').onclick = fetchLayoutTree;
+        $('btnLayoutInfo').onclick = fetchLayoutInfo;
+        $('btnLayoutOpenTree').onclick = () => window.open('/inspect/tree' + showParam('tree'), '_blank');
+        $('btnLayoutOpenInfo').onclick = () => {
+            const raw = ($('layoutId').value || '').trim();
+            if (!raw) {
+                $('layoutInfoOut').textContent = 'Please enter WidgetId (e.g.: 42)';
+                return;
+            }
+            window.open('/inspect/' + encodeURIComponent(raw) + showParam('info'), '_blank');
+        };
+
+        $('btnOverlaySet').onclick = overlaySet;
+        $('btnOverlayRefresh').onclick = refreshOverlays;
+        $('btnOverlayClear').onclick = overlayClear;
+        $('btnCaptureStart').onclick = capStart;
+        $('btnCaptureStop').onclick = capStop;
+        $('btnCaptureOneShot').onclick = capOneShot;
+
+        // Keep the effective show flags visible.
+        ['treeShowId', 'treeShowLayout', 'treeShowGlobalPos', 'treeShowClamp', 'treeShowProps', 'infoShowId', 'infoShowLayout', 'infoShowGlobalPos', 'infoShowClamp', 'infoShowProps']
+            .forEach((id) => $(id)?.addEventListener('change', updateShowPreview));
+
+        // Boot
+        setLogStats();
+        updateShowPreview();
+        refreshStatus();
+        connectSse();
+        fetchWindows().then(() => {
+            refreshScreenshot();
+            refreshOverlays();
+        });
+        // Filter Mode Logic
+        const filtModule = $('filtModule');
+        const filtLevel = $('filtLevel');
+        const filterInput = $('filterInput');
+        const btnToggleFiltMode = $('btnToggleFiltMode');
+        const simpleFilterCtrl = $('simpleFilterCtrl');
+        let isReflecting = false;
+
+        function syncSimpleToRaw() {
+            if (isReflecting) return;
+            const mod = filtModule.value;
+            const lvl = filtLevel.value;
+            if (!mod) {
+                filterInput.value = lvl; // Global level
+            } else {
+                filterInput.value = `off,${mod}=${lvl}`; // Specific module
+            }
+        }
+
+        function toggleFilterMode() {
+            const isSimple = simpleFilterCtrl.style.display !== 'none';
+            if (isSimple) {
+                // Switch to Advanced
+                simpleFilterCtrl.style.display = 'none';
+                filterInput.style.display = 'inline-block';
+                btnToggleFiltMode.textContent = 'Simple';
+            } else {
+                // Switch to Simple
+                // Note: Parsing raw back to simple is hard/ambiguous, so we just reset or keep as is?
+                // User might have typed complex stuff. We'll just show the simple controls 
+                // but their state might be desynced from raw input if user edited raw.
+                // We won't overwrite raw from simple immediately to prevent data loss,
+                // but next interaction with simple will overwrite.
+                filterInput.style.display = 'none';
+                simpleFilterCtrl.style.display = 'inline-flex';
+                btnToggleFiltMode.textContent = 'Advanced';
+            }
+        }
+
+        filtModule.addEventListener('change', syncSimpleToRaw);
+        filtLevel.addEventListener('change', syncSimpleToRaw);
+        btnToggleFiltMode.addEventListener('click', toggleFilterMode);
+
+        // Initialize raw input from default simple state
+        syncSimpleToRaw();
+    </script>
+</body>
+
+</html>

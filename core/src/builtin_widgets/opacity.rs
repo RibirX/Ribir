@@ -55,4 +55,12 @@ impl WrapRender for Opacity {
 
   #[inline]
   fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
+
+  #[cfg(feature = "debug")]
+  fn debug_type(&self) -> Option<&'static str> { Some("opacity") }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> Option<serde_json::Value> {
+    Some(serde_json::json!({ "alpha": self.opacity }))
+  }
 }

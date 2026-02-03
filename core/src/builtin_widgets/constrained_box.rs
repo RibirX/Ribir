@@ -45,6 +45,17 @@ impl WrapRender for ConstrainedBox {
 
   #[inline]
   fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
+
+  #[cfg(feature = "debug")]
+  fn debug_type(&self) -> Option<&'static str> { Some("constrainedBox") }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> Option<serde_json::Value> {
+    Some(serde_json::json!({
+      "min": { "width": self.clamp.min.width, "height": self.clamp.min.height },
+      "max": { "width": self.clamp.max.width, "height": self.clamp.max.height }
+    }))
+  }
 }
 
 #[cfg(test)]

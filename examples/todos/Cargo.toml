@@ -30,7 +30,7 @@ ribir_core = { path = "../../core", features = ["test-utils"]}
 
 [features]
 wgpu = ["ribir/wgpu"]
-
+debug = ["ribir/debug"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

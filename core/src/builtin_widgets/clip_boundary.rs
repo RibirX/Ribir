@@ -79,6 +79,14 @@ impl WrapRender for ClipBoundary {
 
   #[inline]
   fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
+
+  #[cfg(feature = "debug")]
+  fn debug_type(&self) -> Option<&'static str> { Some("clipBoundary") }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> Option<serde_json::Value> {
+    Some(serde_json::json!({ "enabled": self.clip_boundary }))
+  }
 }
 
 #[cfg(test)]

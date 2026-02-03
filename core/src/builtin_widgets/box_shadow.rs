@@ -152,6 +152,20 @@ impl WrapRender for BoxShadowWidget {
 
   #[inline]
   fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
+
+  #[cfg(feature = "debug")]
+  fn debug_type(&self) -> Option<&'static str> { Some("boxShadow") }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> Option<serde_json::Value> {
+    let s = self.box_shadow;
+    Some(serde_json::json!({
+      "offset": { "x": s.offset.x, "y": s.offset.y },
+      "blurRadius": s.blur_radius,
+      "spreadRadius": s.spread_radius,
+      "color": { "r": s.color.red, "g": s.color.green, "b": s.color.blue, "a": s.color.alpha }
+    }))
+  }
 }
 
 impl_compose_child_for_wrap_render!(BoxShadowWidget);

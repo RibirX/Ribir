@@ -87,6 +87,14 @@ impl WrapRender for VisibilityRender {
   }
 
   fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
+
+  #[cfg(feature = "debug")]
+  fn debug_type(&self) -> Option<&'static str> { Some("visibility") }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> Option<serde_json::Value> {
+    Some(serde_json::json!({ "display": self.display }))
+  }
 }
 
 impl Visibility {

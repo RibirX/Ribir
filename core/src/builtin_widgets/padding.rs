@@ -84,6 +84,20 @@ impl WrapRender for Padding {
 
   #[inline]
   fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
+
+  #[cfg(feature = "debug")]
+  fn debug_type(&self) -> Option<&'static str> { Some("padding") }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> Option<serde_json::Value> {
+    let p = self.padding;
+    Some(serde_json::json!({
+      "left": p.left,
+      "right": p.right,
+      "top": p.top,
+      "bottom": p.bottom
+    }))
+  }
 }
 
 impl Padding {

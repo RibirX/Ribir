@@ -70,6 +70,22 @@ impl WrapRender for RadiusWidget {
 
   #[inline]
   fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
+
+  #[cfg(feature = "debug")]
+  fn debug_type(&self) -> Option<&'static str> { Some("radius") }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> Option<serde_json::Value> {
+    let r = self.radius;
+    Some(serde_json::json!({
+      "corners": {
+        "topLeft": r.top_left,
+        "topRight": r.top_right,
+        "bottomLeft": r.bottom_left,
+        "bottomRight": r.bottom_right
+      }
+    }))
+  }
 }
 
 impl_compose_child_for_wrap_render!(RadiusWidget);

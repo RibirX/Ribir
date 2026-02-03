@@ -34,6 +34,9 @@ impl Render for Container {
 
   #[inline]
   fn size_affected_by_child(&self) -> bool { false }
+
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> { std::borrow::Cow::Borrowed("container") }
 }
 
 #[cfg(test)]

@@ -197,7 +197,7 @@ impl FrameHandle {
   fn frame_end(self) -> (Vec<RibirEvent>, EventLoopHandle) {
     if self.has_data_changed {
       for wnd in AppCtx::windows().borrow().values() {
-        wnd.shell_wnd().borrow().request_draw();
+        wnd.shell_wnd().borrow().request_draw(false);
       }
     }
     AppCtx::end_frame();
@@ -285,7 +285,7 @@ impl IdleHandle {
         let changed = AppCtx::emit_change();
         if changed {
           for wnd in AppCtx::windows().borrow().values() {
-            wnd.shell_wnd().borrow().request_draw();
+            wnd.shell_wnd().borrow().request_draw(false);
           }
         }
       }

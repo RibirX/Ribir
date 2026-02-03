@@ -66,6 +66,14 @@ impl WrapRender for Background {
 
   #[inline]
   fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
+
+  #[cfg(feature = "debug")]
+  fn debug_type(&self) -> Option<&'static str> { Some("background") }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> Option<serde_json::Value> {
+    Some(serde_json::json!({ "brush": self.background }))
+  }
 }
 
 impl_compose_child_for_wrap_render!(Background);

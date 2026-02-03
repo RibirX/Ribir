@@ -69,7 +69,7 @@ pub mod prelude {
     ticker::{Duration, Instant},
     widget::*,
     widget_children::*,
-    widget_tree::{AnchorX, AnchorY, BoxClamp, DirtyPhase, LayoutInfo, TrackId, WidgetId},
+    widget_tree::{Anchor, AnchorX, AnchorY, BoxClamp, DirtyPhase, LayoutInfo, TrackId, WidgetId},
     window::{Window, WindowLevel},
   };
   pub use crate::*;
@@ -77,6 +77,12 @@ pub mod prelude {
 
 #[cfg(feature = "test-utils")]
 pub mod test_helper;
+
+#[cfg(feature = "debug")]
+pub mod debug_tool;
+
+#[cfg(feature = "debug")]
+pub mod logging;
 
 impl<T> From<T> for Measure
 where

@@ -25,6 +25,11 @@ impl Render for NoAffectedParentSize {
     // just return { hit: false, can_hit_child: true } here.
     HitTest { hit: false, can_hit_child: true }
   }
+
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> {
+    std::borrow::Cow::Borrowed("noAffectedParentSize")
+  }
 }
 
 #[cfg(test)]

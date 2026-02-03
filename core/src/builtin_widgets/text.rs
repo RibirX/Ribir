@@ -110,6 +110,16 @@ impl Render for Text {
     let rect = visual_glyphs.visual_rect();
     paint_text(ctx.painter(), &visual_glyphs, style.unwrap_or(PaintingStyle::Fill), rect);
   }
+
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> { std::borrow::Cow::Borrowed("text") }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> serde_json::Value {
+    serde_json::json!({
+      "text": *self.text
+    })
+  }
 }
 
 impl Text {
