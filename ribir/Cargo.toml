@@ -61,6 +61,7 @@ png = ["ribir_core/png"]
 jpeg = ["ribir_core/jpeg"]
 wgpu = ["ribir_gpu/wgpu", "dep:wgpu"]
 widgets = ["ribir_widgets"]
+debug = ["ribir_core/debug", "ribir_widgets/debug"]
 
 [target.'cfg(windows)'.dependencies]
 winapi = "0.3.9"

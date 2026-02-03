@@ -21,6 +21,9 @@ impl Render for PathPaintKit {
   fn hit_test(&self, _ctx: &mut HitTestCtx, _: Point) -> HitTest {
     HitTest { hit: false, can_hit_child: false }
   }
+
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> { std::borrow::Cow::Borrowed("path") }
 }
 
 #[cfg(test)]

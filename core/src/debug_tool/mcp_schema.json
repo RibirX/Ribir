@@ -1,0 +1,238 @@
+{
+    "adapter_version": "0.4.0",
+    "fallback_init_result": {
+        "protocolVersion": "2024-11-05",
+        "capabilities": {
+            "tools": {
+                "listChanged": false
+            },
+            "resources": {
+                "listChanged": false,
+                "subscribe": false,
+                "subscribeSupported": false
+            }
+        },
+        "serverInfo": {
+            "name": "Ribir Debug Server",
+            "version": "0.4.0",
+            "description": "Debug and inspect running Ribir applications. Capture screenshots, explore widget tree, add visual overlays, view logs, and record frames."
+        }
+    },
+    "tools": [
+        {
+            "name": "capture_screenshot",
+            "description": "Capture a screenshot of the specified window",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "window_id": {
+                        "type": "string",
+                        "description": "Window ID to capture (optional, defaults to primary)"
+                    }
+                }
+            }
+        },
+        {
+            "name": "inspect_tree",
+            "description": "Get the full widget tree structure",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "window_id": {
+                        "type": "string",
+                        "description": "Window ID (optional)"
+                    },
+                    "options": {
+                        "type": "string",
+                        "description": "Filter what to show. Options: 'all' (everything), 'id' (WidgetId), 'layout' (pos+size), 'global_pos' (screen coords), 'clamp' (constraints), 'props' (properties). Prefix with 'no_' to exclude (e.g. 'all,no_props')."
+                    }
+                }
+            }
+        },
+        {
+            "name": "inspect_widget",
+            "description": "Get details for a specific widget by ID",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "window_id": {
+                        "type": "string",
+                        "description": "Window ID (optional)"
+                    },
+                    "options": {
+                        "type": "string",
+                        "description": "Filter what to show. Options: 'all' (everything), 'id' (WidgetId), 'layout' (pos+size), 'global_pos' (screen coords), 'clamp' (constraints), 'props' (properties). Prefix with 'no_' to exclude (e.g. 'all,no_props')."
+                    },
+                    "id": {
+                        "type": "string",
+                        "description": "Widget ID to inspect"
+                    }
+                },
+                "required": [
+                    "id"
+                ]
+            }
+        },
+        {
+            "name": "get_overlays",
+            "description": "List all active overlays",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "window_id": {
+                        "type": "string",
+                        "description": "Window ID (optional)"
+                    }
+                }
+            }
+        },
+        {
+            "name": "set_log_filter",
+            "description": "Set the log filter (e.g., 'info,ribir_core=debug')",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "filter": {
+                        "type": "string",
+                        "description": "Filter string"
+                    }
+                },
+                "required": [
+                    "filter"
+                ]
+            }
+        },
+        {
+            "name": "add_overlay",
+            "description": "Highlight a widget with a colored overlay",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "window_id": {
+                        "type": "string",
+                        "description": "Window ID (optional)"
+                    },
+                    "id": {
+                        "type": "string",
+                        "description": "Widget ID (e.g., '1', '1:0', or string ID)"
+                    },
+                    "color": {
+                        "type": "string",
+                        "description": "Color hex code (optional, #RRGGBB or #RRGGBBAA, default: #FF000080)"
+                    }
+                },
+                "required": [
+                    "id"
+                ]
+            }
+        },
+        {
+            "name": "remove_overlay",
+            "description": "Remove a specific overlay",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "window_id": {
+                        "type": "string",
+                        "description": "Window ID (optional)"
+                    },
+                    "id": {
+                        "type": "string",
+                        "description": "Widget ID of the overlay to remove"
+                    }
+                },
+                "required": [
+                    "id"
+                ]
+            }
+        },
+        {
+            "name": "clear_overlays",
+            "description": "Clear all overlays",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "window_id": {
+                        "type": "string",
+                        "description": "Window ID (optional)"
+                    }
+                }
+            }
+        },
+        {
+            "name": "start_recording",
+            "description": "Start recording frames to disk",
+            "inputSchema": {
+                "type": "object",
+                "properties": {}
+            }
+        },
+        {
+            "name": "stop_recording",
+            "description": "Stop recording and save to disk",
+            "inputSchema": {
+                "type": "object",
+                "properties": {}
+            }
+        },
+        {
+            "name": "capture_one_shot",
+            "description": "One-click capture: start -> request redraw (if images enabled) -> wait -> stop.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "include": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "logs",
+                                "images"
+                            ]
+                        },
+                        "description": "What to include in the capture (e.g. ['logs', 'images'])"
+                    },
+                    "pre_ms": {
+                        "type": "integer",
+                        "description": "Ms of logs to include prior to start (default 2000)"
+                    },
+                    "post_ms": {
+                        "type": "integer",
+                        "description": "Ms of logs to include after stop (default 1000)"
+                    },
+                    "settle_ms": {
+                        "type": "integer",
+                        "description": "Extra time (ms) to wait after we observe a frame update (default 150)"
+                    },
+                    "output_dir": {
+                        "type": "string",
+                        "description": "Optional output directory"
+                    }
+                },
+                "required": [
+                    "include"
+                ]
+            }
+        }
+    ],
+    "resources": [
+        {
+            "uri": "ribir://logs",
+            "name": "Application Logs",
+            "description": "Recent application logs (last 100 lines)",
+            "mimeType": "text/plain"
+        },
+        {
+            "uri": "ribir://windows",
+            "name": "Window List",
+            "description": "List of active windows",
+            "mimeType": "application/json"
+        },
+        {
+            "uri": "ribir://status",
+            "name": "Server Status",
+            "description": "Debug server status (recording, filter, stats)",
+            "mimeType": "application/json"
+        }
+    ]
+}

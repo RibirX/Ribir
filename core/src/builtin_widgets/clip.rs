@@ -44,4 +44,7 @@ impl Render for Clip {
     ctx.clip(clip_rect);
     Some(clip_rect)
   }
+
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> { std::borrow::Cow::Borrowed("clip") }
 }

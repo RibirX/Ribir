@@ -143,6 +143,26 @@ impl WrapRender for FixedSize {
 
   #[inline]
   fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
+
+  #[cfg(feature = "debug")]
+  fn debug_type(&self) -> Option<&'static str> { Some("fixedSize") }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> Option<serde_json::Value> {
+    let width = match self.size.width {
+      Dimension::Auto => serde_json::json!({ "kind": "auto" }),
+      Dimension::Fixed(Measure::Pixel(v)) => serde_json::json!({ "kind": "px", "value": v }),
+      Dimension::Fixed(Measure::Unit(v)) => serde_json::json!({ "kind": "percent", "value": v }),
+    };
+
+    let height = match self.size.height {
+      Dimension::Auto => serde_json::json!({ "kind": "auto" }),
+      Dimension::Fixed(Measure::Pixel(v)) => serde_json::json!({ "kind": "px", "value": v }),
+      Dimension::Fixed(Measure::Unit(v)) => serde_json::json!({ "kind": "percent", "value": v }),
+    };
+
+    Some(serde_json::json!({ "width": width, "height": height }))
+  }
 }
 
 #[cfg(test)]

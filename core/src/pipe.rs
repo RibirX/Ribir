@@ -589,6 +589,12 @@ impl Render for PipeNode {
   fn adjust_position(&self, pos: Point, ctx: &mut PlaceCtx) -> Point {
     self.as_ref().data.adjust_position(pos, ctx)
   }
+
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> { self.as_ref().data.debug_name() }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> serde_json::Value { self.as_ref().data.debug_properties() }
 }
 
 #[derive(Clone)]

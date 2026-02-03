@@ -45,6 +45,12 @@ pub trait WrapRender {
     host.adjust_position(pos, ctx)
   }
 
+  #[cfg(feature = "debug")]
+  fn debug_type(&self) -> Option<&'static str> { None }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> Option<serde_json::Value> { None }
+
   fn wrapper_dirty_phase(&self) -> DirtyPhase;
 
   fn combine_x_multi_child(this: impl StateWriter<Value = Self>, x: XMultiChild) -> XMultiChild
@@ -133,6 +139,50 @@ impl Render for RenderPair {
       .wrapper
       .adjust_position(self.host.as_render(), pos, ctx)
   }
+
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> { self.host.as_render().debug_name() }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> serde_json::Value {
+    use serde_json::{Map, Value, json};
+
+    let host_props = self.host.as_render().debug_properties();
+    let mut obj: Map<String, Value> = match host_props {
+      Value::Object(map) => map,
+      Value::Null => Map::new(),
+      other => {
+        let mut map = Map::new();
+        map.insert("_value".to_string(), other);
+        map
+      }
+    };
+
+    if let Some(ty) = self.wrapper.debug_type() {
+      let wrapper_props = self
+        .wrapper
+        .debug_properties()
+        .unwrap_or(Value::Null);
+      let entry = json!({ "type": ty, "properties": wrapper_props });
+
+      match obj.get_mut("_wrappers") {
+        Some(Value::Array(arr)) => arr.insert(0, entry),
+        Some(other) => {
+          let prev = std::mem::replace(other, Value::Array(vec![entry]));
+          if !prev.is_null()
+            && let Value::Array(arr) = other
+          {
+            arr.push(prev);
+          }
+        }
+        None => {
+          obj.insert("_wrappers".to_string(), Value::Array(vec![entry]));
+        }
+      }
+    }
+
+    Value::Object(obj)
+  }
 }
 
 impl<R> WrapRender for R
@@ -173,6 +223,12 @@ where
   fn adjust_position(&self, host: &dyn Render, pos: Point, ctx: &mut PlaceCtx) -> Point {
     self.read().adjust_position(host, pos, ctx)
   }
+
+  #[cfg(feature = "debug")]
+  fn debug_type(&self) -> Option<&'static str> { self.read().debug_type() }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> Option<serde_json::Value> { self.read().debug_properties() }
 }
 
 #[macro_export]

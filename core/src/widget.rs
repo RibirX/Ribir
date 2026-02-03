@@ -124,6 +124,21 @@ pub trait Render: 'static {
   /// position should be determined by the parent's layout logic, and you should
   /// not modify it.
   fn adjust_position(&self, pos: Point, _ctx: &mut PlaceCtx) -> Point { pos }
+
+  /// Returns the debug name of this widget for debugging tools.
+  ///
+  /// Default implementation returns the type name.
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> {
+    std::borrow::Cow::Borrowed(std::any::type_name::<Self>())
+  }
+
+  /// Returns debug properties as a JSON value for debugging tools.
+  ///
+  /// Override this to expose widget-specific state (e.g., text content,
+  /// colors). Default implementation returns `null`.
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> serde_json::Value { serde_json::Value::Null }
 }
 
 /// Result of a hit testing operation

@@ -74,6 +74,11 @@ impl Render for UnconstrainedBox {
 
   #[inline]
   fn paint(&self, _: &mut PaintingCtx) {}
+
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> {
+    std::borrow::Cow::Borrowed("unconstrainedBox")
+  }
 }
 
 #[cfg(test)]

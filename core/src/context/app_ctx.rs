@@ -137,6 +137,12 @@ impl AppCtx {
       // the main loop is running.
       let main_fut = async {
         init.await;
+
+        #[cfg(feature = "debug")]
+        {
+          crate::debug_tool::start_debug_server();
+        }
+
         event_loop.run(ui_events).await
       };
       let local_set = &*AppCtx::shared().local_set.borrow();
@@ -194,7 +200,7 @@ impl AppCtx {
     wnd.init(content);
 
     // request draw the first frame.
-    wnd.shell_wnd().borrow().request_draw();
+    wnd.shell_wnd().borrow().request_draw(false);
 
     wnd
   }

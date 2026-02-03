@@ -1,5 +1,9 @@
+#[cfg(feature = "debug")]
+use ribir_core::prelude::{BoxFuture, PixelImage};
 use ribir_core::prelude::{Color, DeviceRect, DeviceSize, PaintCommand, PainterBackend, Transform};
 use ribir_gpu::Surface;
+#[cfg(feature = "debug")]
+use ribir_gpu::Texture;
 
 use crate::winit_shell_wnd::WinitBackend;
 
@@ -42,5 +46,20 @@ impl<'a> WinitBackend<'a> for WgpuBackend<'a> {
   fn end_frame(&mut self) {
     self.backend.end_frame();
     self.surface.present();
+  }
+
+  #[cfg(feature = "debug")]
+  fn capture_screenshot(&mut self) -> Option<BoxFuture<'static, Option<PixelImage>>> {
+    // Get size first to avoid borrow issues
+    let size = self.surface.size();
+    // Get the current texture from surface
+    let texture = self.surface.get_current_texture();
+    let rect = DeviceRect::from_size(size);
+
+    // Copy from texture to image
+    let img_future = texture.copy_as_image(&rect, self.backend.get_impl_mut());
+
+    // Wait for the result
+    Some(Box::pin(async move { img_future.await.ok() }))
   }
 }

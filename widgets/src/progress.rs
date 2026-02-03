@@ -168,6 +168,11 @@ impl Render for SpinnerArc {
       }
     }
   }
+
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> {
+    std::borrow::Cow::Borrowed("spinnerArc")
+  }
 }
 
 /// A SpinnerArc is a widget of SpinnerProgress.

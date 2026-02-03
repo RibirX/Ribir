@@ -34,6 +34,11 @@ impl Render for TransformBox {
 
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) { ctx.painter().apply_transform(&self.matrix); }
+
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> {
+    std::borrow::Cow::Borrowed("transformBox")
+  }
 }
 
 impl TransformBox {

@@ -97,6 +97,9 @@ impl Render for Stack {
     }
     stack_size
   }
+
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> { std::borrow::Cow::Borrowed("stack") }
 }
 
 impl<'c> ComposeChild<'c> for InParentLayout {

@@ -135,6 +135,22 @@ impl WrapRender for BorderWidget {
 
   #[inline]
   fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
+
+  #[cfg(feature = "debug")]
+  fn debug_type(&self) -> Option<&'static str> { Some("border") }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> Option<serde_json::Value> {
+    let b = &self.border;
+    Some(serde_json::json!({
+      "sides": {
+        "left": { "width": b.left.width, "brush": b.left.color },
+        "right": { "width": b.right.width, "brush": b.right.color },
+        "top": { "width": b.top.width, "brush": b.top.color },
+        "bottom": { "width": b.bottom.width, "brush": b.bottom.color }
+      }
+    }))
+  }
 }
 fn limited_radius(radius: &Radius, size: Size) -> Radius {
   let max = size.height.min(size.width) / 2.;

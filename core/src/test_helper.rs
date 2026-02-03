@@ -202,7 +202,7 @@ impl ShellWindow for TestShellWindow {
       Some(Frame { commands: commands.to_owned(), viewport, surface: surface_color });
   }
 
-  fn request_draw(&self) {}
+  fn request_draw(&self, _force: bool) {}
 
   fn id(&self) -> WindowId { self.id }
 

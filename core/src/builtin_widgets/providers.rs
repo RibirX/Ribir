@@ -759,6 +759,12 @@ impl Render for ProvidersRender {
   fn size_affected_by_child(&self) -> bool { self.render.size_affected_by_child() }
 
   fn get_transform(&self) -> Option<Transform> { self.render.get_transform() }
+
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> { self.render.as_render().debug_name() }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> serde_json::Value { self.render.as_render().debug_properties() }
 }
 
 pub(crate) struct Setup {

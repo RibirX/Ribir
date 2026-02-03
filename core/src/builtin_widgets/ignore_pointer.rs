@@ -58,4 +58,17 @@ impl WrapRender for IgnorePointer {
 
   #[inline]
   fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
+
+  #[cfg(feature = "debug")]
+  fn debug_type(&self) -> Option<&'static str> { Some("ignorePointer") }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> Option<serde_json::Value> {
+    let scope = match self.ignore {
+      IgnoreScope::None => "none",
+      IgnoreScope::OnlySelf => "onlySelf",
+      IgnoreScope::Subtree => "subtree",
+    };
+    Some(serde_json::json!({ "scope": scope }))
+  }
 }

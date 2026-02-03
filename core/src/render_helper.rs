@@ -61,6 +61,12 @@ where
 
   #[inline]
   fn get_transform(&self) -> Option<Transform> { self.proxy().get_transform() }
+
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> { self.proxy().debug_name() }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> serde_json::Value { self.proxy().debug_properties() }
 }
 
 impl<R: Render> RenderProxy for RefCell<R> {

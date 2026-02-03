@@ -76,6 +76,9 @@ impl Render for Row {
       ctx,
     )
   }
+
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> { std::borrow::Cow::Borrowed("row") }
 }
 
 impl Render for Column {
@@ -92,6 +95,9 @@ impl Render for Column {
       ctx,
     )
   }
+
+  #[cfg(feature = "debug")]
+  fn debug_name(&self) -> std::borrow::Cow<'static, str> { std::borrow::Cow::Borrowed("column") }
 }
 
 /// Core measure algorithm for linear arrangements (both rows and columns).

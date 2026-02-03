@@ -46,6 +46,14 @@ impl WrapRender for FilterWidget {
 
   #[inline]
   fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
+
+  #[cfg(feature = "debug")]
+  fn debug_type(&self) -> Option<&'static str> { Some("filter") }
+
+  #[cfg(feature = "debug")]
+  fn debug_properties(&self) -> Option<serde_json::Value> {
+    Some(serde_json::json!({ "empty": self.filter.is_empty() }))
+  }
 }
 
 impl_compose_child_for_wrap_render!(FilterWidget);

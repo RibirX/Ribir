@@ -94,7 +94,7 @@ impl App {
     Self::shared().windows.borrow_mut().remove(&id);
   }
 
-  fn send_event(event: UiEvent) {
+  pub(crate) fn send_event(event: UiEvent) {
     let _ = Self::shared()
       ._app_handler
       .borrow()
