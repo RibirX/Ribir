@@ -43,6 +43,7 @@ jobs:
           ref: ${{ steps.event.outputs.branch }}
           fetch-depth: 0
           fetch-tags: true
+          token: ${{ secrets.RIBIR_RELEASE }}
 
       - name: Install ribir-bot
         if: steps.event.outputs.should_run == 'true'
@@ -153,7 +154,7 @@ jobs:
         if: steps.cmd.outputs.command == 'release-stable'
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATE_RELEASE_TOKEN }}
-          GH_TOKEN: ${{ secrets.CRATE_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.RIBIR_RELEASE }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
