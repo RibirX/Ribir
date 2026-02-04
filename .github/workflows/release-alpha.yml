@@ -17,7 +17,7 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-          token: ${{ secrets.CRATE_RELEASE_TOKEN }}
+          token: ${{ secrets.RIBIR_RELEASE }}
 
       - name: Check for new commits
         run: |
@@ -42,14 +42,11 @@ jobs:
       - name: Release alpha
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATE_RELEASE_TOKEN }}
-          GH_TOKEN: ${{ secrets.CRATE_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.RIBIR_RELEASE }}
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Configure git to use token for HTTPS authentication
-          git remote set-url origin https://x-access-token:${{ secrets.CRATE_RELEASE_TOKEN }}@github.com/${{ github.repository }}.git
 
           # One command handles: changelog collect, cargo release, GitHub Release
           ribir-bot release next alpha --execute
