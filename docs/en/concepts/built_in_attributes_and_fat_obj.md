@@ -22,10 +22,68 @@ The `#[declare]` macro supports several options to customize its behavior:
 - **`#[declare(stateless)]`**: Generates a full builder that returns `FatObj<T>`. Supports built-in attributes, but the widget itself is not stateful.
 - **`#[declare(simple)]`**: Generates a simplified builder that returns `Stateful<T>` (or `T` if it has no fields). This is suitable for widgets that don't need built-in attributes.
 - **`#[declare(simple, stateless)]`**: Similar to `simple`, but always returns the plain object `T`.
+- **`#[declare(eager)]`**: Generates a builder that constructs the widget eagerly (immediately upon setting fields). This allows complex fields to be initialized partially (e.g., setting `width` and `height` separately for a `Size` field). It can be combined with `simple` and `stateless`.
 - **`#[declare(validate)]`**: Enables the `declare_validate` method for the widget.
 
 > [!NOTE]
 > `#[simple_declare]` is now deprecated in favor of `#[declare(simple)]`.
+
+### Eager Mode: Partial Initialization of Complex Fields
+
+The `#[declare(eager)]` mode enables **partial initialization of complex fields**. In lazy mode, the widget is only constructed when `finish()` is called. In eager mode, the widget is created immediately with default values, allowing custom setters to modify parts of complex fields.
+
+**Example: Supporting `width` and `height` for a `Size` field**
+
+```rust no_run
+use ribir::prelude::*;
+
+#[derive(Default)]
+#[declare(eager)]
+struct SizedBox {
+    #[declare(default)]
+    size: Size,
+}
+
+impl Render for SizedBox {
+    fn measure(&self, clamp: BoxClamp, _: &mut MeasureCtx) -> Size { clamp.clamp(self.size) }
+
+    fn paint(&self, _: &mut PaintingCtx) {}
+}
+
+impl SizedBoxDeclarer {
+    /// Sets width, supporting both values and pipes
+    fn with_width<K: ?Sized>(&mut self, width: impl RInto<PipeValue<f32>, K>) -> &mut Self {
+        let host = self.host().clone_writer();
+        let mix = self.mix_builtin_widget();
+        mix.init_sub_widget(width, &host, |w: &mut SizedBox, v| w.size.width = v);
+        self
+    }
+
+    /// Sets height, supporting both values and pipes
+    fn with_height<K: ?Sized>(&mut self, height: impl RInto<PipeValue<f32>, K>) -> &mut Self {
+        let host = self.host().clone_writer();
+        let mix = self.mix_builtin_widget();
+        mix.init_sub_widget(height, &host, |w: &mut SizedBox, v| w.size.height = v);
+        self
+    }
+}
+
+// Usage:
+fn example() -> Widget<'static> {
+    let w = Stateful::new(100.0f32);
+    fn_widget! {
+        @SizedBox {
+            width: pipe!(*$read(w)),  // or just: width: 100.0
+            height: 50.0,
+        }
+    }.into_widget()
+}
+```
+
+Key points:
+- `host()` provides access to the stateful widget during declaration
+- `RInto<PipeValue<T>, K>` accepts both plain values and reactive pipes
+- `init_sub_widget` handles pipe subscription and cleanup automatically
 
 ## What is FatObj?
 
