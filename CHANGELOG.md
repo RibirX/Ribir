@@ -10,6 +10,59 @@ For older versions:
 
 <!-- next-header -->
 
+## [0.4.0-alpha.56](https://github.com/RibirX/Ribir/releases/tag/v0.4.0-alpha.56) - 2026-02-04
+
+### 🎨 Features
+
+- **cli**: add MCP support to Ribir CLI (\#870 @wjian23)
+- **core**: add min/max size constraints to FatObj for more ergonomic layout control (\#865 @M-Adoo)
+- **core**: add width, height and size as builtin properties for all widgets (\#843 @wjian23)
+- **core**: introduce MCP debug server for remote inspection (\#870 @wjian23)
+- **core**: introduce VariantSource for unified reactive composition and transformation (\#862 @M-Adoo)
+- **core**: unify align and anchor positioning into AnchorX and AnchorY (\#843 @wjian23)
+- **widgets**: add Center and End support for flex JustifyContent (\#868 @wjian23)
+- **widgets**: add debug metadata support to builtin widgets (\#870 @wjian23)
+- 🤖 enhance changelog collection and release automation (\#857 @M-Adoo)
+
+### 🐛 Fixed
+
+- **macros**: exclude $clone references from watch\! and pipe\! dependency tracking (\#862 @M-Adoo)
+
+### 🔄 Changed
+
+- **core**: introduce ClassChain struct for combining multiple classes (\#861 @M-Adoo)
+- **core**: replace self\_positioned with adjust\_position for more robust widget positioning (\#867 @wjian23)
+- **core**: split Render::perform\_layout into measure and place\_children phases (\#843 @wjian23)
+- **core**: update layout placement flow to consistently apply position adjustments to all widgets (\#867 @wjian23)
+- **macros**: support automatic widget macro generation for simple declarers (\#859 @M-Adoo)
+- **widgets**: remove SizedBox and FractionallySizedBox in favor of builtin size properties (\#843 @wjian23)
+- **widgets**: rename JustifyContent::Compact to JustifyContent::Start (\#868 @wjian23)
+- **widgets**: update internal widgets to use the new multi-class support (\#869 @M-Adoo)
+
+### 📚 Documentation
+
+- add AI agent development guide (\#861 @M-Adoo)
+- update interactive widget design documentation and validation examples (\#862 @M-Adoo)
+
+### 💥 Breaking
+
+- **core**: remove ClassChain and support multiple classes via ClassList in the class field (\#869 @M-Adoo)
+- **core**: remove HAlign, VAlign, and GlobalAnchor widgets and properties (\#843 @wjian23)
+- **core**: rename class\_multi\_impl to class\_chain\_impl and remove class\_array macro (\#861 @M-Adoo)
+- **core**: rename Measure::Percent to Measure::Unit and update percent() to scale values by 1/100. (\#866 @M-Adoo)
+- **core**: rename Variant::clone\_value to snapshot and replace map\_with\_watcher with combine\_with (\#862 @M-Adoo)
+
+<details>
+<summary>🔧 Internal</summary>
+
+- build(tools): 🤖 fix GitHub token usage in release workflows (#872 @M-Adoo)
+- build(tools): 🤖 skip fork repos and configure git auth in release workflows (#871 @M-Adoo)
+- build(tools): 🤖 use CRATE_RELEASE_TOKEN for rc-bot (#863 @M-Adoo)
+- build(tools): 🤖 migrate release tooling from cargo-workspaces to cargo-edit (#858 @M-Adoo)
+- 💡 replace DisabledRipple with DisableInteractiveLayer (#856 @M-Adoo)
+
+</details>
+
 ## [0.4.0-alpha.55](https://github.com/M-Adoo/Ribir/releases/tag/v0.4.0-alpha.55) - 2026-01-21
 
 ### 🎨 Features
@@ -41,7 +94,6 @@ For older versions:
 - **widgets**: refactor Checkbox, Slider and RangeSlider to use event-driven state updates (\#852 @M-Adoo)
 - **widgets**: use new event declaration for Checkbox to simplify implementation. (\#851 @M-Adoo)
 
-
 ### 📚 Documentation
 
 - add Interactive Widget Design standard document (\#842 @M-Adoo)
@@ -57,9 +109,9 @@ For older versions:
 <details>
 <summary>🔧 Internal</summary>
 
-- ci: optimize CI workflow speed and parallelism (#841 @M-Adoo)
-- test(core):💍 improve `new_test_frame` to handle complex widget layout… (#835 @M-Adoo)
-- move cli to tools/cli and update toolchain checks (#838 @M-Adoo)
+- ci: optimize CI workflow speed and parallelism (\#841 @M-Adoo)
+- test(core):💍 improve `new_test_frame` to handle complex widget layout… (\#835 @M-Adoo)
+- move cli to tools/cli and update toolchain checks (\#838 @M-Adoo)
 - **tools**: optimize CI performance using nextest and parallelization (\#850 @M-Adoo)
 - implement Ribir release automation system (\#837 @M-Adoo)
 
