@@ -1358,7 +1358,7 @@ impl<T> FatObj<T> {
     part_writer!(&mut anchor.y)
   }
 
-  fn mix_builtin_widget(&mut self) -> &MixBuiltin {
+  pub fn mix_builtin_widget(&mut self) -> &MixBuiltin {
     self
       .mix_builtin
       .get_or_insert_with(MixBuiltin::default)
@@ -1419,7 +1419,7 @@ use init_sub_widget;
 use init_text_style;
 
 impl MixBuiltin {
-  fn init_sub_widget<V: 'static, B: 'static, K: ?Sized>(
+  pub fn init_sub_widget<V: 'static, B: 'static, K: ?Sized>(
     &self, init: impl RInto<PipeValue<V>, K>, sub_widget: &impl StateWriter<Value = B>,
     set_value: fn(&mut B, V),
   ) {
@@ -1515,6 +1515,12 @@ impl<'a> FatObj<Widget<'a>> {
 impl FatObj<()> {
   #[inline]
   pub fn with_child<C>(self, child: C) -> FatObj<C> { self.map(move |_| child) }
+}
+
+impl<T> FatObj<T> {
+  pub fn host(&self) -> &T { &self.host }
+
+  pub fn host_mut(&mut self) -> &mut T { &mut self.host }
 }
 
 impl<T> std::ops::Deref for FatObj<T> {

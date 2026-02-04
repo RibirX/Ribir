@@ -293,3 +293,189 @@ fn two_way_complete_set() {
   assert_eq!(*d.read(), 4.);
   assert_eq!(*e.read(), 5.);
 }
+
+#[test]
+fn eager_mode_basic() {
+  reset_test_env!();
+
+  #[derive(Default)]
+  #[declare(eager)]
+  struct EagerWidget {
+    #[declare(default = 42.0)]
+    value: f32,
+  }
+
+  let w = EagerWidget::declarer().finish();
+  assert_eq!(w.read().value, 42.0);
+}
+
+#[test]
+fn eager_mode_with_setter() {
+  reset_test_env!();
+
+  #[derive(Default)]
+  #[declare(eager)]
+  struct EagerWidget {
+    #[declare(default)]
+    value: f32,
+  }
+
+  let mut d = EagerWidget::declarer();
+  d.with_value(100.0);
+  let w = d.finish();
+  assert_eq!(w.read().value, 100.0);
+}
+
+#[test]
+fn eager_mode_fallback_to_default() {
+  reset_test_env!();
+
+  #[derive(Default)]
+  #[declare(eager)]
+  struct EagerWidget {
+    // No explicit default - uses Default::default()
+    #[declare(default)]
+    value: f32,
+  }
+
+  let w = EagerWidget::declarer().finish();
+  assert_eq!(w.read().value, 0.0); // f32::default() is 0.0
+}
+
+#[test]
+fn eager_mode_with_builtin_widget() {
+  reset_test_env!();
+
+  #[derive(Default)]
+  #[declare(eager)]
+  struct EagerWidget {
+    #[declare(default = 10.0)]
+    value: f32,
+  }
+
+  let mut d = EagerWidget::declarer();
+  d.with_value(50.0);
+  d.with_margin(ribir::core::builtin_widgets::EdgeInsets::all(10.));
+  let w = d.finish();
+  assert_eq!(w.read().value, 50.0);
+}
+
+#[test]
+fn eager_mode_with_pipe() {
+  reset_test_env!();
+
+  #[derive(Default)]
+  #[declare(eager)]
+  struct EagerWidget {
+    #[declare(default = 10.0)]
+    value: f32,
+  }
+
+  // Create a pipe source
+  let src = Stateful::new(42.0f32);
+  let pipe = Pipe::from_watcher(src.clone_watcher());
+
+  let mut d = EagerWidget::declarer();
+  // with_value accepts PipeValue, which Pipe implements RInto for
+  d.with_value(PipeValue::Pipe { init_value: 42.0, pipe });
+  let w = d.finish();
+
+  // Verify initial value
+  assert_eq!(w.read().value, 42.0);
+}
+
+/// Example: Eager mode with pipe support for partial field initialization.
+///
+/// This demonstrates how to implement partial setters that support both plain
+/// values and reactive pipes. The `width` and `height` fields can accept:
+/// - Plain values: `@SizedBox { width: 100.0, height: 50.0 }`
+/// - Pipe bindings: `@SizedBox { width: pipe!($w), height: pipe!($h) }`
+#[test]
+fn eager_mode_partial_field_with_pipe() {
+  reset_test_env!();
+
+  use ribir::core::prelude::{Pipe, PipeValue, RInto, Size};
+
+  #[derive(Default)]
+  #[declare(eager)]
+  struct SizedBox {
+    #[declare(default)]
+    size: Size,
+  }
+
+  // Implement custom partial setters with pipe support
+  impl SizedBoxDeclarer {
+    /// Sets the width component, supporting both values and pipes
+    fn with_width<K: ?Sized>(&mut self, width: impl RInto<PipeValue<f32>, K>) -> &mut Self {
+      let host = self.host().clone_writer();
+      let mix = self.mix_builtin_widget();
+      mix.init_sub_widget(width, &host, |w: &mut SizedBox, v| w.size.width = v);
+      self
+    }
+
+    /// Sets the height component, supporting both values and pipes
+    fn with_height<K: ?Sized>(&mut self, height: impl RInto<PipeValue<f32>, K>) -> &mut Self {
+      let host = self.host().clone_writer();
+      let mix = self.mix_builtin_widget();
+      mix.init_sub_widget(height, &host, |w: &mut SizedBox, v| w.size.height = v);
+      self
+    }
+  }
+
+  // Test: Plain values
+  let mut d = SizedBox::declarer();
+  d.with_width(100.0);
+  d.with_height(50.0);
+  let w = d.finish();
+  assert_eq!(w.read().size.width, 100.0);
+  assert_eq!(w.read().size.height, 50.0);
+
+  // Test: Pipe binding
+  let width_state = Stateful::new(200.0f32);
+  let height_state = Stateful::new(150.0f32);
+
+  let mut d2 = SizedBox::declarer();
+  let width_pipe = Pipe::from_watcher(width_state.clone_watcher());
+  let height_pipe = Pipe::from_watcher(height_state.clone_watcher());
+
+  d2.with_width(PipeValue::Pipe { init_value: 200.0, pipe: width_pipe });
+  d2.with_height(PipeValue::Pipe { init_value: 150.0, pipe: height_pipe });
+
+  let w2 = d2.finish();
+
+  // Verify initial values
+  assert_eq!(w2.read().size.width, 200.0);
+  assert_eq!(w2.read().size.height, 150.0);
+
+  // Update pipe sources and verify reactive updates
+  *width_state.write() = 250.0;
+  *height_state.write() = 180.0;
+
+  // Pipe updates are processed in next frame
+  let wnd = TestWindow::new_with_size(
+    fn_widget! {
+      @MockBox { size: Size::new(10., 10.) }
+    },
+    Size::new(100., 100.),
+  );
+  wnd.draw_frame();
+
+  assert_eq!(w2.read().size.width, 250.0);
+  assert_eq!(w2.read().size.height, 180.0);
+}
+
+#[test]
+#[should_panic = "Required field `EagerRequired::value` not set"]
+fn eager_mode_required_field_panic() {
+  reset_test_env!();
+
+  #[derive(Default)]
+  #[declare(eager)]
+  struct EagerRequired {
+    #[allow(unused)]
+    value: f32,
+  }
+
+  // Should panic because required field is not set
+  let _ = EagerRequired::declarer().finish();
+}

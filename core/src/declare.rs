@@ -80,6 +80,41 @@
 //!   combined with `stateless` or if the struct is empty.
 //! - **Fields**: Setters accept static values (no pipes).
 //!
+//! ### `#[declare(eager)]`
+//!
+//! Generates a builder that constructs the widget eagerly (immediately upon
+//! setting fields), rather than lazily (collecting all fields and building at
+//! the end).
+//!
+//! - **Use case**: Allows complex fields to be initialized partially. For
+//!   example, a `size` field (of type `Size`) can be initialized by setting
+//!   `width` and `height` separately if the `Size` struct exposes those as
+//!   setters.
+//! - **Outcome**: The generated builder methods directly modify the widget
+//!   instance being built.
+//! - **Compatibility**:
+//!     - Can be combined with `simple` to avoid `FatObj`.
+//!     - Can be combined with `stateless` to avoid `Stateful`.
+//!
+//! #### Example: Partial Initialization
+//!
+//! ```ignore
+//! #[derive(Default)]
+//! #[declare(eager)]
+//! struct SizedBox {
+//!   #[declare(default)]
+//!   size: Size,
+//! }
+//!
+//! // You can now use `width` and `height` to initialize `size` if you add
+//! // methods to `SizedBoxDeclarer` that modify `self.host().size`.
+//! //
+//! // @SizedBox {
+//! //   width: 100.,
+//! //   height: 50.,
+//! // }
+//! ```
+//!
 //! ### `#[declare(stateless)]`
 //! Optimizes the widget by removing the internal `Stateful` wrapper, treating
 //! the widget as immutable after creation.

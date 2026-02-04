@@ -22,10 +22,68 @@ Ribir 提供了一个强大的内置属性系统，让您可以为任何 Widget 
 - **`#[declare(stateless)]`**: 生成一个完整的 Builder，返回 `FatObj<T>`。支持内置属性，但 Widget 本身不是有状态的。
 - **`#[declare(simple)]`**: 生成一个简化的 Builder，返回 `Stateful<T>`（如果 struct 没有字段则返回 `T`）。这适用于不需要内置属性的 Widget。
 - **`#[declare(simple, stateless)]`**: 与 `simple` 类似，但始终返回原始对象 `T`。
+- **`#[declare(eager)]`**: 生成一个 eager 模式的 Builder，它会立即构建 Widget（即在设置字段时立即修改 Widget 实例）。这允许部分初始化复杂字段（例如，可以分别设置 `Size` 字段的 `width` 和 `height`）。它可以与 `simple` 和 `stateless` 结合使用。
 - **`#[declare(validate)]`**: 为 Widget 启用 `declare_validate` 验证方法。
 
 > [!NOTE]
 > `#[simple_declare]` 现在已被废弃，推荐使用 `#[declare(simple)]`。
+
+### Eager 模式：复杂字段的部分初始化
+
+`#[declare(eager)]` 支持**复杂字段的部分初始化**。在延迟模式下，Widget 直到 `finish()` 时才构建。而在 eager 模式下，Widget 会立即以默认值创建，允许自定义设置方法修改复杂字段的各个部分。
+
+**示例：为 `Size` 字段支持 `width` 和 `height`**
+
+```rust no_run
+use ribir::prelude::*;
+
+#[derive(Default)]
+#[declare(eager)]
+struct SizedBox {
+    #[declare(default)]
+    size: Size,
+}
+
+impl Render for SizedBox {
+    fn measure(&self, clamp: BoxClamp, _: &mut MeasureCtx) -> Size { clamp.clamp(self.size) }
+
+    fn paint(&self, _: &mut PaintingCtx) {}
+}
+
+impl SizedBoxDeclarer {
+    /// 设置宽度，支持普通值和 pipe
+    fn with_width<K: ?Sized>(&mut self, width: impl RInto<PipeValue<f32>, K>) -> &mut Self {
+        let host = self.host().clone_writer();
+        let mix = self.mix_builtin_widget();
+        mix.init_sub_widget(width, &host, |w: &mut SizedBox, v| w.size.width = v);
+        self
+    }
+
+    /// 设置高度，支持普通值和 pipe
+    fn with_height<K: ?Sized>(&mut self, height: impl RInto<PipeValue<f32>, K>) -> &mut Self {
+        let host = self.host().clone_writer();
+        let mix = self.mix_builtin_widget();
+        mix.init_sub_widget(height, &host, |w: &mut SizedBox, v| w.size.height = v);
+        self
+    }
+}
+
+// 使用：
+fn example() -> Widget<'static> {
+    let w = Stateful::new(100.0f32);
+    fn_widget! {
+        @SizedBox {
+            width: pipe!(*$read(w)),  // 或：width: 100.0
+            height: 50.0,
+        }
+    }.into_widget()
+}
+```
+
+关键点：
+- `host()` 在声明期间提供对有状态 Widget 的访问
+- `RInto<PipeValue<T>, K>` 同时接受普通值和响应式 pipe
+- `init_sub_widget` 自动处理 pipe 订阅和清理
 
 ## 什么是 FatObj？
 
