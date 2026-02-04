@@ -8,6 +8,7 @@ permissions:
 
 jobs:
   release:
+    if: '!github.event.repository.fork'
     runs-on: ubuntu-latest
     steps:
       - name: Validate branch
@@ -52,5 +53,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Configure git to use token for HTTPS authentication
+          git remote set-url origin https://x-access-token:${{ secrets.CRATE_RELEASE_TOKEN }}@github.com/${{ github.repository }}.git
 
           ribir-bot release next patch --execute

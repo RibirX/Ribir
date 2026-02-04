@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   enter-rc:
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' && !github.event.repository.fork
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,6 +40,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Configure git to use token for HTTPS authentication
+          git remote set-url origin https://x-access-token:${{ secrets.CRATE_RELEASE_TOKEN }}@github.com/${{ github.repository }}.git
 
           # Version is auto-detected from the latest git tag
           ribir-bot release enter-rc --execute

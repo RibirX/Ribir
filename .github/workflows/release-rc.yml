@@ -9,7 +9,7 @@ permissions:
 jobs:
   release:
     # RC releases (rc.2, rc.3, etc.) must be published from release-X.Y.x branches
-    if: startsWith(github.ref, 'refs/heads/release-')
+    if: startsWith(github.ref, 'refs/heads/release-') && !github.event.repository.fork
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,5 +46,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Configure git to use token for HTTPS authentication
+          git remote set-url origin https://x-access-token:${{ secrets.CRATE_RELEASE_TOKEN }}@github.com/${{ github.repository }}.git
 
           ribir-bot release next rc --execute
