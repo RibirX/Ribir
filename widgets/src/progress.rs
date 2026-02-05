@@ -69,14 +69,14 @@ impl LinearProgress {
       @Expanded {
         flex: distinct_pipe! { $read(this).value.unwrap_or(1.) },
         @Container {
-          size: Size::new(0., 6.),
+          hint_size: Size::new(0., 6.),
           class: LINEAR_DETERMINATE_INDICATOR,
         }
       }
       @Expanded {
         flex: distinct_pipe! {$read(this).value.map_or(0., |v| 1. - v) },
         @Container {
-          size: Size::new(0., 6.),
+          hint_size: Size::new(0., 6.),
           class: LINEAR_DETERMINATE_TRACK,
         }
       }
@@ -87,7 +87,7 @@ impl LinearProgress {
   fn indeterminate() -> Widget<'static> {
     container! {
       class: LINEAR_PROGRESS_INDETERMINATE,
-      size: Size::new(0., 6.),
+      hint_size: Size::new(0., 6.),
     }
     .into_widget()
   }

@@ -84,7 +84,7 @@ impl ComposeChild<'static> for Switch {
       let switch_widget = @Stack {
           class: distinct_pipe!([SWITCH, $read(this).state_class_name()]),
           @Container {
-            size: Size::new(40., 20.),
+            hint_size: Size::new(40., 20.),
             class: distinct_pipe!([SWITCH_THUMB, $read(this).thumb_class_name()]),
           }
       };
