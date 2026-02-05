@@ -149,14 +149,7 @@ where
   fn_widget! {
     let id = $read(task).id();
     let item = @ListItemChildren {
-      @ {
-        let mut checkbox = @Checkbox { checked: pipe!($read(task).complete) };
-        let u = watch!($read(checkbox).checked)
-          .distinct_until_changed()
-          .subscribe(move |v| $write(task).complete = v);
-        checkbox.on_disposed(move |_| u.unsubscribe());
-        checkbox
-      }
+      @Checkbox { checked: TwoWay::new(part_writer!(&mut task.complete)) }
       @ListItemHeadline { @ { $read(task).label.clone() } }
       @Trailing {
         @Icon {

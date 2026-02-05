@@ -333,14 +333,7 @@ where
     let id = $read(task).id();
 
     @ListItem {
-      @ {
-        let mut checkbox = @Checkbox { checked: pipe!($read(task).complete) };
-        let u = watch!($read(checkbox).checked)
-          .distinct_until_changed()
-          .subscribe(move |v| $write(task).complete = v);
-        checkbox.on_disposed(move |_| u.unsubscribe());
-        checkbox
-      }
+      @Checkbox { checked: TwoWay::new(part_writer!(&mut task.complete)) }
       @ListItemHeadline { @ { $read(task).label.clone() } }
       @Trailing {
         @Icon {
@@ -357,7 +350,7 @@ where
 
 In this function widget, the interesting part is that `Todos` is not passed as a parameter. Instead, it's stipulated that `Task` must be split from `Todos`. This way, you can get the `Writer` of `Todos` in reverse, which allows you to implement the delete function.
 
-Next, use `Checkbox` to show whether the task is complete, monitor its changes, and synchronize the changes back to `Task`.
+Next, use `Checkbox` with `TwoWay` binding to show whether the task is complete and automatically synchronize the changes back to `Task`.
 
 Finally, use `ListItem` to show a complete task, composing `Checkbox`, delete button and task content together. `ListItem` is also a widget provided by the Ribir widgets library, and specifies its own child type. Here, `HeadlineText` is used to show the title, `Leading` represents the header content, and `Trailing` represents the tail content.
 
@@ -681,14 +674,7 @@ where
     let id = $read(task).id();
 
     @ListItem {
-      @ {
-        let mut checkbox = @Checkbox { checked: pipe!($read(task).complete) };
-        let u = watch!($read(checkbox).checked)
-          .distinct_until_changed()
-          .subscribe(move |v| $write(task).complete = v);
-        checkbox.on_disposed(move |_| u.unsubscribe());
-        checkbox
-      }
+      @ { @Checkbox { checked: TwoWay::new(part_writer!(&mut task.complete)) } }
       @ListItemHeadline { @ { $read(task).label.clone() } }
       @Trailing {
         @Icon {
