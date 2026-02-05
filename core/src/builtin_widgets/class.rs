@@ -581,7 +581,7 @@ mod tests {
       @Providers {
         providers: smallvec![initd_classes().into_provider()],
         @Container {
-          size: Size::new(100., 100.),
+          hint_size: Size::new(100., 100.),
           class: pipe!(*$read(cls)),
         }
       }
@@ -626,7 +626,7 @@ mod tests {
       @Providers {
         providers: smallvec![classes.into_provider()],
         @Container {
-          size: Size::new(100., 100.),
+          hint_size: Size::new(100., 100.),
           class: pipe!(*$read(cls)),
         }
       }
@@ -648,7 +648,7 @@ mod tests {
       @Providers {
         providers: smallvec![initd_classes().into_provider()],
         @Container {
-          size: Size::new(100., 100.),
+          hint_size: Size::new(100., 100.),
           class: [MARGIN, CLAMP_50],
         }
       }
@@ -680,7 +680,7 @@ mod tests {
       @Providers {
         providers: smallvec![classes.into_provider()],
         @Container {
-          size: Size::new(100., 100.),
+          hint_size: Size::new(100., 100.),
           class: pipe!(*$read(cls)),
         }
       }
@@ -712,7 +712,7 @@ mod tests {
       @Providers {
         providers: smallvec![classes.into_provider()],
         @Container {
-          size: Size::new(100., 100.),
+          hint_size: Size::new(100., 100.),
           class: pipe!($read(trigger); PROVIDER_CLS),
           on_performed_layout: move |e| {
             *$write(w_val) =  *Provider::of::<i32>(e).unwrap();
@@ -735,7 +735,7 @@ mod tests {
       @Providers {
         providers: smallvec![initd_classes().into_provider()],
         @Container {
-          size: Size::new(100., 100.),
+          hint_size: Size::new(100., 100.),
           class: pipe!(*$read(cls)),
         }
       }
@@ -760,7 +760,7 @@ mod tests {
       @Providers {
         providers: smallvec![initd_classes().into_provider()],
         @Container {
-          size: Size::new(100., 100.),
+          hint_size: Size::new(100., 100.),
           class: pipe!(*$read(cls)),
         }
       }
@@ -787,7 +787,7 @@ mod tests {
           })
         ],
         @Container {
-          size: Size::new(100., 100.),
+          hint_size: Size::new(100., 100.),
           class: MARGIN,
         }
       }
@@ -811,7 +811,7 @@ mod tests {
         providers: smallvec![initd_classes().into_provider()],
         @ {
           let w = pipe!(*$read(w_trigger)).map(|_| fn_widget!{
-            @Container {size: Size::new(100., 100.) }
+            @Container {hint_size: Size::new(100., 100.) }
           });
           @Class {
             class: pipe!(*$read(cls)),
@@ -839,7 +839,7 @@ mod tests {
       let mut w = FatObj::new(w);
       rdl! {
         @Container {
-          size: Size::new(100., 100.),
+          hint_size: Size::new(100., 100.),
           @(w) {
             on_performed_layout: move |e| {
               let id = $clone(w.track_id()).get().unwrap();
@@ -858,7 +858,7 @@ mod tests {
       @Providers {
         providers: smallvec![classes.clone().into_provider()],
         @Container {
-          size: Size::new(100., 100.),
+          hint_size: Size::new(100., 100.),
           class: pipe!(*$read(cls)),
         }
       }
@@ -997,5 +997,34 @@ mod tests {
     let id2 = r_id.read().as_ref().and_then(|w| w.get());
     assert!(id1 != id2);
     assert!(!id2.unwrap().is_dropped(wnd.tree()));
+  }
+
+  #[test]
+  fn override_size_by_widget_field() {
+    reset_test_env!();
+
+    let mut classes = Classes::default();
+    classes.insert(
+      CLAMP_50,
+      style_class! {
+        clamp: BoxClamp::fixed_size(Size::new(50., 50.))
+      },
+    );
+
+    let cls = Stateful::new(Some(CLAMP_50));
+
+    let wnd = TestWindow::from_widget(fn_widget! {
+      let cls = cls.clone_writer();
+      @Providers {
+        providers: smallvec![classes.clone().into_provider()],
+        @Container {
+          size: Size::new(100., 100.),
+          class: pipe!(*$read(cls)),
+        }
+      }
+    });
+
+    wnd.draw_frame();
+    wnd.assert_root_size(Size::new(100., 100.));
   }
 }

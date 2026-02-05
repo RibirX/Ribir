@@ -98,11 +98,11 @@ impl<'c> ComposeChild<'c> for Scrollbar {
             };
             let mut h_thumb =  @Container {
               class: H_SCROLL_THUMB,
-              width: distinct_pipe!{
+              hint_width: distinct_pipe!{
                 let track_width = *$read(h_track.layout_width());
                 h_thumb_rate(&$read(scroll)) * track_width
               },
-              height: 4.,
+              hint_height: 4.,
             };
 
             @(h_track) {
@@ -134,8 +134,8 @@ impl<'c> ComposeChild<'c> for Scrollbar {
 
             let mut v_thumb = @Container {
               class: V_SCROLL_THUMB,
-              width: 4.,
-              height: distinct_pipe!{
+              hint_width: 4.,
+              hint_height: distinct_pipe!{
                 let track_height = *$read(v_track.layout_height());
                 v_thumb_rate(&$read(scroll)) * track_height
               },
@@ -204,7 +204,7 @@ mod test {
     WidgetTester::new(fn_widget! {
       let scrollbar = Scrollbar::new(Scrollable::Both);
       @(scrollbar) {
-        @Container { size: Size::new(500., 500.) }
+        @Container { hint_size: Size::new(500., 500.) }
       }
     })
     .with_wnd_size(Size::new(100., 100.)),
@@ -222,7 +222,7 @@ mod test {
       WidgetTester::new(fn_widget! {
         let scrollbar = Scrollbar { scroll : inner.clone_writer() };
         @(scrollbar) {
-          @Container { size: Size::new(500., 500.) }
+          @Container { hint_size: Size::new(500., 500.) }
         }
       })
       .with_wnd_size(Size::new(100., 100.))

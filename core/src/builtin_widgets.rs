@@ -1488,8 +1488,8 @@ impl<'a> FatObj<Widget<'a>> {
     compose_builtin_widgets!(
       host
         + [
-          fixed_size,
           class,
+          fixed_size,
           constrained_box,
           tooltips,
           margin,
