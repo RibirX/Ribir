@@ -34,8 +34,11 @@ jobs:
         with:
           toolchain: stable
 
-      - name: Install ribir-bot from repo
-        run: cargo install --path tools/ribir-bot
+      - name: Install ribir-bot
+        uses: taiki-e/cache-cargo-install-action@v2
+        with:
+          tool: ribir-bot
+          version: 0.1
 
       - uses: ./.github/actions/setup-gemini
 
