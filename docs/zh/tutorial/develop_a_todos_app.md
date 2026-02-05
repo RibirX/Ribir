@@ -323,14 +323,7 @@ where
     let id = $read(task).id();
 
     @ListItem {
-      @ {
-        let mut checkbox = @Checkbox { checked: pipe!($read(task).complete) };
-        let u = watch!($read(checkbox).checked)
-          .distinct_until_changed()
-          .subscribe(move |v| $write(task).complete = v);
-        checkbox.on_disposed(move |_| u.unsubscribe());
-        checkbox
-      }
+      @Checkbox { checked: TwoWay::new(part_writer!(&mut task.complete)) }
       @ListItemHeadline { @ { $read(task).label.clone() } }
       @Trailing {
         @Icon {
@@ -347,7 +340,7 @@ where
 
 在这个函数控件中，有意思的的地方在于，并没有通过参数来传递 `Todos`, 而是规定了 `Task` 必须是从 `Todos` 中分裂出来的，这样你就可以反向拿到 `Todos` 的 `Writer` ，从而实现删除功能。
 
-接着，用 `Checkbox` 来展示任务是否完成，并监听它的变化，将变化同步回 `Task` 中。
+接着，用 `Checkbox` 的 `TwoWay` 绑定来展示任务是否完成，并自动将变化同步回 `Task` 中。
 
 最后，用 `ListItem` 来展示一个完整任务，将 `Checkbox`, 删除按钮和任务内容组合在一起。`ListItem` 也是 Ribir widgets 库提供的一个 widget，并规定了自己的孩子类型，这里用到了 `HeadlineText` 来展示标题， `Leading` 表示头部内容，`Trailing` 表示尾部内容。
 
@@ -670,14 +663,7 @@ where
     let id = $read(task).id();
 
     @ListItem {
-      @ {
-        let mut checkbox = @Checkbox { checked: pipe!($read(task).complete) };
-        let u = watch!($read(checkbox).checked)
-          .distinct_until_changed()
-          .subscribe(move |v| $write(task).complete = v);
-        checkbox.on_disposed(move |_| u.unsubscribe());
-        checkbox
-      }
+      @ { @Checkbox { checked: TwoWay::new(part_writer!(&mut task.complete)) } }
       @ListItemHeadline { @ { $read(task).label.clone() } }
       @Trailing {
         @Icon {
