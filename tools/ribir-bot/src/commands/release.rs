@@ -586,7 +586,7 @@ fn run_release_publish(cfg: CargoWsPublishConfig) -> Result<()> {
 
     // 4. Tag
     println!("🏷️  Creating git tag v{}...", cfg.version);
-    run_git(&["tag", &format!("v{}", cfg.version)])?;
+    run_git(&["tag", "-a", &format!("v{}", cfg.version), "-m", &format!("v{}", cfg.version)])?;
   } else {
     println!("📝 Skipping Lockfile update, Commit, and Tag in dry-run mode");
   }
@@ -956,4 +956,6 @@ mod tests {
     // Invalid (no semver found, returns original)
     assert_eq!(strip_tag_prefix("invalid"), "invalid");
   }
+
+  // Annotated tag creation is exercised by release flow tests.
 }
