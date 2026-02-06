@@ -124,6 +124,7 @@ tracing = "0.1.41"
 tracing-log = "0.2.0"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "fmt", "registry"] }
 tokio-stream = { version = "0.1.17", features = ["sync", "time"] }
+dirs = "5.0"
 
 priority-queue = "2.1.1"
 web-sys = { version = "0.3.69", features = ["HtmlCollection"] }

@@ -1,5 +1,12 @@
 ## Cli for ribir
 
+### Install
+
+```bash
+# From the repo root
+cargo install --path tools/cli
+```
+
 ### SubCommand
 
 #### run-wasm
@@ -21,10 +28,10 @@ Bundle the native app for distribution.
 cd examples/counter
 
 # Build and bundle (default behavior)
-cargo run -p cli -- bundle
+cargo run -p ribir-cli -- bundle
 
 # With custom config file
-cargo run -p cli -- bundle -c path/to/bundle.toml
+cargo run -p ribir-cli -- bundle -c path/to/bundle.toml
 ```
 
 ##### Subcommands
@@ -49,23 +56,23 @@ cargo run -p cli -- bundle -c path/to/bundle.toml
 
 ```bash
 # Default: build + package with auto-detected profile
-cargo run -p cli -- bundle
+cargo run -p ribir-cli -- bundle
 
 # Use a specific profile
-cargo run -p cli -- bundle --profile release
+cargo run -p ribir-cli -- bundle --profile release
 
 # Clean build
-cargo run -p cli -- bundle --clean
+cargo run -p ribir-cli -- bundle --clean
 
 # Only build (for CI/CD pipelines)
-cargo run -p cli -- bundle build
+cargo run -p ribir-cli -- bundle build
 
 # Only package (assumes already built)
-cargo run -p cli -- bundle pack
+cargo run -p ribir-cli -- bundle pack
 
 # Combine options
-cargo run -p cli -- bundle build --profile dev --clean
-cargo run -p cli -- bundle pack --profile release
+cargo run -p ribir-cli -- bundle build --profile dev --clean
+cargo run -p ribir-cli -- bundle pack --profile release
 ```
 
 ##### Profile Detection
@@ -123,11 +130,33 @@ No additional configuration is needed - just use `asset!("path/to/file")` in you
 
 #### mcp
 
-Configure MCP (Model Context Protocol) for AI coding assistants to debug Ribir applications.
+Start MCP (Model Context Protocol) stdio server for AI coding assistants to debug Ribir applications.
 
 ##### What is MCP?
 
-MCP (Model Context Protocol) is a standard that allows AI assistants to interact with external tools and services. The Ribir Debug MCP server enables AI clients to inspect and debug running Ribir applications in real-time.
+MCP (Model Context Protocol) is a standard that allows AI assistants to interact with external tools and services. The Ribir MCP server provides a native Rust stdio server that enables AI clients to inspect and debug running Ribir applications in real-time.
+
+##### Automatic Port Discovery
+
+The MCP server supports **automatic port discovery** so the CLI can find the running debug server for whichever project you're in:
+
+- When a Ribir app starts with `--features debug`, it registers its dynamically assigned port in `~/.local/state/ribir/debug-ports/`
+- The MCP server checks the registry for the current working directory and forwards requests to the correct port
+- No manual port configuration is needed
+
+```bash
+# Terminal 1: Debug project A (auto-discovered port)
+cd ~/projects/app-a
+cargo run --features debug
+# Output: Debug server listening on http://127.0.0.1:2333
+
+# Terminal 2: Debug project B (auto-discovered port)
+cd ~/projects/app-b
+cargo run --features debug
+# Output: Debug server listening on http://127.0.0.1:2334
+
+# AI clients in each project directory will auto-discover the correct port
+```
 
 ##### Available Tools
 
@@ -161,71 +190,134 @@ When connected, the AI assistant can use these tools:
 # 1. Run your Ribir app with debug feature enabled
 cargo run --features debug
 
-# 2. In another terminal, install and configure MCP
-cargo run -p cli -- mcp install
+# 2. Configure your AI client to use the MCP server
+# The port is auto-discovered - no env var needed!
+```
 
-# 3. Use your AI client with MCP tools
-# Example: "Use ribir-debug to capture a screenshot"
+##### Configuration Examples
+
+###### Claude Desktop / Claude CLI
+
+Add to `~/.claude.json` or `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "ribir-debug": {
+      "command": "cargo",
+      "args": ["run", "-p", "cli", "--", "mcp", "serve"]
+    }
+  }
+}
+```
+
+###### OpenCode CLI
+
+Add to `~/.config/opencode/opencode.json`:
+
+```json
+{
+  "mcp": {
+    "ribir-debug": {
+      "type": "local",
+      "command": ["cargo", "run", "-p", "cli", "--", "mcp", "serve"],
+      "enabled": true
+    }
+  }
+}
+```
+
+###### Codex CLI
+
+Add to `~/.codex/config.toml`:
+
+```toml
+[[mcp.servers]]
+name = "ribir-debug"
+command = "cargo"
+args = ["run", "-p", "cli", "--", "mcp", "serve"]
 ```
 
 ##### Subcommands
 
 | Command | Description |
 |---------|-------------|
-| `mcp install` | Install adapter to `~/.ribir/` and configure AI clients |
-| `mcp upgrade` | Upgrade adapter files in `~/.ribir/` |
-| `mcp status` | Show current MCP configuration status |
+| `mcp serve` | Start MCP stdio server (used by AI clients) |
+| `mcp check` | Check connection to the Ribir debug server |
+| `mcp list` | List all active debug sessions |
 
-##### Install Options
+##### Options
+
+**serve options:**
 
 | Option | Description |
 |--------|-------------|
-| `-c, --client <CLIENT>` | Target AI client: `auto`, `claude-cli`, `opencode`, `gemini` |
-| `-p, --port <PORT>` | Ribir debug server port (default: `2333`) |
-| `--dry-run` | Show what would be written without making changes |
-| `--skip-adapter` | Skip copying adapter files to `~/.ribir/` |
+| `-p, --port <PORT>` | Override auto-discovered port |
 
-##### Supported AI Clients
+**check options:**
 
-| Client | Config Path |
+| Option | Description |
 |--------|-------------|
-| `claude-cli` | Claude CLI (`~/.claude.json`) |
-| `opencode` | OpenCode CLI (`~/.config/opencode/opencode.json`) |
-| `gemini` | Gemini CLI (`~/.gemini/settings.json`) |
+| `-p, --port <PORT>` | Override auto-discovered port |
 
 ##### Examples
 
 ```bash
-# Auto-detect and configure all installed AI clients
-cargo run -p cli -- mcp install
+# List all active debug sessions
+cargo run -p ribir-cli -- mcp list
 
-# Configure only OpenCode
-cargo run -p cli -- mcp install --client=opencode
+# Test connection to auto-discovered debug server
+cargo run -p ribir-cli -- mcp check
 
-# Use a custom port
-cargo run -p cli -- mcp install --port=8080
+# Start MCP server with auto-discovery
+cargo run -p ribir-cli -- mcp serve
 
-# Preview what would be written
-cargo run -p cli -- mcp install --dry-run --client=opencode
+# Override with a specific port
+cargo run -p ribir-cli -- mcp serve --port=8080
 ```
 
 ##### How It Works
 
 ```
 ┌─────────────────┐     stdio      ┌──────────────────┐     HTTP     ┌─────────────────┐
-│   AI Client     │◄──────────────►│   Node Adapter   │◄───────────►│  Ribir App      │
-│ (Claude/OpenCode)│               │  (mcp-adapter.js) │  :2333     │  (debug server) │
+│   AI Client     │◄──────────────►│  Rust MCP Server │◄───────────►│  Ribir App      │
+│ (Claude/Codex)  │               │  (cli mcp serve) │  :auto     │  (debug server) │
 └─────────────────┘               └──────────────────┘            └─────────────────┘
-                                          │
-                                          │ loads schema
-                                          ▼
-                                   ~/.ribir/
-                                   ├── mcp-adapter.js
-                                   └── mcp_schema.json
 ```
 
-1. **Install**: Copies `mcp-adapter.js` and `mcp_schema.json` to `~/.ribir/`
-2. **Configure**: Adds `ribir-debug` server entry to each AI client's config
-3. **Run**: Start your Ribir app with `--features debug` to enable the debug server
-4. **Use**: AI client communicates with the adapter via stdio, adapter forwards requests to the debug server
-5. **Upgrade**: Run `mcp upgrade` to update adapter files after updating Ribir
+1. **Run**: Start your Ribir app with `--features debug` - it auto-registers its port
+2. **Configure**: Add `ribir-debug` server entry to your AI client's config (no port needed)
+3. **Connect**: AI client launches `cli mcp serve` which auto-discovers the port
+4. **Forward**: The MCP server forwards JSON-RPC requests to the debug HTTP server
+5. **Respond**: Responses flow back through the MCP server to the AI client
+
+##### Multi-Project Debugging
+
+When debugging multiple Ribir projects simultaneously:
+
+1. Each project's debug server registers its port with the project path as key
+2. The MCP server discovers the port based on the current working directory
+3. No configuration changes needed - just run from the correct directory
+
+```bash
+# View all active sessions
+cargo run -p ribir-cli -- mcp list
+
+# Output:
+# Active debug sessions:
+#
+#   Port: 2333
+#   Path: /Users/you/projects/app-a
+#   PID:  12345
+#
+#   Port: 2334
+#   Path: /Users/you/projects/app-b
+#   PID:  12346
+```
+
+##### Fallback Mode
+
+If the debug server is not running, the MCP server operates in fallback mode:
+- Tool/resource discovery still works (via `initialize`, `tools/list`, `resources/list`)
+- Tool invocations return helpful error messages with setup instructions
+- This allows AI clients to discover available capabilities even when the app isn't running

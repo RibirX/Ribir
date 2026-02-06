@@ -4,14 +4,22 @@ Ribir provides a built-in debug server that enables both AI-powered debugging vi
 
 ## 🚀 Getting Started
 
-To enable debug features in your Ribir application, you must run it with the `debug` feature enabled:
+To enable debug features in your Ribir application:
+
+1. Install `ribir-cli` (once).
+
+```bash
+# From the repo root
+cargo install --path tools/cli
+```
+2. Run your app with the `debug` feature enabled:
 
 ```bash
 cargo run --features debug
 ```
 
 When the `debug` feature is active:
-1. An HTTP debug server starts on `127.0.0.1:2333` (by default).
+1. An HTTP debug server starts on `127.0.0.1` with a dynamically assigned port and prints the full URL on startup (`RIBIR_DEBUG_URL=...`).
 2. Continuous frame capture and log buffering are enabled.
 3. The application can interact with MCP-compatible AI assistants.
 
@@ -21,23 +29,41 @@ The debug server can be configured using environment variables:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `RIBIR_DEBUG_PORT` | The port the debug server listens on | `2333` |
 | `RIBIR_CAPTURE_DIR` | Directory where recorded frames and captures are saved | `captures` |
 
 ---
 
+> **Port:** The HTTP debug server uses a dynamically assigned port. Use the startup log to find the full URL.
+
 ## 🤖 AI Debugging (MCP)
 
-Ribir supports the [Model Context Protocol (MCP)](https://modelcontextprotocol.io), allowing AI coding assistants like Claude, Gemini, or OpenCode to "see" and interact with your running application.
+Ribir supports the [Model Context Protocol (MCP)](https://modelcontextprotocol.io), allowing AI coding assistants like Claude, Codex, or OpenCode to "see" and interact with your running application.
 
-### Installation
+### Setup
 
-Use the Ribir CLI to configure your AI clients:
+Configure your AI client to use the Ribir MCP server. Add the following to your AI client's MCP configuration:
 
-```bash
-# Install the MCP adapter and configure all detected AI clients
-cargo run -p cli -- mcp install
+**For Claude Desktop / Claude CLI** (`~/.claude.json` or `claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "ribir-debug": {
+      "command": "ribir-cli",
+      "args": ["mcp", "serve"]
+    }
+  }
+}
 ```
+
+**For Codex CLI** (`~/.codex/config.toml`):
+```toml
+[[mcp.servers]]
+name = "ribir-debug"
+command = "ribir-cli"
+args = ["mcp", "serve"]
+```
+
+For other clients, see `tools/cli/README.md` for configuration examples.
 
 ### Key MCP Tools
 
@@ -48,16 +74,14 @@ When connected, the AI can use tools such as:
 - `add_overlay`/`remove_overlay`: Visually highlight widgets in the app.
 - `set_log_filter`: Dynamically change log levels (e.g., `ribir_core=debug`).
 
----
-
 ## 🌐 HTTP Debug Server
 
 The debug server provides a REST API and a built-in web UI for manual inspection.
 
 ### Built-in Web UI
 
-Open your browser to:
-[http://localhost:2333/ui](http://localhost:2333/ui)
+Open your browser to the URL printed on startup, for example:
+`http://127.0.0.1:<port>/ui`
 
 This UI allows you to:
 - View live logs.

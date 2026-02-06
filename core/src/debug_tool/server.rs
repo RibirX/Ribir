@@ -228,18 +228,12 @@ pub struct DebugServerState {
   pub active_capture: tokio::sync::Mutex<Option<CaptureSession>>,
 }
 
-const DEFAULT_DEBUG_PORT: u16 = 2333;
-
-/// Start the debug HTTP server on the specified port.
+/// Start the debug HTTP server on a dynamically assigned port.
 /// Start the debug HTTP server.
-/// - Reads `RIBIR_DEBUG_PORT` env var (default 2333).
 /// - Initializes debug logging.
 pub fn start_debug_server() -> mpsc::Sender<DebugCommand> {
   crate::logging::init_debug_tracing("info");
-  let port = std::env::var("RIBIR_DEBUG_PORT")
-    .ok()
-    .and_then(|s| s.parse().ok())
-    .unwrap_or(DEFAULT_DEBUG_PORT);
+  let bind_addr = "127.0.0.1:0";
 
   let (cmd_tx, mut cmd_rx) = mpsc::channel::<DebugCommand>(32);
   let (frame_tx, mut frame_rx) = mpsc::unbounded_channel::<FramePacket>();
@@ -378,14 +372,37 @@ pub fn start_debug_server() -> mpsc::Sender<DebugCommand> {
 
   // Spawn HTTP server on background task
   tokio::spawn(async move {
-    match tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port)).await {
+    match tokio::net::TcpListener::bind(bind_addr).await {
       Ok(listener) => {
-        log::info!("Debug MCP server listening on http://127.0.0.1:{}", port);
-        println!("Debug MCP server listening on http://127.0.0.1:{}", port);
-        axum::serve(listener, app).await.ok();
+        let local_addr = match listener.local_addr() {
+          Ok(addr) => addr,
+          Err(err) => {
+            log::error!("Failed to read debug server address: {}", err);
+            return;
+          }
+        };
+        let port = local_addr.port();
+        let url = format!("http://{}", local_addr);
+        let ui_url = format!("{}/ui", url);
+        log::info!("Debug server listening on {} (open /ui)", url);
+        println!("Debug server listening on {} (open /ui)", url);
+        eprintln!("RIBIR_DEBUG_URL={}", url);
+        eprintln!("RIBIR_DEBUG_UI={}", ui_url);
+
+        // Register the port for discovery by MCP clients
+        let registry_file = super::port_registry::register_port(port).ok();
+
+        let result = axum::serve(listener, app).await;
+
+        // Unregister on shutdown
+        if let Some(file) = registry_file {
+          super::port_registry::unregister_port(&file);
+        }
+
+        result.ok();
       }
       Err(e) => {
-        log::error!("Failed to bind debug server on port {}: {}", port, e);
+        log::error!("Failed to bind debug server on {}: {}", bind_addr, e);
       }
     }
   });
@@ -460,11 +477,6 @@ async fn set_logs_filter(
   crate::logging::update_filter(&payload.filter).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
   Ok(Json(LogsFilterResponse { ok: true }))
 }
-// Using multi_replace for handling disparate chunks is better, but I'm doing
-// contiguous replacement of a block of handlers. The code I'm replacing covers
-// start_debug_server ending to set_logs_filter. Oh wait, set_logs_filter and
-// others are further down. I will just replacing the routing part and adding
-// get_windows handler. Also updating LayoutQuery (further down).
 
 #[derive(serde::Deserialize, Default)]
 struct LayoutQuery {

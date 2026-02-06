@@ -46,6 +46,7 @@ serde_json = { workspace = true, optional = true }
 axum = { version = "0.8", optional = true }
 tower-http = { version = "0.6", features = ["cors"], optional = true }
 base64 = { version = "0.21", optional = true }
+dirs = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "rt", "time", "macros", "sync"]}
@@ -72,5 +73,5 @@ png = ["ribir_painter/png"]
 jpeg = ["ribir_painter/jpeg"]
 test-utils = []
 tracing = ["dep:tracing", "dep:tracing-log", "dep:tracing-subscriber", "dep:tokio-stream"]
-debug = ["serde", "serde_json", "axum", "tower-http", "png", "tracing", "dep:base64"]
+debug = ["serde", "serde_json", "axum", "tower-http", "png", "tracing", "dep:base64", "dep:dirs"]
 

@@ -10,6 +10,7 @@
 mod helpers;
 mod mcp;
 mod overlays;
+mod port_registry;
 mod server;
 mod service;
 mod types;
