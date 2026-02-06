@@ -79,7 +79,24 @@ impl Compose for MyComponent {
 4. **Test**: `cargo +nightly ci test`
 5. **Visual Tests**: If you change rendering, check `test_cases/`. Update expected images with `RIBIR_IMG_TEST=overwrite cargo +nightly ci test`.
 
-## 6. Interaction & Data Flow
+## 6. Debug Logs & MCP (Important)
+- **Start app with debug enabled**:
+```bash
+cargo run --features debug
+```
+- **Startup URLs**: On launch it prints `RIBIR_DEBUG_URL=...` and `RIBIR_DEBUG_UI=...`. Use these for manual access and include them in bug reports.
+- **Logs**: In-memory ring buffer only, capped to 50,000 entries and ~60s of history. `/logs` returns NDJSON and includes `x-ribir-log-dropped` for any dropped count.
+- **Captures**: Saved to `captures/<capture_id>/logs.jsonl` by default. Override with `RIBIR_CAPTURE_DIR=/path`.
+- **MCP usage (agent-facing)**: From an MCP client, read resources and run tools below.
+```text
+Resources: ribir://status, ribir://windows, ribir://logs
+Tools: capture_screenshot, inspect_tree, inspect_widget, get_overlays, set_log_filter,
+       add_overlay, remove_overlay, clear_overlays, start_recording, stop_recording,
+       capture_one_shot
+```
+- **Authoritative schema**: `core/src/debug_tool/mcp_schema.json`. Setup details in `dev-docs/debug-features.md`.
+
+## 7. Interaction & Data Flow
 For interactive widgets, follow the **Single Source of Truth** rule: UI is a projection of data.
 
 1. **Path A (Standard)**: Data changes -> `pipe!` emits -> UI updates.
@@ -88,7 +105,26 @@ For interactive widgets, follow the **Single Source of Truth** rule: UI is a pro
 
 > 📘 **Deep Dive**: For complex interactive widgets, strictly follow `dev-docs/interactive-widget-design.md`.
 
-## 7. Common Pitfalls
+## 8. Rust Code Organization
+
+Use Rust 2018+ module style: `foo.rs` + `foo/` directory (not `foo/mod.rs`).
+
+```
+# ✅ Preferred
+src/
+├── mcp.rs           # Module entry
+└── mcp/
+    ├── serve.rs
+    └── schema.rs
+
+# ❌ Avoid
+src/
+└── mcp/
+    ├── mod.rs
+    └── ...
+```
+
+## 9. Common Pitfalls
 - **Deadlocks/Panics**: Calling `$write(s)` while a `$read(s)` is active in the same scope (RefCell borrow conflict).
 - **Infinite Loops**: A `pipe!` that modifies the same state it reads from.
 - **Orphan Widgets**: Forgetting to call `.into_widget()` when returning a widget from a function that isn't `fn_widget!`.

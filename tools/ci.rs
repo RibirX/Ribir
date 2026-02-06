@@ -382,7 +382,7 @@ fn run_wasm(stable_version: &str) -> Result<(), ()> {
       "--exclude",
       "ribir_dev_helper",
       "--exclude",
-      "cli",
+      "ribir-cli",
       "--exclude",
       "pomodoro",
       "--exclude",
@@ -398,7 +398,7 @@ fn run_bundle(stable_version: &str) -> Result<(), ()> {
 
   run_cargo_command(
     stable_version,
-    &["run", "-p", "cli", "--", "bundle", "--profile", "dev"],
+    &["run", "-p", "ribir-cli", "--", "bundle", "--profile", "dev"],
     Some("examples/gallery"),
     &[("RIBIR_FEATURES", "wgpu")],
   )?;

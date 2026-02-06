@@ -21,7 +21,7 @@
     "tools": [
         {
             "name": "capture_screenshot",
-            "description": "Capture a screenshot of the specified window",
+            "description": "Capture a screenshot of the specified window. Returns the image as base64-encoded PNG data in the response.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -104,7 +104,7 @@
         },
         {
             "name": "add_overlay",
-            "description": "Highlight a widget with a colored overlay",
+            "description": "Add a visual highlight overlay to a widget for debugging purposes",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -128,7 +128,7 @@
         },
         {
             "name": "remove_overlay",
-            "description": "Remove a specific overlay",
+            "description": "Remove a specific visual debug overlay from a widget",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -148,7 +148,7 @@
         },
         {
             "name": "clear_overlays",
-            "description": "Clear all overlays",
+            "description": "Clear all visual debug overlays from the window",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -161,7 +161,7 @@
         },
         {
             "name": "start_recording",
-            "description": "Start recording frames to disk",
+            "description": "Start recording frames to disk. Frames are saved as PNG files in the current working directory with pattern: frame_{timestamp}_{sequence}.png. Use RIBIR_CAPTURE_DIR env var to customize output location (defaults to ./captures/)",
             "inputSchema": {
                 "type": "object",
                 "properties": {}
@@ -169,7 +169,7 @@
         },
         {
             "name": "stop_recording",
-            "description": "Stop recording and save to disk",
+            "description": "Stop recording and return the capture directory path. Use RIBIR_CAPTURE_DIR env var to customize output location (defaults to ./captures/)",
             "inputSchema": {
                 "type": "object",
                 "properties": {}
@@ -177,7 +177,7 @@
         },
         {
             "name": "capture_one_shot",
-            "description": "One-click capture: start -> request redraw (if images enabled) -> wait -> stop.",
+            "description": "One-click capture: start -> request redraw (if images enabled) -> wait -> stop. Returns the capture session directory path. Default output directory is $RIBIR_CAPTURE_DIR or ./captures/{capture_id}/, containing frames/*.png, logs.jsonl and manifest.json",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -219,19 +219,19 @@
         {
             "uri": "ribir://logs",
             "name": "Application Logs",
-            "description": "Recent application logs (last 100 lines)",
+            "description": "Recent application logs (last 100 lines). Access via resources/read method with the given URI",
             "mimeType": "text/plain"
         },
         {
             "uri": "ribir://windows",
             "name": "Window List",
-            "description": "List of active windows",
+            "description": "List of active windows. Access via resources/read method with the given URI",
             "mimeType": "application/json"
         },
         {
             "uri": "ribir://status",
             "name": "Server Status",
-            "description": "Debug server status (recording, filter, stats)",
+            "description": "Debug server status (recording, filter, stats). Access via resources/read method with the given URI",
             "mimeType": "application/json"
         }
     ]
