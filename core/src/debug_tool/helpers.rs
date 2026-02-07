@@ -90,9 +90,10 @@ pub(crate) fn build_layout_info_json(
 /// Uses the widget's layout box (pos+size) rather than visual bounds.
 pub(crate) fn get_widget_global_overlay_rect(id: WidgetId, tree: &WidgetTree) -> Option<Rect> {
   let layout = tree.store.layout_info(id)?;
-  let parent = id.parent(tree)?;
-
-  let global_pos = tree.map_to_global(layout.pos, parent);
+  let global_pos = match id.parent(tree) {
+    Some(parent) => tree.map_to_global(layout.pos, parent),
+    None => layout.pos,
+  };
 
   let size = layout.size?;
   Some(Rect::new(global_pos, size))

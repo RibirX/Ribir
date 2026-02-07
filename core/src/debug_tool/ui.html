@@ -8,6 +8,34 @@
     <style>
         :root {
             color-scheme: light dark;
+            --bg: #f6f7fb;
+            --bg-accent: #e8f0ff;
+            --panel: #ffffff;
+            --panel-soft: rgba(17, 24, 39, 0.04);
+            --border: rgba(15, 23, 42, 0.12);
+            --text: #0f172a;
+            --muted: rgba(30, 41, 59, 0.72);
+            --accent: #2563eb;
+            --accent-weak: rgba(37, 99, 235, 0.16);
+            --danger: #dc2626;
+            --shadow: 0 8px 24px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.06);
+            --radius: 12px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0b0f16;
+                --bg-accent: #0c1b34;
+                --panel: #0f172a;
+                --panel-soft: rgba(148, 163, 184, 0.08);
+                --border: rgba(148, 163, 184, 0.2);
+                --text: #e2e8f0;
+                --muted: rgba(226, 232, 240, 0.7);
+                --accent: #60a5fa;
+                --accent-weak: rgba(96, 165, 250, 0.18);
+                --danger: #f87171;
+                --shadow: 0 10px 28px rgba(2, 6, 23, 0.55), 0 2px 8px rgba(2, 6, 23, 0.4);
+            }
         }
 
         * {
@@ -15,17 +43,27 @@
         }
 
         body {
-            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+            font-family: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
             margin: 0;
+            color: var(--text);
+            background:
+                radial-gradient(1200px 500px at 0% -10%, var(--bg-accent), transparent 60%),
+                radial-gradient(1000px 400px at 100% -20%, rgba(37, 99, 235, 0.12), transparent 60%),
+                var(--bg);
         }
 
         header {
-            padding: 8px 12px;
-            border-bottom: 1px solid rgba(127, 127, 127, .25);
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border);
             display: flex;
             gap: 8px;
             align-items: center;
             flex-wrap: wrap;
+            position: sticky;
+            top: 0;
+            z-index: 30;
+            background: color-mix(in srgb, var(--bg) 78%, transparent);
+            backdrop-filter: blur(12px);
         }
 
         header h1 {
@@ -37,24 +75,27 @@
         .pill {
             padding: 2px 8px;
             border-radius: 999px;
-            border: 1px solid rgba(127, 127, 127, .35);
+            border: 1px solid var(--border);
             font-size: 12px;
+            background: var(--panel-soft);
         }
 
         main {
             display: grid;
             grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
-            gap: 8px;
-            padding: 8px;
+            gap: 14px;
+            padding: 12px;
+            max-width: 100%;
+            margin: 0;
+            align-items: start;
         }
 
         /* A full-width row inside main that hosts two panels side-by-side. */
         .pair {
             grid-column: 1 / -1;
             display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-            gap: 8px;
+            grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr);
+            gap: 14px;
         }
 
         /* Let a section span both main columns. */
@@ -76,19 +117,21 @@
         .inner-row {
             display: grid;
             grid-template-columns: 420px minmax(0, 1fr);
-            gap: 8px;
+            gap: 12px;
             align-items: start;
         }
 
         section {
-            border: 1px solid rgba(127, 127, 127, .25);
-            border-radius: 10px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
             overflow: hidden;
+            background: var(--panel);
+            box-shadow: var(--shadow);
         }
 
         section>.hd {
-            padding: 6px 10px;
-            border-bottom: 1px solid rgba(127, 127, 127, .25);
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
             font-weight: 600;
             display: flex;
             justify-content: space-between;
@@ -97,7 +140,7 @@
         }
 
         section>.bd {
-            padding: 8px;
+            padding: 12px;
         }
 
         .row {
@@ -115,32 +158,35 @@
         input[type=text],
         input[type=number] {
             padding: 6px 8px;
-            border-radius: 8px;
-            border: 1px solid rgba(127, 127, 127, .35);
+            border-radius: 10px;
+            border: 1px solid var(--border);
             min-width: 120px;
             max-width: 100%;
+            background: var(--panel);
+            color: var(--text);
         }
 
         button {
             padding: 7px 10px;
-            border-radius: 8px;
-            border: 1px solid rgba(127, 127, 127, .35);
-            background: rgba(127, 127, 127, .12);
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--panel-soft);
             cursor: pointer;
+            color: var(--text);
         }
 
         button:hover {
-            background: rgba(127, 127, 127, .18);
+            background: color-mix(in srgb, var(--panel-soft) 70%, var(--accent-weak));
         }
 
         button.primary {
-            background: rgba(0, 122, 255, .18);
-            border-color: rgba(0, 122, 255, .35);
+            background: var(--accent-weak);
+            border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
         }
 
         button.danger {
-            background: rgba(255, 59, 48, .15);
-            border-color: rgba(255, 59, 48, .35);
+            background: color-mix(in srgb, var(--danger) 18%, transparent);
+            border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
         }
 
         button.active {
@@ -149,22 +195,23 @@
         }
 
         small.muted {
-            color: rgba(127, 127, 127, .9);
+            color: var(--muted);
         }
 
         pre {
             margin: 0;
             padding: 10px;
-            background: rgba(127, 127, 127, .10);
-            border-radius: 10px;
+            background: var(--panel-soft);
+            border-radius: 12px;
             overflow: auto;
             font-size: 12px;
             line-height: 1.35;
+            border: 1px solid var(--border);
         }
 
         /* Keep the logs window size stable so it won't push other panels. */
         #logs {
-            height: clamp(180px, 35vh, 420px);
+            height: clamp(220px, 40vh, 520px);
         }
 
         .log-controls {
@@ -195,9 +242,10 @@
 
         select {
             padding: 6px 8px;
-            border-radius: 8px;
-            border: 1px solid rgba(127, 127, 127, .35);
-            background: rgba(127, 127, 127, .10);
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            color: var(--text);
         }
 
         .kv {
@@ -242,12 +290,6 @@
             margin-left: auto;
         }
 
-        #showPreview {
-            max-width: 44vw;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
 
         .layout-actions {
             display: inline-flex;
@@ -288,9 +330,116 @@
             margin: 0 0 6px 0;
         }
 
+        .pane-left,
+        .pane-right {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
         #layoutTreeOut,
         #layoutInfoOut {
-            height: clamp(140px, 22vh, 280px);
+            height: clamp(160px, 26vh, 340px);
+        }
+
+        .tree-tools {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 6px;
+        }
+
+        .tree-tools .grow {
+            min-width: 180px;
+        }
+
+        .tree {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 6px 4px;
+            max-height: clamp(180px, 42vh, 520px);
+            min-height: 220px;
+            overflow: auto;
+            background: var(--panel-soft);
+        }
+
+        .tree-side {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-left: auto;
+        }
+
+        .tree-selected {
+            padding: 4px 8px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: var(--panel-soft);
+            font-size: 12px;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        .tree-main {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .tree-main.show-raw {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        }
+
+        .tree-main>pre {
+            height: 100%;
+        }
+
+        .tree-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 6px;
+            border-radius: 6px;
+            cursor: default;
+            user-select: none;
+            white-space: nowrap;
+        }
+
+        .tree-row:hover {
+            background: var(--panel-soft);
+        }
+
+        .tree-row.selected {
+            background: var(--accent-weak);
+            border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+        }
+
+        .tree-toggle {
+            width: 14px;
+            text-align: center;
+            color: rgba(127, 127, 127, .95);
+            flex: 0 0 14px;
+        }
+
+        .tree-id {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 12px;
+            padding: 1px 4px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--panel-soft);
+        }
+
+        .tree-props {
+            font-size: 11px;
+            padding: 1px 4px;
+            border-radius: 999px;
+            border: 1px solid rgba(127, 127, 127, .3);
+            color: rgba(127, 127, 127, .95);
         }
 
         .field-grid {
@@ -308,7 +457,7 @@
 
         .field label {
             font-size: 12px;
-            color: rgba(127, 127, 127, .95);
+            color: var(--muted);
         }
 
         @media (max-width: 980px) {
@@ -327,9 +476,10 @@
             display: flex;
             gap: 6px;
             align-items: center;
-            padding: 4px 8px;
-            border: 1px solid rgba(127, 127, 127, .25);
+            padding: 4px 10px;
+            border: 1px solid var(--border);
             border-radius: 999px;
+            background: var(--panel-soft);
         }
 
         details.inline {
@@ -342,10 +492,11 @@
             user-select: none;
             list-style: none;
             padding: 4px 8px;
-            border: 1px solid rgba(127, 127, 127, .25);
+            border: 1px solid var(--border);
             border-radius: 999px;
             font-size: 12px;
-            color: rgba(127, 127, 127, .95);
+            color: var(--muted);
+            background: var(--panel-soft);
         }
 
         details.inline>summary::-webkit-details-marker {
@@ -360,10 +511,11 @@
             z-index: 20;
             min-width: min(560px, 90vw);
             padding: 10px;
-            border: 1px solid rgba(127, 127, 127, .25);
-            border-radius: 10px;
-            background: rgba(20, 20, 20, .92);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: color-mix(in srgb, var(--panel) 92%, transparent);
             backdrop-filter: blur(10px);
+            box-shadow: var(--shadow);
         }
 
         details.inline[open] .popover {
@@ -399,6 +551,13 @@
         .status-dot.inactive {
             background-color: #ef4444;
         }
+
+        .sidebar,
+        .content {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
     </style>
 </head>
 
@@ -417,7 +576,7 @@
     <main>
         <!-- Column 1: Workspace & Status Sidebar -->
         <!-- Column 1: Workspace & Status Sidebar -->
-        <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div class="sidebar">
             <section>
                 <div class="hd">
                     <span>Status</span>
@@ -508,68 +667,72 @@
         </div>
 
         <!-- Column 2: Main Content (Layout, Logs, Screenshot) -->
-        <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div class="content">
 
             <section>
                 <div class="hd">
                     <span>Layout</span>
+                    <small class="muted" id="treeSelected">Selected: (none)</small>
                 </div>
                 <div class="bd">
                     <div class="layout-controls">
                         <label>WidgetId</label>
                         <input id="layoutId" class="grow" type="text" placeholder="e.g.: 42" />
-                        <div class="layout-show" title="Tree defaults to needing only id; details commonly use all">
-                            <small class="muted tiny" id="showPreview"></small>
-                            <details class="inline" id="showMenu">
-                                <summary>options</summary>
+
+                        <div class="layout-actions">
+                            <button id="btnLayoutInfo">Query Details</button>
+                            <button id="btnLayoutOpenInfo" title="Open /inspect/{id} in new tab">Open Details</button>
+                        </div>
+
+                        <div class="layout-show" title="Options for tree and detail queries">
+                            <details class="inline" id="detailOptions">
+                                <summary>detail options</summary>
                                 <div class="popover">
-                                    <div class="show-grid">
-                                        <div>
-                                            <div class="muted tiny" style="margin-bottom: 6px;">Tree (/inspect/tree)
-                                            </div>
-                                            <div class="check">
-                                                <label><input id="treeShowId" type="checkbox" checked /> id</label>
-                                                <label><input id="treeShowLayout" type="checkbox" /> layout</label>
-                                                <label><input id="treeShowGlobalPos" type="checkbox" />
-                                                    global_pos</label>
-                                                <label><input id="treeShowClamp" type="checkbox" /> clamp</label>
-                                                <label><input id="treeShowProps" type="checkbox" /> props</label>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <div class="muted tiny" style="margin-bottom: 6px;">Details (/inspect/{id})
-                                            </div>
-                                            <div class="check">
-                                                <label><input id="infoShowId" type="checkbox" checked /> id</label>
-                                                <label><input id="infoShowLayout" type="checkbox" checked />
-                                                    layout</label>
-                                                <label><input id="infoShowGlobalPos" type="checkbox" checked />
-                                                    global_pos</label>
-                                                <label><input id="infoShowClamp" type="checkbox" checked />
-                                                    clamp</label>
-                                                <label><input id="infoShowProps" type="checkbox" checked />
-                                                    props</label>
-                                            </div>
-                                        </div>
+                                    <div class="muted tiny" style="margin-bottom: 6px;">Details (/inspect/{id})</div>
+                                    <div class="check">
+                                        <label><input id="infoShowId" type="checkbox" checked /> id</label>
+                                        <label><input id="infoShowLayout" type="checkbox" checked /> layout</label>
+                                        <label><input id="infoShowGlobalPos" type="checkbox" checked />
+                                            global_pos</label>
+                                        <label><input id="infoShowClamp" type="checkbox" checked /> clamp</label>
+                                        <label><input id="infoShowProps" type="checkbox" checked /> props</label>
                                     </div>
                                 </div>
                             </details>
-                        </div>
-
-                        <div class="layout-actions">
-                            <button id="btnLayoutTree">Get Tree</button>
-                            <button id="btnLayoutOpenTree" title="Open /inspect/tree in new tab">Open Tree</button>
-                            <button id="btnLayoutInfo">Query Details</button>
-                            <button id="btnLayoutOpenInfo" title="Open /inspect/{id} in new tab">Open Details</button>
                         </div>
                     </div>
 
                     <div class="layout-split">
                         <div>
                             <div class="pane-hd">
-                                <small class="muted">Tree (<code>/inspect/tree</code>)</small>
+                                <div class="pane-left">
+                                    <button id="btnLayoutTree" class="primary">Get Tree</button>
+                                </div>
+                                <div class="pane-right">
+                                    <label class="inline tiny"><input id="treeRawToggle" type="checkbox" /> Raw</label>
+                                    <details class="inline" id="treeOptions">
+                                        <summary>tree options</summary>
+                                        <div class="popover">
+                                            <div class="muted tiny" style="margin-bottom: 6px;">Tree (/inspect/tree)</div>
+                                            <div class="check">
+                                                <label><input id="treeShowId" type="checkbox" checked /> id</label>
+                                                <label><input id="treeShowLayout" type="checkbox" /> layout</label>
+                                                <label><input id="treeShowGlobalPos" type="checkbox" /> global_pos</label>
+                                                <label><input id="treeShowClamp" type="checkbox" /> clamp</label>
+                                                <label><input id="treeShowProps" type="checkbox" /> props</label>
+                                            </div>
+                                        </div>
+                                    </details>
+                                    <button id="btnTreeClearOverlay">Clear Selected Overlay</button>
+                                    <button id="btnLayoutOpenTree" title="Open /inspect/tree in new tab">Open Tree</button>
+                                </div>
                             </div>
-                            <pre id="layoutTreeOut"></pre>
+                            <div class="tree-main" id="treeMain">
+                                <div id="layoutTreeView" class="tree"></div>
+                                <div id="treeRawWrap" style="display:none">
+                                    <pre id="layoutTreeOut"></pre>
+                                </div>
+                            </div>
                         </div>
                         <div>
                             <div class="pane-hd">
@@ -692,6 +855,14 @@
         const logBuf = [];
         let viewLineCount = 0;
         let searchTimer = null;
+        let treeData = null;
+        let treeExpanded = new Set();
+        let treeSelectedKey = null;
+        let treeSelectedId = null;
+        let treeSelectedPath = null;
+        let autoOverlayId = null;
+        let treeClickTimer = null;
+        let treeVisible = [];
 
         function setLogStats() {
             const stats = $('logStats');
@@ -850,6 +1021,281 @@
                 return JSON.stringify(sortKeys(obj), null, 2);
             } catch (_) {
                 return String(obj);
+            }
+        }
+
+        function formatWidgetIdValue(idVal) {
+            if (idVal === null || typeof idVal === 'undefined') return { display: null, raw: null };
+            if (typeof idVal === 'object') {
+                const raw = JSON.stringify(idVal);
+                const idx = idVal.index1 ?? idVal.index ?? idVal.id;
+                const display = typeof idx !== 'undefined' ? `#${idx}` : raw;
+                return { display, raw };
+            }
+            const raw = String(idVal);
+            return { display: `#${raw}`, raw };
+        }
+
+        function nodeKeyFor(node, pathIndexes) {
+            const idInfo = formatWidgetIdValue(node?.id);
+            if (idInfo.raw) return `id:${idInfo.raw}`;
+            return `path:${pathIndexes.join('/')}`;
+        }
+
+        function nodeLabelFor(node, idInfo) {
+            const name = node?.name || 'Unknown';
+            if (idInfo?.display) return `${idInfo.display} ${name}`;
+            return name;
+        }
+
+        function collectTreeKeys(node, pathIndexes, set) {
+            const key = nodeKeyFor(node, pathIndexes);
+            set.add(key);
+            const children = Array.isArray(node?.children) ? node.children : [];
+            for (let i = 0; i < children.length; i++) {
+                collectTreeKeys(children[i], pathIndexes.concat(i), set);
+            }
+        }
+
+        function updateTreeSelectedLabel() {
+            const el = $('treeSelected');
+            if (!el) return;
+            if (!treeSelectedPath || !treeSelectedPath.length) {
+                el.textContent = 'Selected: (none)';
+                return;
+            }
+            el.textContent = 'Selected: ' + treeSelectedPath.join(' / ');
+        }
+
+        function setTreeSelection(node, key, labels) {
+            const idInfo = formatWidgetIdValue(node?.id);
+            treeSelectedKey = key;
+            treeSelectedId = idInfo.raw;
+            treeSelectedPath = labels;
+            updateTreeSelectedLabel();
+            renderTreeView();
+        }
+
+        async function setOverlayForSelected() {
+            if (!treeSelectedId) {
+                alert('This tree was fetched without id; enable "id" in options and refresh.');
+                return;
+            }
+            if (autoOverlayId && autoOverlayId !== treeSelectedId) {
+                await overlayRemove(autoOverlayId);
+            }
+            autoOverlayId = treeSelectedId;
+            $('overlayId').value = treeSelectedId;
+            $('layoutId').value = treeSelectedId;
+            const color = ($('overlayColor').value || '').trim();
+            if (!color) {
+                alert('Please enter overlay color');
+                return;
+            }
+            const res = await fetch('/overlay', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ id: treeSelectedId, color, window_id: getSelectedWindowId() }),
+            });
+            if (!res.ok) {
+                const msg = await res.text();
+                alert('Set overlay failed: ' + msg);
+                return;
+            }
+            await refreshOverlays();
+            if ($('overlayAutoShot')?.checked) refreshScreenshot();
+        }
+
+        function toggleTreeNode(key) {
+            if (treeExpanded.has(key)) treeExpanded.delete(key);
+            else treeExpanded.add(key);
+            renderTreeView();
+        }
+
+        function renderTreeView() {
+            const container = $('layoutTreeView');
+            if (!container) return;
+            container.innerHTML = '';
+            container.tabIndex = 0;
+            if (!treeData) {
+                container.innerHTML = '<small class="muted tiny" style="padding:4px">(No tree yet)</small>';
+                treeVisible = [];
+                return;
+            }
+            treeVisible = [];
+
+            function buildNode(node, pathIndexes, pathLabels, depth, parentKey) {
+                const idInfo = formatWidgetIdValue(node?.id);
+                const currentLabel = nodeLabelFor(node, idInfo);
+                const key = nodeKeyFor(node, pathIndexes);
+                const children = Array.isArray(node?.children) ? node.children : [];
+                const hasChildren = children.length > 0;
+                const expanded = hasChildren && treeExpanded.has(key);
+                const labelPath = pathLabels.concat([currentLabel]);
+
+                treeVisible.push({
+                    key,
+                    node,
+                    labels: labelPath,
+                    hasChildren,
+                    expanded,
+                    parentKey,
+                });
+
+                const row = document.createElement('div');
+                row.className = 'tree-row' + (treeSelectedKey === key ? ' selected' : '');
+                row.style.paddingLeft = `${depth * 14 + 6}px`;
+                row.dataset.key = key;
+
+                const toggle = document.createElement('span');
+                toggle.className = 'tree-toggle';
+                toggle.textContent = hasChildren ? (expanded ? '▾' : '▸') : '';
+
+                row.appendChild(toggle);
+                if (idInfo?.display) {
+                    const idSpan = document.createElement('span');
+                    idSpan.className = 'tree-id';
+                    idSpan.textContent = idInfo.display;
+                    row.appendChild(idSpan);
+                }
+
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = node?.name || 'Unknown';
+                row.appendChild(nameSpan);
+
+                if (node?.properties && Object.keys(node.properties || {}).length) {
+                    const propSpan = document.createElement('span');
+                    propSpan.className = 'tree-props';
+                    propSpan.textContent = 'props';
+                    row.appendChild(propSpan);
+                }
+
+                row.addEventListener('click', () => {
+                    if (treeClickTimer) clearTimeout(treeClickTimer);
+                    treeClickTimer = setTimeout(() => {
+                        treeClickTimer = null;
+                        if (hasChildren) toggleTreeNode(key);
+                    }, 220);
+                });
+
+                row.addEventListener('dblclick', async () => {
+                    if (treeClickTimer) {
+                        clearTimeout(treeClickTimer);
+                        treeClickTimer = null;
+                    }
+                    setTreeSelection(node, key, labelPath);
+                    await setOverlayForSelected();
+                });
+
+                container.appendChild(row);
+
+                if (expanded) {
+                    for (let i = 0; i < children.length; i++) {
+                        const child = children[i];
+                        buildNode(child, pathIndexes.concat(i), labelPath, depth + 1, key);
+                    }
+                }
+            }
+
+            buildNode(treeData, [0], [], 0, null);
+        }
+
+        function findVisibleIndexByKey(key) {
+            if (!key) return -1;
+            for (let i = 0; i < treeVisible.length; i++) {
+                if (treeVisible[i].key === key) return i;
+            }
+            return -1;
+        }
+
+        function scrollTreeRowIntoView(key) {
+            const container = $('layoutTreeView');
+            if (!container) return;
+            const safeKey = (window.CSS && CSS.escape) ? CSS.escape(String(key)) : String(key).replace(/"/g, '\\"');
+            const row = container.querySelector(`[data-key="${safeKey}"]`);
+            if (row) row.scrollIntoView({ block: 'nearest' });
+        }
+
+        function selectVisibleByIndex(idx) {
+            if (idx < 0 || idx >= treeVisible.length) return;
+            const item = treeVisible[idx];
+            setTreeSelection(item.node, item.key, item.labels);
+            scrollTreeRowIntoView(item.key);
+        }
+
+        async function selectVisibleWithOverlay(idx) {
+            if (idx < 0 || idx >= treeVisible.length) return;
+            const item = treeVisible[idx];
+            setTreeSelection(item.node, item.key, item.labels);
+            scrollTreeRowIntoView(item.key);
+            await setOverlayForSelected();
+        }
+
+        function expandNode(key) {
+            treeExpanded.add(key);
+            renderTreeView();
+            const idx = findVisibleIndexByKey(key);
+            if (idx !== -1) selectVisibleByIndex(idx);
+        }
+
+        function collapseNode(key) {
+            treeExpanded.delete(key);
+            renderTreeView();
+            const idx = findVisibleIndexByKey(key);
+            if (idx !== -1) selectVisibleByIndex(idx);
+        }
+
+        function handleTreeKeydown(e) {
+            if (!treeVisible.length) return;
+            const idx = findVisibleIndexByKey(treeSelectedKey);
+            const hasSelection = idx !== -1;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                const next = hasSelection ? Math.min(idx + 1, treeVisible.length - 1) : 0;
+                selectVisibleByIndex(next);
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                const prev = hasSelection ? Math.max(idx - 1, 0) : treeVisible.length - 1;
+                selectVisibleByIndex(prev);
+                return;
+            }
+            if (e.key === 'ArrowRight') {
+                if (!hasSelection) return;
+                e.preventDefault();
+                const item = treeVisible[idx];
+                if (item.hasChildren && !item.expanded) {
+                    expandNode(item.key);
+                    return;
+                }
+                if (item.hasChildren) {
+                    const next = idx + 1;
+                    if (treeVisible[next] && treeVisible[next].parentKey === item.key) {
+                        selectVisibleByIndex(next);
+                    }
+                }
+                return;
+            }
+            if (e.key === 'ArrowLeft') {
+                if (!hasSelection) return;
+                e.preventDefault();
+                const item = treeVisible[idx];
+                if (item.hasChildren && item.expanded) {
+                    collapseNode(item.key);
+                    return;
+                }
+                if (item.parentKey) {
+                    const pIdx = findVisibleIndexByKey(item.parentKey);
+                    if (pIdx !== -1) selectVisibleByIndex(pIdx);
+                }
+                return;
+            }
+            if (e.key === ' ') {
+                if (!hasSelection) return;
+                e.preventDefault();
+                selectVisibleWithOverlay(idx);
             }
         }
 
@@ -1119,6 +1565,12 @@
             if ($('overlayAutoShot')?.checked) refreshScreenshot();
         }
 
+        async function clearSelectedOverlay() {
+            if (!autoOverlayId) return;
+            await overlayRemove(autoOverlayId);
+            autoOverlayId = null;
+        }
+
         function showTokens(prefix) {
             const wantId = !!$(prefix + 'ShowId')?.checked;
             const wantLayout = !!$(prefix + 'ShowLayout')?.checked;
@@ -1159,25 +1611,40 @@
             return qs ? ('?' + qs) : '';
         }
 
-        function updateShowPreview() {
-            const el = $('showPreview');
-            if (!el) return;
-            const tree = showTokens('tree');
-            const info = showTokens('info');
-            const treeTxt = tree.length ? tree.join(',') : '(none)';
-            const infoTxt = info.length ? info.join(',') : '(none)';
-            el.textContent = `Tree options=${treeTxt} ｜ Details options=${infoTxt}`;
-        }
 
         async function fetchLayoutTree() {
             const out = $('layoutTreeOut');
             const url = '/inspect/tree' + showParam('tree');
-            out.textContent = `GET ${url}\n\nLoading...`;
+            out.textContent = 'Loading...';
             try {
                 // Tree usually needs id for drill-down; user can tune via checkboxes.
                 const res = await fetch(url);
                 const txt = await res.text();
-                out.textContent = `GET ${url}\n\n` + prettyTextMaybeJson(txt);
+                out.textContent = prettyTextMaybeJson(txt);
+                try {
+                    treeData = JSON.parse(txt);
+                } catch (e) {
+                    treeData = null;
+                    const treeEl = $('layoutTreeView');
+                    if (treeEl) {
+                        treeEl.innerHTML = '<small class="warn tiny" style="padding:4px">(Tree JSON parse failed)</small>';
+                    }
+                    return;
+                }
+
+                const allKeys = new Set();
+                collectTreeKeys(treeData, [0], allKeys);
+                treeExpanded = new Set([...treeExpanded].filter((k) => allKeys.has(k)));
+                const rootKey = nodeKeyFor(treeData, [0]);
+                if (!treeExpanded.has(rootKey)) treeExpanded.add(rootKey);
+                if (treeSelectedKey && !allKeys.has(treeSelectedKey)) {
+                    treeSelectedKey = null;
+                    treeSelectedId = null;
+                    treeSelectedPath = null;
+                    autoOverlayId = null;
+                    updateTreeSelectedLabel();
+                }
+                renderTreeView();
             } catch (e) {
                 out.textContent = `GET ${url}\n\nRequest failed: ` + (e?.message || String(e));
             }
@@ -1336,17 +1803,22 @@
         $('btnOverlaySet').onclick = overlaySet;
         $('btnOverlayRefresh').onclick = refreshOverlays;
         $('btnOverlayClear').onclick = overlayClear;
+        $('btnTreeClearOverlay').onclick = clearSelectedOverlay;
+        $('layoutTreeView')?.addEventListener('keydown', handleTreeKeydown);
+        $('treeRawToggle').onchange = () => {
+            const wrap = $('treeRawWrap');
+            wrap.style.display = $('treeRawToggle').checked ? 'block' : 'none';
+            const main = $('treeMain');
+            if (main) main.classList.toggle('show-raw', $('treeRawToggle').checked);
+        };
         $('btnCaptureStart').onclick = capStart;
         $('btnCaptureStop').onclick = capStop;
         $('btnCaptureOneShot').onclick = capOneShot;
 
         // Keep the effective show flags visible.
-        ['treeShowId', 'treeShowLayout', 'treeShowGlobalPos', 'treeShowClamp', 'treeShowProps', 'infoShowId', 'infoShowLayout', 'infoShowGlobalPos', 'infoShowClamp', 'infoShowProps']
-            .forEach((id) => $(id)?.addEventListener('change', updateShowPreview));
-
         // Boot
         setLogStats();
-        updateShowPreview();
+        renderTreeView();
         refreshStatus();
         connectSse();
         fetchWindows().then(() => {
