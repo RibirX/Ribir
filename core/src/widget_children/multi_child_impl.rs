@@ -1,17 +1,5 @@
 use super::*;
 
-/// Type-erased container for widgets that manage multiple children.
-///
-/// Acts as a bridge between compile-time safety and runtime flexibility by:
-/// - Enforcing multi-child constraints at type system level
-/// - Allowing dynamic dispatch through [`BoxedParent`]
-///
-/// # Type Safety
-/// Automatically derived via [`From`] for any type implementing:
-/// - [`MultiChild`] (composition constraint)
-/// - [`Parent`] (hierarchy capability)
-pub struct XMultiChild<'p>(pub(crate) Box<dyn BoxedParent + 'p>);
-
 /// Intermediate builder for constructing parent-child widget relationships.
 ///
 /// Combines a parent widget with its collected children during composition.
@@ -63,11 +51,11 @@ impl<'p, P> MultiPair<'p, P> {
 ///
 /// Enables seamless integration of custom multi-child widgets into the
 /// framework's container system through trait-based coercion.
-impl<'p, P> From<P> for XMultiChild<'p>
+impl<'p, P> From<P> for XChild<'p, MultiKind>
 where
   P: Parent + MultiChild + 'p,
 {
-  fn from(value: P) -> Self { XMultiChild(Box::new(value)) }
+  fn from(value: P) -> Self { XChild::from_boxed(Box::new(value)) }
 }
 
 // ------ Widget Iterator Conversions ------
@@ -130,11 +118,6 @@ where
     let MultiPair { parent, children } = value;
     parent.x_with_children(children)
   }
-}
-
-impl<'p> RFrom<XMultiChild<'p>, OtherWidget<dyn Compose>> for Widget<'p> {
-  #[inline]
-  fn r_from(value: XMultiChild<'p>) -> Self { value.0.boxed_with_children(vec![]) }
 }
 
 impl<'p, P> std::ops::Deref for MultiPair<'p, P> {

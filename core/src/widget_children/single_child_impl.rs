@@ -1,17 +1,5 @@
 use super::*;
 
-/// Type-erased container enforcing single-child widget composition rules
-///
-/// Acts as a bridge between compile-time safety and runtime flexibility by:
-/// - Enforcing single-child constraints at type system level
-/// - Allowing dynamic dispatch through [`BoxedParent`]
-///
-/// # Type Safety
-/// Automatically derived via [`From`] for any type implementing:
-/// - [`SingleChild`] (composition constraint)
-/// - [`Parent`] (hierarchy capability)
-pub struct XSingleChild<'p>(pub(crate) Box<dyn BoxedParent + 'p>);
-
 /// Intermediate composition state holding parent-child relationship
 ///
 /// Used during widget tree construction to:
@@ -64,12 +52,12 @@ impl<P: Into<XSingleChild<'static>>> SingleChild for Pipe<P> {}
 /// Enables automatic conversion from any valid parent type to:
 /// - Type-erased container (XSingleChild)
 /// - Final widget representation
-impl<'p, P> From<P> for XSingleChild<'p>
+impl<'p, P> From<P> for XChild<'p, SingleKind>
 where
   P: SingleChild + Parent + 'p,
 {
   #[inline]
-  fn from(value: P) -> Self { Self(Box::new(value)) }
+  fn from(value: P) -> Self { XChild::from_boxed(Box::new(value)) }
 }
 
 /// Final composition step converting parent-child pair to concrete widge
@@ -82,12 +70,6 @@ where
     let children = child.map_or_else(Vec::new, |child| vec![child]);
     parent.x_with_children(children)
   }
-}
-
-/// Direct conversion from type-erased container to final widget
-impl<'p> RFrom<XSingleChild<'p>, OtherWidget<dyn Compose>> for Widget<'p> {
-  #[inline]
-  fn r_from(value: XSingleChild<'p>) -> Self { value.0.boxed_with_children(vec![]) }
 }
 
 /// Transparent parent access for composition pair

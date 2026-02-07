@@ -2,9 +2,11 @@ use crate::{pipe::*, prelude::*, widget::Widget};
 mod compose_child_impl;
 mod multi_child_impl;
 mod single_child_impl;
+mod x_child_impl;
 pub use compose_child_impl::*;
 pub use multi_child_impl::*;
 pub use single_child_impl::*;
+pub use x_child_impl::*;
 
 /// Trait marking widgets that enforce single-child composition semantics.
 ///
@@ -410,17 +412,7 @@ impl<P: Parent> XParent for P {
   }
 }
 
-impl<'p> XParent for XSingleChild<'p> {
-  #[inline]
-  fn x_with_children<'w>(self, children: Vec<Widget<'w>>) -> Widget<'w>
-  where
-    Self: 'w,
-  {
-    (self.0).boxed_with_children(children)
-  }
-}
-
-impl<'p> XParent for XMultiChild<'p> {
+impl<'p, K> XParent for XChild<'p, K> {
   #[inline]
   fn x_with_children<'w>(self, children: Vec<Widget<'w>>) -> Widget<'w>
   where
