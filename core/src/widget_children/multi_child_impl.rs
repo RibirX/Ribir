@@ -49,7 +49,6 @@ impl<'p, P> MultiPair<'p, P> {
 
 /// Use [`IntoMultiChild`] to explicitly convert a parent into an `XMultiChild`
 /// when needed.
-
 // ------ Widget Iterator Conversions ------
 impl<'w, I, K> IntoWidgetIter<'w, dyn Iterator<Item = K>> for I
 where

@@ -67,12 +67,12 @@ impl Render for Row {
     )
   }
 
-  fn place_children(&self, _size: Size, ctx: &mut PlaceCtx) {
+  fn place_children(&self, size: Size, ctx: &mut PlaceCtx) {
     perform_linear_layout_positions(
       Direction::Horizontal,
       self.align_items,
       self.justify_content,
-      _size,
+      size,
       ctx,
     )
   }
@@ -86,12 +86,12 @@ impl Render for Column {
     perform_linear_measure(Direction::Vertical, self.align_items, self.justify_content, clamp, ctx)
   }
 
-  fn place_children(&self, _size: Size, ctx: &mut PlaceCtx) {
+  fn place_children(&self, size: Size, ctx: &mut PlaceCtx) {
     perform_linear_layout_positions(
       Direction::Vertical,
       self.align_items,
       self.justify_content,
-      _size,
+      size,
       ctx,
     )
   }
