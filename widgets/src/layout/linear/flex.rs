@@ -712,19 +712,19 @@ mod tests {
   widget_layout_test!(
     center_main_align,
     main_align(JustifyContent::Center),
-    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 20.)),
-    LayoutCase::new(&[0, 0, 0]).with_x(100.),
-    LayoutCase::new(&[0, 0, 1]).with_x(200.),
-    LayoutCase::new(&[0, 0, 2]).with_x(300.)
+    LayoutCase::new(&[0, 0]).with_size(Size::new(300., 20.)),
+    LayoutCase::new(&[0, 0, 0]).with_x(0.),
+    LayoutCase::new(&[0, 0, 1]).with_x(100.),
+    LayoutCase::new(&[0, 0, 2]).with_x(200.)
   );
 
   widget_layout_test!(
     end_main_align,
     main_align(JustifyContent::End),
-    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 20.)),
-    LayoutCase::new(&[0, 0, 0]).with_x(200.),
-    LayoutCase::new(&[0, 0, 1]).with_x(300.),
-    LayoutCase::new(&[0, 0, 2]).with_x(400.)
+    LayoutCase::new(&[0, 0]).with_size(Size::new(300., 20.)),
+    LayoutCase::new(&[0, 0, 0]).with_x(0.),
+    LayoutCase::new(&[0, 0, 1]).with_x(100.),
+    LayoutCase::new(&[0, 0, 2]).with_x(200.)
   );
 
   widget_layout_test!(

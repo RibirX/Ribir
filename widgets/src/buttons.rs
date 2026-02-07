@@ -301,9 +301,8 @@ impl<'c> ButtonChild<'c> {
 
         @Row {
           class: btn,
-          x: AnchorX::center(),
           align_items: Align::Center,
-          justify_content: JustifyContent::Start,
+          justify_content: JustifyContent::Center,
           @ { items }
         }
       }

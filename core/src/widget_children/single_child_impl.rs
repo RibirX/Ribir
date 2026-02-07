@@ -51,7 +51,7 @@ impl<P: IntoSingleChild<'static>> SingleChild for Pipe<P> {}
 ///
 /// Use [`IntoSingleChild`] to explicitly convert a parent into an
 /// `XSingleChild` when needed.
-
+///
 /// Final composition step converting parent-child pair to concrete widge
 impl<'s: 'w, 'w, P> RFrom<SinglePair<'s, P>, OtherWidget<dyn Compose>> for Widget<'w>
 where

@@ -324,7 +324,8 @@ impl TabsInlineIcon {
     if self.0 {
       Row { align_items: Align::Center, justify_content: JustifyContent::Start }.into_multi_child()
     } else {
-      Column { align_items: Align::Center, justify_content: JustifyContent::Start }.into_multi_child()
+      Column { align_items: Align::Center, justify_content: JustifyContent::Start }
+        .into_multi_child()
     }
   }
 }

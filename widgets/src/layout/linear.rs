@@ -244,7 +244,12 @@ impl JustifyContent {
     }
   }
 
-  pub(crate) fn is_space_layout(&self) -> bool { !matches!(self, JustifyContent::Start) }
+  fn is_space_layout(&self) -> bool {
+    matches!(
+      self,
+      JustifyContent::SpaceAround | JustifyContent::SpaceBetween | JustifyContent::SpaceEvenly
+    )
+  }
 
   pub(crate) fn is_spacing_distributed(&self) -> bool {
     matches!(
