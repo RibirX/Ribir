@@ -28,10 +28,10 @@ Bundle the native app for distribution.
 cd examples/counter
 
 # Build and bundle (default behavior)
-cargo run -p ribir-cli -- bundle
+ribir-cli bundle
 
 # With custom config file
-cargo run -p ribir-cli -- bundle -c path/to/bundle.toml
+ribir-cli bundle -c path/to/bundle.toml
 ```
 
 ##### Subcommands
@@ -56,23 +56,23 @@ cargo run -p ribir-cli -- bundle -c path/to/bundle.toml
 
 ```bash
 # Default: build + package with auto-detected profile
-cargo run -p ribir-cli -- bundle
+ribir-cli bundle
 
 # Use a specific profile
-cargo run -p ribir-cli -- bundle --profile release
+ribir-cli bundle --profile release
 
 # Clean build
-cargo run -p ribir-cli -- bundle --clean
+ribir-cli bundle --clean
 
 # Only build (for CI/CD pipelines)
-cargo run -p ribir-cli -- bundle build
+ribir-cli bundle build
 
 # Only package (assumes already built)
-cargo run -p ribir-cli -- bundle pack
+ribir-cli bundle pack
 
 # Combine options
-cargo run -p ribir-cli -- bundle build --profile dev --clean
-cargo run -p ribir-cli -- bundle pack --profile release
+ribir-cli bundle build --profile dev --clean
+ribir-cli bundle pack --profile release
 ```
 
 ##### Profile Detection
@@ -140,9 +140,9 @@ MCP (Model Context Protocol) is a standard that allows AI assistants to interact
 
 The MCP server supports **automatic port discovery** so the CLI can find the running debug server for whichever project you're in:
 
-- When a Ribir app starts with `--features debug`, it registers its dynamically assigned port in `~/.local/state/ribir/debug-ports/`
-- The MCP server checks the registry for the current working directory and forwards requests to the correct port
-- No manual port configuration is needed
+- When a Ribir app starts with `--features debug`, it binds to `127.0.0.1:2333` and increments until it finds a free port (fallbacks to a dynamic port), then registers the chosen port in `~/.local/state/ribir/debug-ports/`
+- The MCP server checks the registry for the best path match relative to the current working directory (exact match first, otherwise nearest parent/child path match)
+- `mcp check` fails fast when no matching session is found; `mcp serve` still starts in fallback mode so MCP handshake and tool discovery continue to work
 
 ```bash
 # Terminal 1: Debug project A (auto-discovered port)
@@ -264,16 +264,16 @@ args = ["run", "-p", "cli", "--", "mcp", "serve"]
 
 ```bash
 # List all active debug sessions
-cargo run -p ribir-cli -- mcp list
+ribir-cli mcp list
 
 # Test connection to auto-discovered debug server
-cargo run -p ribir-cli -- mcp check
+ribir-cli mcp check
 
 # Start MCP server with auto-discovery
-cargo run -p ribir-cli -- mcp serve
+ribir-cli mcp serve
 
 # Override with a specific port
-cargo run -p ribir-cli -- mcp serve --port=8080
+ribir-cli mcp serve --port=8080
 ```
 
 ##### How It Works
@@ -285,7 +285,7 @@ cargo run -p ribir-cli -- mcp serve --port=8080
 └─────────────────┘               └──────────────────┘            └─────────────────┘
 ```
 
-1. **Run**: Start your Ribir app with `--features debug` - it auto-registers its port
+1. **Run**: Start your Ribir app with `--features debug` - it binds to `127.0.0.1:2333` and increments until a free port is found, then auto-registers that port
 2. **Configure**: Add `ribir-debug` server entry to your AI client's config (no port needed)
 3. **Connect**: AI client launches `cli mcp serve` which auto-discovers the port
 4. **Forward**: The MCP server forwards JSON-RPC requests to the debug HTTP server
@@ -296,7 +296,7 @@ cargo run -p ribir-cli -- mcp serve --port=8080
 When debugging multiple Ribir projects simultaneously:
 
 1. Each project's debug server registers its port with the project path as key
-2. The MCP server discovers the port based on the current working directory
+2. The MCP server discovers the port using the best path match (exact first, otherwise nearest parent/child match)
 3. No configuration changes needed - just run from the correct directory
 
 ```bash
@@ -321,3 +321,11 @@ If the debug server is not running, the MCP server operates in fallback mode:
 - Tool/resource discovery still works (via `initialize`, `tools/list`, `resources/list`)
 - Tool invocations return helpful error messages with setup instructions
 - This allows AI clients to discover available capabilities even when the app isn't running
+
+##### Troubleshooting: Session Not Found or Wrong Port
+
+1. Preferred for MCP clients: call `start_app` with an explicit target (`package`, `bin`, or `example`)
+2. Run `ribir-cli mcp list` to inspect which paths and ports are currently registered
+3. If needed, force the port via `ribir-cli mcp serve --port <PORT>`
+
+`start_app` now requires an explicit target to avoid ambiguous `cargo run` behavior in workspace roots.

@@ -15,10 +15,74 @@
         "serverInfo": {
             "name": "Ribir Debug Server",
             "version": "0.4.0",
-            "description": "Debug and inspect running Ribir applications. Capture screenshots, explore widget tree, add visual overlays, view logs, and record frames."
+            "description": "Debug and inspect running Ribir applications. Capture screenshots, explore widget tree, add visual overlays, view logs, and record frames. The HTTP server binds to 127.0.0.1:2333 and increments until a free port is found (fallback to a dynamic port). Use RIBIR_DEBUG_URL or the port registry for discovery."
         }
     },
     "tools": [
+        {
+            "name": "start_app",
+            "description": "Start the Ribir application in debug mode (detached). In workspaces, pass an explicit target via package/bin/example.",
+            "inputSchema": {
+                "type": "object",
+                "anyOf": [
+                    {
+                        "required": [
+                            "bin"
+                        ]
+                    },
+                    {
+                        "required": [
+                            "example"
+                        ]
+                    },
+                    {
+                        "required": [
+                            "package"
+                        ]
+                    }
+                ],
+                "properties": {
+                    "bin": {
+                        "type": "string",
+                        "description": "Name of the binary to run (e.g., 'myapp')"
+                    },
+                    "example": {
+                        "type": "string",
+                        "description": "Name of the example to run (e.g., 'todo')"
+                    },
+                    "package": {
+                        "type": "string",
+                        "description": "Package name (for workspaces)"
+                    },
+                    "features": {
+        "type": "string",
+         "description": "Comma-separated extra features to enable (will be merged with 'debug' feature)"
+       },
+       "cargo_args": {
+         "description": "Additional cargo arguments to pass to the command",
+         "oneOf": [
+           {
+             "type": "string",
+             "description": "Space-separated cargo arguments (e.g., '--release --target wasm32-unknown-unknown')"
+           },
+           {
+             "type": "array",
+             "items": { "type": "string" },
+             "description": "Array of cargo arguments (e.g., ['--release', '--target', 'wasm32-unknown-unknown'])"
+           }
+         ]
+      }
+                }
+            }
+        },
+        {
+            "name": "stop_app",
+            "description": "Stop the currently running Ribir application launched by this server.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {}
+            }
+        },
         {
             "name": "capture_screenshot",
             "description": "Capture a screenshot of the specified window. Returns the image as base64-encoded PNG data in the response.",

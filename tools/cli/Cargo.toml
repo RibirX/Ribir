@@ -26,8 +26,9 @@ log = { workspace = true, features = ["kv", "kv_std"]}
 env_logger.workspace = true
 semver = "1.0"
 dirs.workspace = true
-tokio = { workspace = true, features = ["rt", "io-util", "io-std", "macros"] }
+tokio = { workspace = true, features = ["rt", "io-util", "io-std", "macros", "process", "time"] }
 reqwest = { version = "0.13.1", features = ["json"] }
+ shell-words = "1.1"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

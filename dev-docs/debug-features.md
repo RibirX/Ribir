@@ -19,7 +19,7 @@ cargo run --features debug
 ```
 
 When the `debug` feature is active:
-1. An HTTP debug server starts on `127.0.0.1` with a dynamically assigned port and prints the full URL on startup (`RIBIR_DEBUG_URL=...`).
+1. An HTTP debug server starts on `127.0.0.1` and prints the full URL on startup (`RIBIR_DEBUG_URL=...`).
 2. Continuous frame capture and log buffering are enabled.
 3. The application can interact with MCP-compatible AI assistants.
 
@@ -33,7 +33,7 @@ The debug server can be configured using environment variables:
 
 ---
 
-> **Port:** The HTTP debug server uses a dynamically assigned port. Use the startup log to find the full URL.
+> **Port:** The HTTP debug server tries `127.0.0.1:2333` first, then increments until it finds a free port (default range: `2333..2432`). If none are available, it falls back to a dynamic port. Use the startup log (`RIBIR_DEBUG_URL=...`) or the port registry for discovery.
 
 ## 🤖 AI Debugging (MCP)
 
@@ -64,6 +64,14 @@ args = ["mcp", "serve"]
 ```
 
 For other clients, see `tools/cli/README.md` for configuration examples.
+
+The MCP bridge (`ribir-cli mcp serve`) discovers the debug server via the port registry, so you do not need to hardcode a port. Discovery prefers exact path matches and falls back to the nearest parent/child path match.
+
+If no matching debug session exists:
+- `ribir-cli mcp check` fails fast with guidance.
+- `ribir-cli mcp serve` starts in fallback mode so MCP initialization and tool/resource listing still work.
+
+For MCP clients, prefer calling `start_app` with an explicit `package`, `bin`, or `example` target.
 
 ### Key MCP Tools
 
