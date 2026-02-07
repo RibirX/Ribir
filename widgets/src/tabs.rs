@@ -242,7 +242,7 @@ impl<'w> Tab<'w> {
       let inline = Variant::<TabsInlineIcon>::new_or_default(ctx);
       let line = match inline {
         Variant::Value(inline) => inline.align_header_widget(),
-        Variant::Watcher(w) => pipe!($read(w).align_header_widget()).into()
+        Variant::Watcher(w) => pipe!($read(w).align_header_widget()).into_multi_child()
       };
 
       let header = @Class {
@@ -322,9 +322,9 @@ impl TabPos {
 impl TabsInlineIcon {
   fn align_header_widget(self) -> XMultiChild<'static> {
     if self.0 {
-      Row { align_items: Align::Center, justify_content: JustifyContent::Start }.into()
+      Row { align_items: Align::Center, justify_content: JustifyContent::Start }.into_multi_child()
     } else {
-      Column { align_items: Align::Center, justify_content: JustifyContent::Start }.into()
+      Column { align_items: Align::Center, justify_content: JustifyContent::Start }.into_multi_child()
     }
   }
 }

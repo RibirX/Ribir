@@ -47,16 +47,8 @@ impl<'p, P> MultiPair<'p, P> {
 
 // ------ Core Type Conversions ------
 
-/// Automatic conversion from any valid multi-child parent to XMultiChild
-///
-/// Enables seamless integration of custom multi-child widgets into the
-/// framework's container system through trait-based coercion.
-impl<'p, P> From<P> for XChild<'p, MultiKind>
-where
-  P: Parent + MultiChild + 'p,
-{
-  fn from(value: P) -> Self { XChild::from_boxed(Box::new(value)) }
-}
+/// Use [`IntoMultiChild`] to explicitly convert a parent into an `XMultiChild`
+/// when needed.
 
 // ------ Widget Iterator Conversions ------
 impl<'w, I, K> IntoWidgetIter<'w, dyn Iterator<Item = K>> for I
@@ -102,7 +94,7 @@ impl<P: MultiChild> MultiChild for FatObj<P> {}
 
 impl<P: MultiChild, F: FnOnce() -> P> MultiChild for FnWidget<P, F> {}
 
-impl<P: Into<XMultiChild<'static>>> MultiChild for Pipe<P> {}
+impl<P: IntoMultiChild<'static>> MultiChild for Pipe<P> {}
 
 // ------ Final Composition Conversions ------
 
