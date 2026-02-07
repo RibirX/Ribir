@@ -222,9 +222,9 @@ fn pipe_single_parent() {
     let blank = pipe! {
       fn_widget! {
         let w: XSingleChild = if *$read(outside_blank) {
-          Margin { margin: edges }.into()
+          Margin { margin: edges }.into_single_child()
         } else {
-          FittedBox::new(BoxFit::None).into()
+          FittedBox::new(BoxFit::None).into_single_child()
         };
         w
       }
@@ -255,9 +255,9 @@ fn pipe_multi_parent() {
     let container = pipe! {
       fn_widget!{
         let w: XMultiChild = if *$read(stack_or_flex) {
-          @Stack {}.into()
+          @Stack {}.into_multi_child()
         } else {
-          @Flex {}.into()
+          @Flex {}.into_multi_child()
         };
         w
       }

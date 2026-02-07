@@ -386,6 +386,46 @@ where
   }
 }
 
+impl<S, F> crate::widget_children::sealed::IntoXChild<'static, SingleKind> for VariantMap<S, F>
+where
+  S: VariantSnapshot,
+  <S as VariantSource>::Value: Clone,
+  F: Fn(&S::Value) -> XSingleChild<'static> + 'static,
+{
+  fn into_x_child(self) -> XSingleChild<'static> {
+    let VariantMap { source, map } = self;
+    if let Some(modifies) = source.modifies() {
+      let trigger = modifies
+        .merge(Local::of(ModifyInfo::default()))
+        .box_it();
+      Pipe::new(trigger, move |_| map(&source.snapshot())).into_single_child()
+    } else {
+      map(&source.snapshot())
+    }
+  }
+}
+
+impl<S, F> crate::widget_children::sealed::IntoXChild<'static, MultiKind> for VariantMap<S, F>
+where
+  S: VariantSnapshot,
+  <S as VariantSource>::Value: Clone,
+  F: Fn(&S::Value) -> XMultiChild<'static> + 'static,
+{
+  fn into_x_child(self) -> XMultiChild<'static> {
+    let VariantMap { source, map } = self;
+    if let Some(modifies) = source.modifies() {
+      // Keep children stable by using the pipe-parent replacement path, and emit
+      // once immediately so the correct parent is built for the first frame.
+      let trigger = modifies
+        .merge(Local::of(ModifyInfo::default()))
+        .box_it();
+      Pipe::new(trigger, move |_| map(&source.snapshot())).into_multi_child()
+    } else {
+      map(&source.snapshot())
+    }
+  }
+}
+
 impl<S, F, U> VariantSource for VariantMap<S, F>
 where
   S: VariantSource,

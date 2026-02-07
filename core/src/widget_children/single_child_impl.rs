@@ -43,22 +43,14 @@ impl<'p> SingleChild for XSingleChild<'p> {}
 impl<T> SingleChild for T where T: StateReader<Value: SingleChild> {}
 impl<T: SingleChild> SingleChild for FatObj<T> {}
 impl<F: FnOnce() -> W, W: SingleChild> SingleChild for FnWidget<W, F> {}
-impl<P: Into<XSingleChild<'static>>> SingleChild for Pipe<P> {}
+impl<P: IntoSingleChild<'static>> SingleChild for Pipe<P> {}
 
 // ------------------ Composition Conversions ------------------
 
-/// Framework integration point for single-child components
+/// Framework integration point for single-child components.
 ///
-/// Enables automatic conversion from any valid parent type to:
-/// - Type-erased container (XSingleChild)
-/// - Final widget representation
-impl<'p, P> From<P> for XChild<'p, SingleKind>
-where
-  P: SingleChild + Parent + 'p,
-{
-  #[inline]
-  fn from(value: P) -> Self { XChild::from_boxed(Box::new(value)) }
-}
+/// Use [`IntoSingleChild`] to explicitly convert a parent into an
+/// `XSingleChild` when needed.
 
 /// Final composition step converting parent-child pair to concrete widge
 impl<'s: 'w, 'w, P> RFrom<SinglePair<'s, P>, OtherWidget<dyn Compose>> for Widget<'w>
