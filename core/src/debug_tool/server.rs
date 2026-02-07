@@ -220,6 +220,7 @@ pub struct DebugServerState {
   pub recording: AtomicBool,
   pub last_frame_rx: watch::Receiver<Option<Arc<PixelImage>>>,
   pub last_frame_tx: watch::Sender<Option<Arc<PixelImage>>>,
+  pub bound_addr: tokio::sync::RwLock<Option<std::net::SocketAddr>>,
 
   pub log_ring: tokio::sync::Mutex<LogRing>,
   pub log_broadcast: broadcast::Sender<Arc<str>>,
@@ -233,7 +234,9 @@ pub struct DebugServerState {
 /// - Initializes debug logging.
 pub fn start_debug_server() -> mpsc::Sender<DebugCommand> {
   crate::logging::init_debug_tracing("info");
-  let bind_addr = "127.0.0.1:0";
+  let bind_host = "127.0.0.1";
+  let bind_start_port = 2333;
+  let bind_port_range = 100;
 
   let (cmd_tx, mut cmd_rx) = mpsc::channel::<DebugCommand>(32);
   let (frame_tx, mut frame_rx) = mpsc::unbounded_channel::<FramePacket>();
@@ -258,6 +261,7 @@ pub fn start_debug_server() -> mpsc::Sender<DebugCommand> {
     recording: AtomicBool::new(false),
     last_frame_rx,
     last_frame_tx,
+    bound_addr: tokio::sync::RwLock::new(None),
     log_ring: tokio::sync::Mutex::new(LogRing::new(50_000, 60_000)),
     log_broadcast,
 
@@ -368,42 +372,69 @@ pub fn start_debug_server() -> mpsc::Sender<DebugCommand> {
     .route("/mcp/sse", get(mcp_sse_handler))
     .route("/mcp/message", post(mcp_message_handler))
     .layer(cors)
-    .with_state(state);
+    .with_state(state.clone());
 
   // Spawn HTTP server on background task
+  let state_clone2 = state.clone();
   tokio::spawn(async move {
-    match tokio::net::TcpListener::bind(bind_addr).await {
-      Ok(listener) => {
-        let local_addr = match listener.local_addr() {
-          Ok(addr) => addr,
-          Err(err) => {
-            log::error!("Failed to read debug server address: {}", err);
-            return;
-          }
-        };
-        let port = local_addr.port();
-        let url = format!("http://{}", local_addr);
-        let ui_url = format!("{}/ui", url);
-        log::info!("Debug server listening on {} (open /ui)", url);
-        println!("Debug server listening on {} (open /ui)", url);
-        eprintln!("RIBIR_DEBUG_URL={}", url);
-        eprintln!("RIBIR_DEBUG_UI={}", ui_url);
-
-        // Register the port for discovery by MCP clients
-        let registry_file = super::port_registry::register_port(port).ok();
-
-        let result = axum::serve(listener, app).await;
-
-        // Unregister on shutdown
-        if let Some(file) = registry_file {
-          super::port_registry::unregister_port(&file);
+    let mut listener = None;
+    for offset in 0..bind_port_range {
+      let port = bind_start_port + offset;
+      let addr = format!("{}:{}", bind_host, port);
+      match tokio::net::TcpListener::bind(&addr).await {
+        Ok(found) => {
+          listener = Some(found);
+          break;
         }
+        Err(err) => {
+          log::warn!("Debug server bind failed on {}: {}", addr, err);
+        }
+      }
+    }
 
-        result.ok();
+    if listener.is_none() {
+      match tokio::net::TcpListener::bind(format!("{}:0", bind_host)).await {
+        Ok(found) => {
+          listener = Some(found);
+        }
+        Err(e) => {
+          log::error!("Failed to bind debug server on {}:0: {}", bind_host, e);
+          return;
+        }
       }
-      Err(e) => {
-        log::error!("Failed to bind debug server on {}: {}", bind_addr, e);
+    }
+
+    if let Some(listener) = listener {
+      let local_addr = match listener.local_addr() {
+        Ok(addr) => addr,
+        Err(err) => {
+          log::error!("Failed to read debug server address: {}", err);
+          return;
+        }
+      };
+      {
+        let mut guard = state_clone2.bound_addr.write().await;
+        *guard = Some(local_addr);
       }
+      let port = local_addr.port();
+      let url = format!("http://{}", local_addr);
+      let ui_url = format!("{}/ui", url);
+      log::info!("Debug server listening on {} (open /ui)", url);
+      println!("Debug server listening on {} (open /ui)", url);
+      eprintln!("RIBIR_DEBUG_URL={}", url);
+      eprintln!("RIBIR_DEBUG_UI={}", ui_url);
+
+      // Register the port for discovery by MCP clients
+      let registry_file = super::port_registry::register_port(port).ok();
+
+      let result = axum::serve(listener, app).await;
+
+      // Unregister on shutdown
+      if let Some(file) = registry_file {
+        super::port_registry::unregister_port(&file);
+      }
+
+      result.ok();
     }
   });
 
@@ -1032,12 +1063,19 @@ fn encode_png_response(img: &PixelImage) -> axum::response::Response {
 /// Per MCP spec, this endpoint sends an "endpoint" event with the URL
 /// where clients should POST their JSON-RPC requests.
 async fn mcp_sse_handler(
-  State(_state): State<Arc<DebugServerState>>,
+  State(state): State<Arc<DebugServerState>>,
 ) -> Sse<impl futures::Stream<Item = Result<Event, std::convert::Infallible>>> {
   log::info!("MCP: SSE connection established");
 
   // Build the message endpoint URL
-  let endpoint_url = "http://127.0.0.1:2333/mcp/message";
+  let endpoint_url = {
+    let guard = state.bound_addr.read().await;
+    let addr = guard
+      .as_ref()
+      .map(|a| a.to_string())
+      .unwrap_or_else(|| "127.0.0.1:2333".to_string());
+    format!("http://{}/mcp/message", addr)
+  };
 
   // Send the endpoint event as required by MCP spec
   let endpoint_event = Event::default()

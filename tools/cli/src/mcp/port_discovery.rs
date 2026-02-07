@@ -51,6 +51,40 @@ impl PortRegistry {
     Some(entry)
   }
 
+  /// Discover the best matching port for a given path.
+  ///
+  /// Matching strategy:
+  /// 1. Exact match for current path.
+  /// 2. Prefix match between current path and registered path (in either
+  ///    direction) with the longest common prefix depth.
+  /// 3. If multiple entries have the same depth, prefer the most recently
+  ///    started session.
+  pub fn discover_best_for_path(&self, path: &Path) -> Option<PortEntry> {
+    if let Some(entry) = self.discover_for_path(path) {
+      return Some(entry);
+    }
+
+    let current = normalize_path(path);
+    let mut best: Option<(usize, u64, PortEntry)> = None;
+
+    for entry in self.list_all() {
+      let project = normalize_path(&entry.project_path);
+      if !(current.starts_with(&project) || project.starts_with(&current)) {
+        continue;
+      }
+
+      let depth = common_prefix_depth(&current, &project);
+      match &best {
+        Some((best_depth, best_started, _))
+          if depth < *best_depth || (depth == *best_depth && entry.started_at <= *best_started) => {
+        }
+        _ => best = Some((depth, entry.started_at, entry)),
+      }
+    }
+
+    best.map(|(_, _, entry)| entry)
+  }
+
   /// List all registered ports.
   pub fn list_all(&self) -> Vec<PortEntry> {
     let mut entries = Vec::new();
@@ -82,6 +116,11 @@ impl PortRegistry {
     file.read_to_string(&mut contents).ok()?;
     serde_json::from_str(&contents).ok()
   }
+}
+
+#[cfg(test)]
+impl PortRegistry {
+  pub(crate) fn with_state_dir(state_dir: PathBuf) -> Self { Self { state_dir } }
 }
 
 impl Default for PortRegistry {
@@ -116,6 +155,19 @@ pub fn path_to_hash(path: &Path) -> String {
   let mut hasher = DefaultHasher::new();
   path_str.hash(&mut hasher);
   format!("{:016x}", hasher.finish())
+}
+
+fn normalize_path(path: &Path) -> PathBuf {
+  path
+    .canonicalize()
+    .unwrap_or_else(|_| path.to_path_buf())
+}
+
+fn common_prefix_depth(a: &Path, b: &Path) -> usize {
+  a.components()
+    .zip(b.components())
+    .take_while(|(left, right)| left == right)
+    .count()
 }
 
 /// Check if a process with the given PID is alive.
@@ -153,7 +205,19 @@ fn is_process_alive(pid: u32) -> bool {
 
 #[cfg(test)]
 mod tests {
+  use std::time::{SystemTime, UNIX_EPOCH};
+
   use super::*;
+
+  fn temp_dir(prefix: &str) -> PathBuf {
+    let unique = SystemTime::now()
+      .duration_since(UNIX_EPOCH)
+      .unwrap_or_default()
+      .as_nanos();
+    let dir = std::env::temp_dir().join(format!("{prefix}-{}-{unique}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    dir
+  }
 
   #[test]
   fn test_path_to_hash() {
@@ -175,5 +239,150 @@ mod tests {
     let hash2 = path_to_hash(path);
 
     assert_eq!(hash1, hash2);
+  }
+
+  #[test]
+  fn discover_requires_exact_project_path_match() {
+    let state_dir = temp_dir("ribir-cli-registry-exact");
+    let registry = PortRegistry::with_state_dir(state_dir.clone());
+    let project_root = temp_dir("ribir-cli-registry-project");
+    let sub_dir = project_root.join("nested");
+    fs::create_dir_all(&sub_dir).unwrap();
+
+    let hash = path_to_hash(&project_root);
+    let file_path = state_dir.join(format!("{hash}.json"));
+    let entry = PortEntry {
+      port: 2445,
+      project_path: project_root.clone(),
+      pid: std::process::id(),
+      started_at: 0,
+    };
+    fs::write(file_path, serde_json::to_vec(&entry).unwrap()).unwrap();
+
+    assert!(
+      registry
+        .discover_for_path(&project_root)
+        .is_some()
+    );
+    assert!(registry.discover_for_path(&sub_dir).is_none());
+
+    let _ = fs::remove_dir_all(state_dir);
+    let _ = fs::remove_dir_all(project_root);
+  }
+
+  #[test]
+  fn discover_best_matches_parent_or_child_path() {
+    let state_dir = temp_dir("ribir-cli-registry-best");
+    let registry = PortRegistry::with_state_dir(state_dir.clone());
+    let project_root = temp_dir("ribir-cli-registry-best-project");
+    let sub_dir = project_root.join("nested");
+    fs::create_dir_all(&sub_dir).unwrap();
+
+    let hash = path_to_hash(&project_root);
+    let file_path = state_dir.join(format!("{hash}.json"));
+    let entry = PortEntry {
+      port: 2445,
+      project_path: project_root.clone(),
+      pid: std::process::id(),
+      started_at: 10,
+    };
+    fs::write(file_path, serde_json::to_vec(&entry).unwrap()).unwrap();
+
+    let discovered = registry
+      .discover_best_for_path(&sub_dir)
+      .expect("expected parent/child match");
+    assert_eq!(discovered.port, 2445);
+
+    let _ = fs::remove_dir_all(state_dir);
+    let _ = fs::remove_dir_all(project_root);
+  }
+
+  #[test]
+  fn discover_best_prefers_longest_common_prefix() {
+    let state_dir = temp_dir("ribir-cli-registry-depth");
+    let registry = PortRegistry::with_state_dir(state_dir.clone());
+    let root = temp_dir("ribir-cli-registry-depth-root");
+    let cwd = root.join("a").join("b").join("c");
+    fs::create_dir_all(&cwd).unwrap();
+
+    let candidate1 = root.join("a");
+    let candidate2 = root.join("a").join("b");
+    fs::create_dir_all(&candidate1).unwrap();
+    fs::create_dir_all(&candidate2).unwrap();
+
+    let entry1 = PortEntry {
+      port: 2401,
+      project_path: candidate1.clone(),
+      pid: std::process::id(),
+      started_at: 100,
+    };
+    let entry2 = PortEntry {
+      port: 2402,
+      project_path: candidate2.clone(),
+      pid: std::process::id(),
+      started_at: 50,
+    };
+    fs::write(
+      state_dir.join(format!("{}.json", path_to_hash(&candidate1))),
+      serde_json::to_vec(&entry1).unwrap(),
+    )
+    .unwrap();
+    fs::write(
+      state_dir.join(format!("{}.json", path_to_hash(&candidate2))),
+      serde_json::to_vec(&entry2).unwrap(),
+    )
+    .unwrap();
+
+    let discovered = registry
+      .discover_best_for_path(&cwd)
+      .expect("expected depth-based match");
+    assert_eq!(discovered.port, 2402);
+
+    let _ = fs::remove_dir_all(state_dir);
+    let _ = fs::remove_dir_all(root);
+  }
+
+  #[test]
+  fn discover_best_prefers_newer_session_when_depth_ties() {
+    let state_dir = temp_dir("ribir-cli-registry-tie");
+    let registry = PortRegistry::with_state_dir(state_dir.clone());
+    let root = temp_dir("ribir-cli-registry-tie-root");
+    let cwd = root.join("a");
+    let candidate1 = cwd.join("x");
+    let candidate2 = cwd.join("y");
+    fs::create_dir_all(&cwd).unwrap();
+    fs::create_dir_all(&candidate1).unwrap();
+    fs::create_dir_all(&candidate2).unwrap();
+
+    let entry1 = PortEntry {
+      port: 2403,
+      project_path: candidate1.clone(),
+      pid: std::process::id(),
+      started_at: 100,
+    };
+    let entry2 = PortEntry {
+      port: 2404,
+      project_path: candidate2.clone(),
+      pid: std::process::id(),
+      started_at: 200,
+    };
+    fs::write(
+      state_dir.join(format!("{}.json", path_to_hash(&candidate1))),
+      serde_json::to_vec(&entry1).unwrap(),
+    )
+    .unwrap();
+    fs::write(
+      state_dir.join(format!("{}.json", path_to_hash(&candidate2))),
+      serde_json::to_vec(&entry2).unwrap(),
+    )
+    .unwrap();
+
+    let discovered = registry
+      .discover_best_for_path(&cwd)
+      .expect("expected tie-break match");
+    assert_eq!(discovered.port, 2404);
+
+    let _ = fs::remove_dir_all(state_dir);
+    let _ = fs::remove_dir_all(root);
   }
 }
