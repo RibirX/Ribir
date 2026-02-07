@@ -59,7 +59,7 @@ pub trait WrapRender {
   {
     let combine = combine_method::<Self>(this);
     let parent = CombinedParent { combine: Box::new(combine), parent: x.0 };
-    XMultiChild(Box::new(parent))
+    XChild::from_boxed(Box::new(parent))
   }
 
   fn combine_x_single_child(this: impl StateWriter<Value = Self>, x: XSingleChild) -> XSingleChild
@@ -68,7 +68,7 @@ pub trait WrapRender {
   {
     let combine = combine_method::<Self>(this);
     let parent = CombinedParent { combine: Box::new(combine), parent: x.0 };
-    XSingleChild(Box::new(parent))
+    XChild::from_boxed(Box::new(parent))
   }
 
   fn combine_child(this: impl StateWriter<Value = Self>, child: Widget) -> Widget
