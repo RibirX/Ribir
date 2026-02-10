@@ -21,63 +21,67 @@
     "tools": [
         {
             "name": "start_app",
-            "description": "Start the Ribir application in debug mode (detached). In workspaces, pass an explicit target via package/bin/example.",
+            "description": "Start or attach a Ribir debug session for a runnable crate path. This tool first tries to attach an existing session for project_path, then launches `cargo run --features debug` if no session is found. Use an absolute crate path (not workspace root).",
             "inputSchema": {
                 "type": "object",
-                "anyOf": [
-                    {
-                        "required": [
-                            "bin"
-                        ]
-                    },
-                    {
-                        "required": [
-                            "example"
-                        ]
-                    },
-                    {
-                        "required": [
-                            "package"
-                        ]
-                    }
+                "required": [
+                    "project_path"
                 ],
                 "properties": {
-                    "bin": {
+                    "project_path": {
                         "type": "string",
-                        "description": "Name of the binary to run (e.g., 'myapp')"
-                    },
-                    "example": {
-                        "type": "string",
-                        "description": "Name of the example to run (e.g., 'todo')"
-                    },
-                    "package": {
-                        "type": "string",
-                        "description": "Package name (for workspaces)"
+                        "description": "Absolute path to a runnable Rust crate directory containing Cargo.toml. Do not pass workspace root unless it is directly runnable."
                     },
                     "features": {
-        "type": "string",
-         "description": "Comma-separated extra features to enable (will be merged with 'debug' feature)"
-       },
-       "cargo_args": {
-         "description": "Additional cargo arguments to pass to the command",
-         "oneOf": [
-           {
-             "type": "string",
-             "description": "Space-separated cargo arguments (e.g., '--release --target wasm32-unknown-unknown')"
-           },
-           {
-             "type": "array",
-             "items": { "type": "string" },
-             "description": "Array of cargo arguments (e.g., ['--release', '--target', 'wasm32-unknown-unknown'])"
-           }
-         ]
-      }
+                        "type": "string",
+                        "description": "Comma-separated extra features to merge with `debug`."
+                    },
+                    "cargo_args": {
+                        "description": "Additional cargo arguments to pass to the run command.",
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "description": "Space-separated cargo arguments."
+                            },
+                            {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "Array form of cargo arguments."
+                            }
+                        ]
+                    },
+                    "adopt": {
+                        "type": "boolean",
+                        "description": "Whether this MCP server should manage and stop the process via stop_app. Default true."
+                    }
+                }
+            }
+        },
+        {
+            "name": "attach_app",
+            "description": "Attach to an already running Ribir debug server by explicit URL (for example from RIBIR_DEBUG_URL).",
+            "inputSchema": {
+                "type": "object",
+                "required": [
+                    "url"
+                ],
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "Debug server base URL, e.g. http://127.0.0.1:2333"
+                    },
+                    "adopt": {
+                        "type": "boolean",
+                        "description": "Attempt to adopt process ownership for cleanup via stop_app when PID can be resolved from registry."
+                    }
                 }
             }
         },
         {
             "name": "stop_app",
-            "description": "Stop the currently running Ribir application launched by this server.",
+            "description": "Stop only the process currently managed by this MCP server (launched or adopted). No-op when nothing is managed.",
             "inputSchema": {
                 "type": "object",
                 "properties": {}
@@ -129,7 +133,7 @@
                     },
                     "id": {
                         "type": "string",
-                        "description": "Widget ID to inspect"
+                        "description": "Widget ID to inspect. Supported formats: '3', '3:0', or '{\"index1\":3,\"stamp\":0}'."
                     }
                 },
                 "required": [
@@ -178,7 +182,7 @@
                     },
                     "id": {
                         "type": "string",
-                        "description": "Widget ID (e.g., '1', '1:0', or string ID)"
+                        "description": "Widget ID (e.g., '3', '3:0', or '{\"index1\":3,\"stamp\":0}')"
                     },
                     "color": {
                         "type": "string",
@@ -202,7 +206,7 @@
                     },
                     "id": {
                         "type": "string",
-                        "description": "Widget ID of the overlay to remove"
+                        "description": "Widget ID of the overlay to remove. Supported formats: '3', '3:0', or '{\"index1\":3,\"stamp\":0}'."
                     }
                 },
                 "required": [
@@ -225,15 +229,27 @@
         },
         {
             "name": "start_recording",
-            "description": "Start recording frames to disk. Frames are saved as PNG files in the current working directory with pattern: frame_{timestamp}_{sequence}.png. Use RIBIR_CAPTURE_DIR env var to customize output location (defaults to ./captures/)",
+            "description": "Start a capture session for frame recording. Output is written under $RIBIR_CAPTURE_DIR (default ./captures/{capture_id}/frames).",
             "inputSchema": {
                 "type": "object",
-                "properties": {}
+                "properties": {
+                    "include": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "logs",
+                                "images"
+                            ]
+                        },
+                        "description": "Optional capture channels. Allowed values: 'logs', 'images'. Defaults to ['images'] when omitted."
+                    }
+                }
             }
         },
         {
             "name": "stop_recording",
-            "description": "Stop recording and return the capture directory path. Use RIBIR_CAPTURE_DIR env var to customize output location (defaults to ./captures/)",
+            "description": "Stop the active recording session and return absolute capture and manifest paths.",
             "inputSchema": {
                 "type": "object",
                 "properties": {}
@@ -254,7 +270,7 @@
                                 "images"
                             ]
                         },
-                        "description": "What to include in the capture (e.g. ['logs', 'images'])"
+                        "description": "Capture channels to include. Allowed values: 'logs', 'images'."
                     },
                     "pre_ms": {
                         "type": "integer",

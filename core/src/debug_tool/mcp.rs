@@ -316,7 +316,12 @@ async fn handle_tool_call(
             CallToolResult { content: vec![ToolContent::Text { text: json_str }], is_error: false };
           JsonRpcResponse::result(id, serde_json::to_value(result).unwrap())
         }
-        Err(ServiceError::NotFound) => JsonRpcResponse::error(id, -32001, "Widget not found"),
+        Err(ServiceError::NotFound) => JsonRpcResponse::error(
+          id,
+          -32001,
+          "Widget not found. Supported id formats: '3', '3:0', or '{\"index1\":3,\"stamp\":0}'. \
+           Tip: call inspect_tree(options='id') to discover valid IDs.",
+        ),
         Err(e) => JsonRpcResponse::error(id, -32000, e.to_string()),
       }
     }
@@ -375,6 +380,12 @@ async fn handle_tool_call(
           };
           JsonRpcResponse::result(id, serde_json::to_value(result).unwrap())
         }
+        Err(ServiceError::NotFound) => JsonRpcResponse::error(
+          id,
+          -32001,
+          "Widget not found for overlay. Supported id formats: '3', '3:0', or \
+           '{\"index1\":3,\"stamp\":0}'.",
+        ),
         Err(e) => JsonRpcResponse::error(id, -32000, format!("Failed to add overlay: {}", e)),
       }
     }
@@ -394,6 +405,12 @@ async fn handle_tool_call(
           };
           JsonRpcResponse::result(id, serde_json::to_value(result).unwrap())
         }
+        Err(ServiceError::NotFound) => JsonRpcResponse::error(
+          id,
+          -32001,
+          "Overlay/widget not found. Supported id formats: '3', '3:0', or \
+           '{\"index1\":3,\"stamp\":0}'.",
+        ),
         Err(e) => JsonRpcResponse::error(id, -32000, format!("Failed to remove overlay: {}", e)),
       }
     }
@@ -410,31 +427,96 @@ async fn handle_tool_call(
     },
 
     "start_recording" => {
-      use std::sync::atomic::Ordering;
-      state.recording.store(true, Ordering::Relaxed);
-      let result = CallToolResult {
-        content: vec![ToolContent::Text { text: "Recording started".to_string() }],
-        is_error: false,
+      #[derive(Deserialize)]
+      struct StartRecordingArgs {
+        #[serde(default)]
+        include: Vec<String>,
+      }
+
+      let include = if let Some(raw) = params.arguments.clone() {
+        let parsed: StartRecordingArgs = match serde_json::from_value(raw) {
+          Ok(v) => v,
+          Err(e) => return JsonRpcResponse::error(id, -32602, format!("Invalid params: {}", e)),
+        };
+
+        if parsed.include.is_empty() {
+          vec!["images".to_string()]
+        } else if parsed
+          .include
+          .iter()
+          .all(|v| matches!(v.as_str(), "logs" | "images"))
+        {
+          parsed.include
+        } else {
+          return JsonRpcResponse::error(
+            id,
+            -32602,
+            "Invalid 'include'. Allowed values: 'logs', 'images'.",
+          );
+        }
+      } else {
+        vec!["images".to_string()]
       };
-      JsonRpcResponse::result(id, serde_json::to_value(result).unwrap())
+
+      match crate::debug_tool::server::capture_start_inner(
+        state.clone(),
+        include,
+        2_000,
+        1_000,
+        None,
+      )
+      .await
+      {
+        Ok(axum::Json(resp)) => {
+          state
+            .recording
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+          let result = CallToolResult {
+            content: vec![ToolContent::Text {
+              text: format!("Recording started. Capture dir: {}", resp.capture_dir),
+            }],
+            is_error: false,
+          };
+          JsonRpcResponse::result(id, serde_json::to_value(result).unwrap())
+        }
+        Err(axum::http::StatusCode::CONFLICT) => {
+          JsonRpcResponse::error(id, -32000, "Recording already active")
+        }
+        Err(code) => {
+          JsonRpcResponse::error(id, -32000, format!("Failed to start recording: status {}", code))
+        }
+      }
     }
 
     "stop_recording" => {
-      use std::sync::atomic::Ordering;
-      state.recording.store(false, Ordering::Relaxed);
-      let capture_dir =
-        std::env::var("RIBIR_CAPTURE_DIR").unwrap_or_else(|_| "captures".to_string());
-      let abs_path = std::fs::canonicalize(&capture_dir)
-        .ok()
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or(capture_dir);
-      let result = CallToolResult {
-        content: vec![ToolContent::Text {
-          text: format!("Recording stopped. Saved to {}", abs_path),
-        }],
-        is_error: false,
-      };
-      JsonRpcResponse::result(id, serde_json::to_value(result).unwrap())
+      match crate::debug_tool::server::capture_stop_inner(
+        state.clone(),
+        crate::debug_tool::server::CaptureStopRequest { capture_id: None },
+      )
+      .await
+      {
+        Ok(axum::Json(resp)) => {
+          state
+            .recording
+            .store(false, std::sync::atomic::Ordering::Relaxed);
+          let result = CallToolResult {
+            content: vec![ToolContent::Text {
+              text: format!(
+                "Recording stopped.\nCapture: {}\nManifest: {}",
+                resp.capture_dir, resp.manifest_path
+              ),
+            }],
+            is_error: false,
+          };
+          JsonRpcResponse::result(id, serde_json::to_value(result).unwrap())
+        }
+        Err(axum::http::StatusCode::NOT_FOUND) => {
+          JsonRpcResponse::error(id, -32001, "No active recording session")
+        }
+        Err(code) => {
+          JsonRpcResponse::error(id, -32000, format!("Failed to stop recording: status {}", code))
+        }
+      }
     }
 
     "capture_one_shot" => {
@@ -444,49 +526,7 @@ async fn handle_tool_call(
           Err(e) => return JsonRpcResponse::error(id, -32602, format!("Invalid params: {}", e)),
         };
 
-      let settle_ms = req.settle_ms.unwrap_or(150);
-      let include_images = req.include.iter().any(|s| s == "images");
-
-      match crate::debug_tool::server::capture_start_inner(
-        state.clone(),
-        req.include,
-        req.pre_ms.unwrap_or(2_000),
-        req.post_ms.unwrap_or(1_000),
-        req.output_dir,
-      )
-      .await
-      {
-        Ok(_) => {}
-        Err(code) => {
-          return JsonRpcResponse::error(
-            id,
-            -32000,
-            format!("Failed to start capture: status {}", code),
-          );
-        }
-      }
-
-      if include_images {
-        // Ask the UI thread to redraw once, then wait for the next frame update.
-        let _ = state
-          .command_tx
-          .send(crate::debug_tool::types::DebugCommand::RequestRedraw { window_id: None })
-          .await;
-        let mut rx = state.last_frame_rx.clone();
-
-        // Wait until we observe at least one frame update (best-effort).
-        let _ = tokio::time::timeout(std::time::Duration::from_millis(800), rx.changed()).await;
-
-        // Optional extra settle time to capture any overlays/layout changes.
-        tokio::time::sleep(std::time::Duration::from_millis(settle_ms)).await;
-      }
-
-      match crate::debug_tool::server::capture_stop_inner(
-        state,
-        crate::debug_tool::server::CaptureStopRequest { capture_id: None },
-      )
-      .await
-      {
+      match crate::debug_tool::server::capture_one_shot_inner(state, req).await {
         Ok(axum::Json(resp)) => {
           let result = CallToolResult {
             content: vec![ToolContent::Text {
@@ -500,7 +540,7 @@ async fn handle_tool_call(
           JsonRpcResponse::result(id, serde_json::to_value(result).unwrap())
         }
         Err(code) => {
-          JsonRpcResponse::error(id, -32000, format!("Failed to stop capture: status {}", code))
+          JsonRpcResponse::error(id, -32000, format!("Failed to capture one shot: status {}", code))
         }
       }
     }
@@ -562,27 +602,13 @@ async fn handle_read_resource(
       }
     }
     "ribir://status" => {
-      let ring_len = state.log_ring.lock().await.len();
-      let recording = state
-        .recording
-        .load(std::sync::atomic::Ordering::Relaxed);
-      let capture_root = state.capture_root.to_string_lossy().to_string();
-
-      // Construct status JSON
-      let status = serde_json::json!({
-        "recording": recording,
-        "log_sink_connected": crate::logging::debug_log_sender_installed(),
-        "filter": crate::logging::current_filter_string(),
-        "ring_len": ring_len,
-        "capture_root": capture_root,
-        // We could add more fields if needed
-      });
+      let status = crate::debug_tool::server::build_status_response(&state).await;
 
       let result = ReadResourceResult {
         contents: vec![ResourceContent {
           uri: params.uri,
           mime_type: Some("application/json".to_string()),
-          text: Some(status.to_string()),
+          text: Some(serde_json::to_string(&status).unwrap_or_else(|_| "{}".to_string())),
           blob: None,
         }],
       };

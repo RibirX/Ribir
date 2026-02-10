@@ -1,10 +1,9 @@
 //! Data types for the debug MCP server.
 
-use ribir_geom::Rect;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::{widget_tree::WidgetId, window::WindowId};
+use crate::window::WindowId;
 
 /// Controls which fields are collected and returned by the layout endpoints.
 ///
@@ -47,14 +46,6 @@ pub enum DebugCommand {
     id: String,
     options: InspectOptions,
     reply: tokio::sync::oneshot::Sender<Option<Value>>,
-  },
-  /// Query global rects for a list of widgets.
-  ///
-  /// The returned vector matches the input order.
-  GetOverlayRects {
-    window_id: Option<WindowId>,
-    ids: Vec<WidgetId>,
-    reply: tokio::sync::oneshot::Sender<Vec<Option<Rect>>>,
   },
   AddOverlay {
     window_id: Option<WindowId>,
