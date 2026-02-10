@@ -1510,13 +1510,9 @@
         }
 
         async function overlayRemove(id) {
-            // If ID matches current input, maybe clear it? Nah.
-            // Just send delete request.
-            // Special handling: if ID is complex JSON string, we need to pass it properly?
-            // Our current `clear_overlays` handles `?id=...`. It uses fuzzy resolver.
-            // If we pass the full JSON string from the list, it should resolve exactly.
-            // Our current `clear_overlays` handles `?id=...`. It uses fuzzy resolver.
-            // If we pass the full JSON string from the list, it should resolve exactly.
+            // Send the exact id back to server. Supported formats are:
+            // - WidgetId JSON string, e.g. {"index1": 42, "stamp": 0}
+            // - numeric shorthand, e.g. "42"
             let url = '/overlay/' + encodeURIComponent(id);
             const wid = getSelectedWindowId();
             if (wid) url += `?window_id=${wid}`;

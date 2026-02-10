@@ -65,17 +65,24 @@ args = ["mcp", "serve"]
 
 For other clients, see `tools/cli/README.md` for configuration examples.
 
-The MCP bridge (`ribir-cli mcp serve`) discovers the debug server via the port registry, so you do not need to hardcode a port. Discovery prefers exact path matches and falls back to the nearest parent/child path match.
+The MCP bridge (`ribir-cli mcp serve`) can discover debug ports via registry, and also supports explicit attach by URL when the client already knows `RIBIR_DEBUG_URL`.
 
 If no matching debug session exists:
 - `ribir-cli mcp check` fails fast with guidance.
 - `ribir-cli mcp serve` starts in fallback mode so MCP initialization and tool/resource listing still work.
 
-For MCP clients, prefer calling `start_app` with an explicit `package`, `bin`, or `example` target.
+For MCP clients, prefer:
+- `start_app` with absolute runnable crate `project_path` (attach-first, then launch if needed).
+- `attach_app` with explicit URL when the client already has `RIBIR_DEBUG_URL`.
+
+If users manually launch GUI apps before attach, recommend non-blocking startup commands; foreground `cargo run` blocks until app exit.
 
 ### Key MCP Tools
 
 When connected, the AI can use tools such as:
+- `start_app`: Attach-first launch by absolute runnable crate `project_path`.
+- `attach_app`: Direct attach to explicit debug URL.
+- `stop_app`: Stop only process managed by the MCP bridge.
 - `capture_screenshot`: Get a visual of the current app state.
 - `inspect_tree`: Read the full widget tree and layout information.
 - `inspect_widget`: Get detailed properties of a specific widget.
@@ -98,6 +105,9 @@ This UI allows you to:
 - Manage debug overlays.
 - Control frame recording.
 
+For MCP SSE, use:
+`http://127.0.0.1:<port>/mcp/sse`
+
 ### API Endpoints
 
 | Endpoint | Method | Description |
@@ -108,6 +118,17 @@ This UI allows you to:
 | `/screenshot` | `GET` | Download a PNG screenshot of the active window |
 | `/logs` | `GET` | Get recent logs in NDJSON format |
 | `/logs/stream` | `GET` | Real-time log stream via Server-Sent Events (SSE) |
+
+`/inspect/tree` and `/inspect/{id}` accept `options` tokens:
+`all,id,layout,global_pos,clamp,props,no_global_pos,no_clamp,no_props`.
+
+For widget identifier inputs (`id`) in inspect/overlay APIs, use one of:
+- `{"index1": <n>, "stamp": <s>}` (full `WidgetId`)
+- `<n>:<s>` (colon shorthand, e.g. `3:0`)
+- `<n>` (numeric shorthand, matched by `index1`)
+
+`window_id` is optional. If omitted, the first active window is used.
+In multi-window scenarios, query `ribir://windows` first and pass `window_id` explicitly.
 
 ---
 
@@ -120,6 +141,7 @@ You can record every frame rendered by the application. This is useful for debug
 - **Via UI**: Toggle the "Recording" checkbox.
 - **Via API**: `POST /recording`
 - **Output**: PNG frames are saved to the `captures` directory.
+- **MCP tools**: `start_recording(include?)` creates a capture session directory. `include` accepts `logs` and/or `images` (default: `images`). `stop_recording` returns absolute `capture_dir` and `manifest_path`.
 
 ### Captures (One-Shot)
 

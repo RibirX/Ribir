@@ -15,10 +15,7 @@ mod server;
 mod service;
 mod types;
 
-use std::sync::{
-  Arc, OnceLock,
-  atomic::{AtomicBool, Ordering},
-};
+use std::sync::{Arc, OnceLock};
 
 pub(crate) use overlays::paint_debug_overlays;
 pub use overlays::{clear_overlays, set_overlay_hex};
@@ -39,9 +36,3 @@ pub struct FramePacket {
 
 /// Global channel sender for transmitting frames to the debug server.
 pub static FRAME_TX: OnceLock<mpsc::UnboundedSender<FramePacket>> = OnceLock::new();
-
-/// Global recording state.
-pub static RECORDING: AtomicBool = AtomicBool::new(false);
-
-/// Check if debug recording is enabled.
-pub fn is_recording() -> bool { RECORDING.load(Ordering::Relaxed) }

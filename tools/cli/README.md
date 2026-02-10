@@ -138,10 +138,11 @@ MCP (Model Context Protocol) is a standard that allows AI assistants to interact
 
 ##### Automatic Port Discovery
 
-The MCP server supports **automatic port discovery** so the CLI can find the running debug server for whichever project you're in:
+The MCP server supports **automatic port discovery** for pre-existing sessions, and also supports explicit URL attach:
 
 - When a Ribir app starts with `--features debug`, it binds to `127.0.0.1:2333` and increments until it finds a free port (fallbacks to a dynamic port), then registers the chosen port in `~/.local/state/ribir/debug-ports/`
-- The MCP server checks the registry for the best path match relative to the current working directory (exact match first, otherwise nearest parent/child path match)
+- `start_app(project_path)` uses registry attach-first for that project path, then launches if no running session exists
+- `attach_app(url)` bypasses discovery and connects directly by explicit URL
 - `mcp check` fails fast when no matching session is found; `mcp serve` still starts in fallback mode so MCP handshake and tool discovery continue to work
 
 ```bash
@@ -155,7 +156,7 @@ cd ~/projects/app-b
 cargo run --features debug
 # Output: Debug server listening on http://127.0.0.1:2334
 
-# AI clients in each project directory will auto-discover the correct port
+# MCP clients can either call start_app(project_path) or attach_app(url)
 ```
 
 ##### Available Tools
@@ -164,6 +165,9 @@ When connected, the AI assistant can use these tools:
 
 | Tool | Description |
 |------|-------------|
+| `start_app` | Start or attach by runnable crate path (`project_path`) |
+| `attach_app` | Attach directly to a known debug URL (e.g. `RIBIR_DEBUG_URL`) |
+| `stop_app` | Stop only the process managed by this MCP bridge |
 | `capture_screenshot` | Capture a screenshot of the application window |
 | `inspect_tree` | Get the widget tree structure and layout information |
 | `inspect_widget` | Get detailed information about a specific widget |
@@ -172,7 +176,7 @@ When connected, the AI assistant can use these tools:
 | `remove_overlay` | Remove a specific overlay |
 | `clear_overlays` | Clear all overlays |
 | `set_log_filter` | Set the log filter (e.g., `info,ribir_core=debug`) |
-| `start_recording` | Start recording frames to disk |
+| `start_recording` | Start recording to disk (`include`: `logs`, `images`; default `images`) |
 | `stop_recording` | Stop recording and save to disk |
 | `capture_one_shot` | Capture a single sequence of frames (pre/post trigger) |
 
@@ -190,8 +194,10 @@ When connected, the AI assistant can use these tools:
 # 1. Run your Ribir app with debug feature enabled
 cargo run --features debug
 
-# 2. Configure your AI client to use the MCP server
-# The port is auto-discovered - no env var needed!
+# 2. Configure your AI client to use the MCP server.
+# 3. In MCP:
+#    - call start_app(project_path) for attach-first launch flow, or
+#    - call attach_app(url) if you already have RIBIR_DEBUG_URL.
 ```
 
 ##### Configuration Examples
@@ -266,10 +272,10 @@ args = ["run", "-p", "cli", "--", "mcp", "serve"]
 # List all active debug sessions
 ribir-cli mcp list
 
-# Test connection to auto-discovered debug server
+# Test connection to discovered debug server
 ribir-cli mcp check
 
-# Start MCP server with auto-discovery
+# Start MCP server bridge
 ribir-cli mcp serve
 
 # Override with a specific port
@@ -281,13 +287,13 @@ ribir-cli mcp serve --port=8080
 ```
 ┌─────────────────┐     stdio      ┌──────────────────┐     HTTP     ┌─────────────────┐
 │   AI Client     │◄──────────────►│  Rust MCP Server │◄───────────►│  Ribir App      │
-│ (Claude/Codex)  │               │  (cli mcp serve) │  :auto     │  (debug server) │
+│ (Claude/Codex)  │               │  (cli mcp serve) │  :attach   │  (debug server) │
 └─────────────────┘               └──────────────────┘            └─────────────────┘
 ```
 
-1. **Run**: Start your Ribir app with `--features debug` - it binds to `127.0.0.1:2333` and increments until a free port is found, then auto-registers that port
+1. **Run**: Start your Ribir app with `--features debug` (or let `start_app(project_path)` start it)
 2. **Configure**: Add `ribir-debug` server entry to your AI client's config (no port needed)
-3. **Connect**: AI client launches `cli mcp serve` which auto-discovers the port
+3. **Connect**: AI client launches `cli mcp serve`, then calls `start_app(project_path)` or `attach_app(url)`
 4. **Forward**: The MCP server forwards JSON-RPC requests to the debug HTTP server
 5. **Respond**: Responses flow back through the MCP server to the AI client
 
@@ -296,8 +302,8 @@ ribir-cli mcp serve --port=8080
 When debugging multiple Ribir projects simultaneously:
 
 1. Each project's debug server registers its port with the project path as key
-2. The MCP server discovers the port using the best path match (exact first, otherwise nearest parent/child match)
-3. No configuration changes needed - just run from the correct directory
+2. `start_app(project_path)` attaches by exact project path or starts a new session for that path
+3. `attach_app(url)` attaches directly when client already has a debug URL
 
 ```bash
 # View all active sessions
@@ -324,8 +330,11 @@ If the debug server is not running, the MCP server operates in fallback mode:
 
 ##### Troubleshooting: Session Not Found or Wrong Port
 
-1. Preferred for MCP clients: call `start_app` with an explicit target (`package`, `bin`, or `example`)
-2. Run `ribir-cli mcp list` to inspect which paths and ports are currently registered
-3. If needed, force the port via `ribir-cli mcp serve --port <PORT>`
-
-`start_app` now requires an explicit target to avoid ambiguous `cargo run` behavior in workspace roots.
+1. Preferred for MCP clients: call `start_app` with an absolute runnable crate `project_path`
+2. If you already know `RIBIR_DEBUG_URL`, call `attach_app` with that URL
+3. If you manually start the GUI app, run it in background to avoid blocking the client process:
+   - macOS/Linux: `cd <project_path> && nohup cargo run --features debug > /tmp/ribir-debug.log 2>&1 &`
+   - PowerShell: `Start-Process cargo -ArgumentList 'run --features debug' -WorkingDirectory '<project_path>'`
+4. Run `ribir-cli mcp list` to inspect which paths and ports are currently registered
+5. If needed, force the port via `ribir-cli mcp serve --port <PORT>`
+`start_app` rejects workspace roots that are not directly runnable crates.

@@ -116,13 +116,12 @@ fn resolve_port_from_inputs(
   }
 
   if let Some(entry) = registry.discover_best_for_path(cwd) {
-    let cwd_canonical = cwd
-      .canonicalize()
-      .unwrap_or_else(|_| cwd.to_path_buf());
-    let entry_canonical = entry
-      .project_path
-      .canonicalize()
-      .unwrap_or_else(|_| entry.project_path.clone());
+    let canonicalize = |p: &Path| {
+      p.canonicalize()
+        .unwrap_or_else(|_| p.to_path_buf())
+    };
+    let cwd_canonical = canonicalize(cwd);
+    let entry_canonical = canonicalize(&entry.project_path);
 
     if entry_canonical != cwd_canonical {
       log::info!(
@@ -144,10 +143,11 @@ fn resolve_port_from_inputs(
 
   anyhow::bail!(
     "No Ribir debug session discovered for current directory: {}\nRecommended next step:\n- call \
-     MCP tool 'start_app' with an explicit target (one of: package/bin/example)\nOther \
-     options:\n- run `ribir-cli mcp list` to inspect active sessions\n- pass an explicit port \
-     with `--port <PORT>`\n- or manually run your app in this worktree with `cargo run --features \
-     debug --example <name>` or `cargo run --features debug -p <package>`",
+     MCP tool 'start_app' with an absolute runnable crate 'project_path'\n- or call MCP tool \
+     'attach_app' with explicit debug URL (for example from RIBIR_DEBUG_URL)\nOther options:\n- \
+     run `ribir-cli mcp list` to inspect active sessions\n- pass an explicit port with `--port \
+     <PORT>`\n- if starting manually, use non-blocking launch command because GUI apps block \
+     foreground terminals",
     cwd.display()
   );
 }
@@ -211,10 +211,12 @@ fn exec_check(args: &ArgMatches) -> Result<()> {
           println!("✗ Cannot connect to debug server");
           println!("  Error: {}", e);
           println!("\nRecommended next step (for MCP clients):");
-          println!("  call MCP tool `start_app` with package/bin/example");
+          println!("  call MCP tool `start_app` with absolute runnable crate `project_path`");
+          println!("  or call MCP tool `attach_app` with explicit `url` from RIBIR_DEBUG_URL");
           println!("\nAlternative manual start:");
-          println!("  cargo run --features debug --example <name>");
-          println!("  cargo run --features debug -p <package>");
+          println!(
+            "  cd <project_path> && nohup cargo run --features debug > /tmp/ribir-debug.log 2>&1 &"
+          );
           Ok(())
         }
       }
@@ -228,10 +230,12 @@ fn exec_list() -> Result<()> {
   if entries.is_empty() {
     println!("No active debug sessions found.");
     println!("\nRecommended next step (for MCP clients):");
-    println!("  call MCP tool `start_app` with package/bin/example");
+    println!("  call MCP tool `start_app` with absolute runnable crate `project_path`");
+    println!("  or call MCP tool `attach_app` with explicit `url` from RIBIR_DEBUG_URL");
     println!("\nManual start examples:");
-    println!("  cargo run --features debug --example <name>");
-    println!("  cargo run --features debug -p <package>");
+    println!(
+      "  cd <project_path> && nohup cargo run --features debug > /tmp/ribir-debug.log 2>&1 &"
+    );
   } else {
     println!("Active debug sessions:\n");
     for entry in entries {
@@ -339,6 +343,7 @@ mod tests {
     let msg = err.to_string();
     assert!(msg.contains("No Ribir debug session discovered for current directory"));
     assert!(msg.contains("call MCP tool 'start_app'"));
+    assert!(msg.contains("attach_app"));
     assert!(!msg.contains("2333"));
 
     let _ = fs::remove_dir_all(state_dir);

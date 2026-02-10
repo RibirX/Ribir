@@ -85,20 +85,6 @@ pub(crate) fn build_layout_info_json(
   Some(Value::Object(obj))
 }
 
-/// Get an overlay rect in global coordinates for a widget.
-///
-/// Uses the widget's layout box (pos+size) rather than visual bounds.
-pub(crate) fn get_widget_global_overlay_rect(id: WidgetId, tree: &WidgetTree) -> Option<Rect> {
-  let layout = tree.store.layout_info(id)?;
-  let global_pos = match id.parent(tree) {
-    Some(parent) => tree.map_to_global(layout.pos, parent),
-    None => layout.pos,
-  };
-
-  let size = layout.size?;
-  Some(Rect::new(global_pos, size))
-}
-
 /// Parse color from hex string (e.g., "#FF000080" or "#FF0000").
 pub(crate) fn parse_hex_color(hex: &str) -> Option<Color> {
   let hex = hex.trim_start_matches('#');
@@ -116,6 +102,20 @@ pub(crate) fn parse_hex_color(hex: &str) -> Option<Color> {
   } else {
     None
   }
+}
+
+/// Get an overlay rect in global coordinates for a widget.
+///
+/// Uses the widget's layout box (pos+size) rather than visual bounds.
+pub(crate) fn get_widget_global_overlay_rect(id: WidgetId, tree: &WidgetTree) -> Option<Rect> {
+  let layout = tree.store.layout_info(id)?;
+  let global_pos = match id.parent(tree) {
+    Some(parent) => tree.map_to_global(layout.pos, parent),
+    None => layout.pos,
+  };
+
+  let size = layout.size?;
+  Some(Rect::new(global_pos, size))
 }
 
 pub(crate) fn parse_inspect_options(options: Option<&str>) -> InspectOptions {
@@ -136,24 +136,19 @@ pub(crate) fn parse_inspect_options(options: Option<&str>) -> InspectOptions {
         out.props = true;
       }
       "id" => out.id = true,
-      "layout" => {
-        out.layout = true;
-        // Backward compatibility: `layout` historically included these.
-        out.global_pos = true;
-        out.clamp = true;
-      }
-      "global_pos" | "globalpos" | "gpos" | "global" => {
+      "layout" => out.layout = true,
+      "global_pos" => {
         out.layout = true;
         out.global_pos = true;
       }
-      "clamp" | "constraint" | "constraints" => {
+      "clamp" => {
         out.layout = true;
         out.clamp = true;
       }
-      "no_global_pos" | "no_globalpos" | "noglobalpos" | "noglobal" => out.global_pos = false,
-      "no_clamp" | "noclamp" => out.clamp = false,
-      "no_props" | "no_prop" | "no_properties" => out.props = false,
-      "props" | "prop" | "properties" => out.props = true,
+      "no_global_pos" => out.global_pos = false,
+      "no_clamp" => out.clamp = false,
+      "no_props" => out.props = false,
+      "props" => out.props = true,
       _ => {}
     }
   }

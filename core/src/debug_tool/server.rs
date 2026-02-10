@@ -75,7 +75,7 @@ pub(crate) struct CaptureSession {
 }
 
 #[derive(serde::Serialize)]
-struct StatusCaptureInfo {
+pub(crate) struct StatusCaptureInfo {
   capture_id: String,
   capture_dir: String,
   start_ts_unix_ms: u64,
@@ -84,7 +84,7 @@ struct StatusCaptureInfo {
 }
 
 #[derive(serde::Serialize)]
-struct StatusResponse {
+pub(crate) struct StatusResponse {
   recording: bool,
   log_sink_connected: bool,
   filter_reload_installed: bool,
@@ -174,8 +174,6 @@ impl LogRing {
       self.items.pop_front();
     }
   }
-
-  pub fn len(&self) -> usize { self.items.len() }
 
   pub fn query_lines(
     &self, since_ts: Option<u64>, until_ts: Option<u64>, limit: Option<usize>,
@@ -279,7 +277,9 @@ pub fn start_debug_server() -> mpsc::Sender<DebugCommand> {
         .send_replace(Some(pkt.image.clone()));
 
       // 2. Save if recording
-      if state_clone.recording.load(Ordering::Relaxed) {
+      if state_clone.recording.load(Ordering::Relaxed)
+        && state_clone.active_capture.lock().await.is_none()
+      {
         let filename = format!("frame_{}_{}.png", pkt.ts_unix_ms, pkt.seq);
 
         // Spawn blocking IO task to save image
@@ -368,7 +368,6 @@ pub fn start_debug_server() -> mpsc::Sender<DebugCommand> {
     .route("/capture/stop", post(capture_stop))
     .route("/capture/one_shot", post(capture_one_shot))
     // MCP protocol endpoints
-    .route("/mcp", get(mcp_sse_handler))
     .route("/mcp/sse", get(mcp_sse_handler))
     .route("/mcp/message", post(mcp_message_handler))
     .layer(cors)
@@ -475,6 +474,10 @@ async fn get_windows(
 
 /// GET /status
 async fn get_status(State(state): State<Arc<DebugServerState>>) -> Json<StatusResponse> {
+  Json(build_status_response(&state).await)
+}
+
+pub(crate) async fn build_status_response(state: &DebugServerState) -> StatusResponse {
   let ring_len = { state.log_ring.lock().await.items.len() };
 
   let active_capture = {
@@ -488,7 +491,7 @@ async fn get_status(State(state): State<Arc<DebugServerState>>) -> Json<StatusRe
     })
   };
 
-  Json(StatusResponse {
+  StatusResponse {
     recording: state.recording.load(Ordering::Relaxed),
     log_sink_connected: crate::logging::debug_log_sender_installed(),
     filter_reload_installed: crate::logging::current_filter_reload_installed(),
@@ -497,7 +500,7 @@ async fn get_status(State(state): State<Arc<DebugServerState>>) -> Json<StatusRe
     ring_len,
     capture_root: state.capture_root.to_string_lossy().to_string(),
     active_capture,
-  })
+  }
 }
 
 /// POST /logs/filter
@@ -557,7 +560,7 @@ pub(crate) async fn capture_start_inner(
     .as_ref()
     .map(PathBuf::from)
     .unwrap_or_else(|| state.capture_root.clone());
-  let capture_dir = root.join(&capture_id);
+  let capture_dir = absolutize_path(root.join(&capture_id));
 
   // Ensure dirs exist.
   let capture_dir_clone = capture_dir.clone();
@@ -616,8 +619,12 @@ pub(crate) async fn capture_stop_inner(
   let manifest_path = capture_dir.join("manifest.json");
   let start_ts_unix_ms = session.start_ts_unix_ms;
 
-  let capture_dir_str = capture_dir.to_string_lossy().to_string();
-  let manifest_path_str = manifest_path.to_string_lossy().to_string();
+  let capture_dir_str = absolutize_path(&capture_dir)
+    .to_string_lossy()
+    .to_string();
+  let manifest_path_str = absolutize_path(&manifest_path)
+    .to_string_lossy()
+    .to_string();
 
   let logs_since = session
     .start_ts_unix_ms
@@ -692,6 +699,12 @@ pub(crate) async fn capture_stop_inner(
 async fn capture_one_shot(
   State(state): State<Arc<DebugServerState>>, Json(payload): Json<CaptureOneShotRequest>,
 ) -> Result<Json<CaptureStopResponse>, StatusCode> {
+  capture_one_shot_inner(state, payload).await
+}
+
+pub(crate) async fn capture_one_shot_inner(
+  state: Arc<DebugServerState>, payload: CaptureOneShotRequest,
+) -> Result<Json<CaptureStopResponse>, StatusCode> {
   let settle_ms = payload.settle_ms.unwrap_or(150);
   let include_images = payload.include.iter().any(|s| s == "images");
 
@@ -705,18 +718,52 @@ async fn capture_one_shot(
   .await?;
 
   if include_images {
+    let initial_frame_count = {
+      let guard = state.active_capture.lock().await;
+      guard
+        .as_ref()
+        .map(|s| s.frames.len())
+        .unwrap_or(0)
+    };
+
     // Ask the UI thread to redraw once, then wait for the next frame update.
+    let mut rx = state.last_frame_rx.clone();
+    let _ = rx.borrow_and_update();
     let _ = state
       .command_tx
       .send(DebugCommand::RequestRedraw { window_id: None })
       .await;
-    let mut rx = state.last_frame_rx.clone();
 
-    // Wait until we observe at least one frame update (best-effort).
-    let _ = tokio::time::timeout(std::time::Duration::from_millis(800), rx.changed()).await;
+    // Wait until we observe at least one new frame update (best-effort).
+    let waited_new_frame = tokio::time::timeout(std::time::Duration::from_millis(1200), async {
+      loop {
+        if rx.changed().await.is_err() {
+          return false;
+        }
+        let current = {
+          let guard = state.active_capture.lock().await;
+          guard
+            .as_ref()
+            .map(|s| s.frames.len())
+            .unwrap_or(0)
+        };
+        if current > initial_frame_count {
+          return true;
+        }
+      }
+    })
+    .await
+    .unwrap_or(false);
 
     // Optional extra settle time to capture any overlays/layout changes.
     tokio::time::sleep(std::time::Duration::from_millis(settle_ms)).await;
+    // Allow spawned PNG writes to flush before stopping capture.
+    tokio::time::sleep(std::time::Duration::from_millis(80)).await;
+
+    if !waited_new_frame {
+      let _ = capture_stop_inner(state.clone(), CaptureStopRequest { capture_id: None }).await;
+      return Err(StatusCode::REQUEST_TIMEOUT);
+    }
   }
 
   capture_stop_inner(state, CaptureStopRequest { capture_id: None }).await
@@ -805,33 +852,47 @@ fn resolve_widget_id(id_str: &str, tree: &WidgetTree) -> Option<WidgetId> {
     return Some(wid);
   }
 
-  if let Ok(idx) = id_str.parse::<u64>() {
-    let root = tree.root();
-    let mut stack = vec![root];
-    while let Some(node) = stack.pop() {
-      if let Ok(val) = serde_json::to_value(node) {
-        // Try to match against struct fields or the value itself
-        let matched = if let Some(v_num) = val.as_u64() {
-          v_num == idx
-        } else {
-          val
-            .get("index1")
-            .or_else(|| val.get("index"))
-            .or_else(|| val.get("id"))
-            .and_then(|v| v.as_u64())
-            == Some(idx)
-        };
-
-        if matched {
-          return Some(node);
-        }
-      }
-      stack.extend(node.children(tree));
-    }
+  if let Some((index, stamp)) = id_str.split_once(':')
+    && let (Ok(index), Ok(stamp)) = (index.parse::<u64>(), stamp.parse::<u64>())
+  {
+    return find_widget_id_by_parts(tree, index, Some(stamp));
   }
 
-  println!("Debug: resolve_widget_id failed for '{}'", id_str);
+  if let Ok(idx) = id_str.parse::<u64>() {
+    return find_widget_id_by_parts(tree, idx, None);
+  }
+
   None
+}
+
+fn find_widget_id_by_parts(tree: &WidgetTree, index1: u64, stamp: Option<u64>) -> Option<WidgetId> {
+  let root = tree.root();
+  let mut stack = vec![root];
+  while let Some(node) = stack.pop() {
+    if let Ok(val) = serde_json::to_value(node) {
+      let node_index = val.get("index1").and_then(|v| v.as_u64());
+      let node_stamp = val.get("stamp").and_then(|v| v.as_u64());
+      let stamp_match = match stamp {
+        Some(expected) => node_stamp == Some(expected),
+        None => true,
+      };
+      if node_index == Some(index1) && stamp_match {
+        return Some(node);
+      }
+    }
+    stack.extend(node.children(tree));
+  }
+  None
+}
+
+fn absolutize_path(path: impl Into<PathBuf>) -> PathBuf {
+  let path = path.into();
+  if path.is_absolute() {
+    return path;
+  }
+  std::env::current_dir()
+    .map(|cwd| cwd.join(&path))
+    .unwrap_or(path)
 }
 
 fn resolve_target_window(requested_id: Option<WindowId>) -> Option<Rc<Window>> {
@@ -883,19 +944,6 @@ async fn handle_command(cmd: DebugCommand) {
         let _ = reply.send(info);
       } else {
         let _ = reply.send(None);
-      }
-    }
-
-    DebugCommand::GetOverlayRects { window_id, ids, reply } => {
-      if let Some(wnd) = resolve_target_window(window_id) {
-        let tree = wnd.tree();
-        let rects = ids
-          .into_iter()
-          .map(|id| get_widget_global_overlay_rect(id, tree))
-          .collect();
-        let _ = reply.send(rects);
-      } else {
-        let _ = reply.send(vec![]);
       }
     }
 
@@ -1057,7 +1105,7 @@ fn encode_png_response(img: &PixelImage) -> axum::response::Response {
 
 // === MCP Protocol Handlers ===
 
-/// GET /mcp or /mcp/sse
+/// GET /mcp/sse
 /// SSE endpoint for MCP (Model Context Protocol)
 ///
 /// Per MCP spec, this endpoint sends an "endpoint" event with the URL
