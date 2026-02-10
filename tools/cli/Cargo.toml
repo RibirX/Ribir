@@ -1,6 +1,6 @@
 [package]
 name = "ribir-cli"
-version = "0.4.0-alpha.54"
+version = "0.4.0-alpha.57"
 edition = "2021"
 description = "Ribir command-line tools for bundling and wasm builds."
 license = "MIT"

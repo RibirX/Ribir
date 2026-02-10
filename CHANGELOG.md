@@ -10,6 +10,49 @@ For older versions:
 
 <!-- next-header -->
 
+## [0.4.0-alpha.57](https://github.com/RibirX/Ribir/releases/tag/v0.4.0-alpha.57) - 2026-02-10
+
+### 🎨 Features
+
+- **macros**: add eager mode support to \#\[declare\] macro (\#873 @M-Adoo)
+- **tools**: add attach\_app tool and enhance start\_app with absolute path support (\#881 @M-Adoo)
+- **tools**: add start\_app and stop\_app MCP tools for remote lifecycle management (\#880 @M-Adoo)
+- **tools**: enhance stop\_app to manage adopted processes from the port registry (\#881 @M-Adoo)
+- **tools**: implement dynamic port discovery and native Rust MCP server (\#878 @M-Adoo)
+
+### 🐛 Fixed
+
+- **core**: fix global overlay position calculation for root widgets in debug tool (\#879 @wjian23)
+
+### 🔄 Changed
+
+- **core**: improve widget ID resolution with colon shorthand (index:stamp) and better numeric matching (\#881 @M-Adoo)
+- **core**: modernize debug tool UI and implement an interactive layout tree (\#879 @wjian23)
+- **core**: prioritize local size attributes over class styles by reordering builtin widgets (\#876 @M-Adoo)
+- **core**: update capture tools to wait for frame synchronization and return absolute file paths (\#881 @M-Adoo)
+- **core**: use deterministic port range 2333-2432 for debug server (\#880 @M-Adoo)
+- **tools**: enhance MCP port discovery with best-match path strategies (\#880 @M-Adoo)
+- **widgets**: migrate Container usages to hint\_size for improved layout consistency (\#876 @M-Adoo)
+
+### 📚 Documentation
+
+- simplify checkbox two-way binding in todos example and tutorial using TwoWay (\#875 @wjian23)
+- **tools**: update debug workflows and developer guides for MCP (\#878 @M-Adoo)
+
+### 💥 Breaking
+
+- **core**: convert Void and Container to field-bearing structs and add hint\_size field (\#873 @M-Adoo)
+- **tools**: remove Node.js MCP adapter in favor of native CLI implementation (\#878 @M-Adoo)
+- **tools**: start\_app now requires an absolute project\_path argument instead of binary/package names (\#881 @M-Adoo)
+
+<details>
+<summary>🔧 Internal</summary>
+
+- build(tools): 🤖 use cache-cargo-install-action for ribir-bot in workflows (#877 @M-Adoo)
+- build(tools): 🤖 use annotated tag for releases (#874 @M-Adoo)
+
+</details>
+
 ## [0.4.0-alpha.56](https://github.com/RibirX/Ribir/releases/tag/v0.4.0-alpha.56) - 2026-02-04
 
 ### 🎨 Features
@@ -55,11 +98,11 @@ For older versions:
 <details>
 <summary>🔧 Internal</summary>
 
-- build(tools): 🤖 fix GitHub token usage in release workflows (#872 @M-Adoo)
-- build(tools): 🤖 skip fork repos and configure git auth in release workflows (#871 @M-Adoo)
-- build(tools): 🤖 use CRATE_RELEASE_TOKEN for rc-bot (#863 @M-Adoo)
-- build(tools): 🤖 migrate release tooling from cargo-workspaces to cargo-edit (#858 @M-Adoo)
-- 💡 replace DisabledRipple with DisableInteractiveLayer (#856 @M-Adoo)
+- build(tools): 🤖 fix GitHub token usage in release workflows (\#872 @M-Adoo)
+- build(tools): 🤖 skip fork repos and configure git auth in release workflows (\#871 @M-Adoo)
+- build(tools): 🤖 use CRATE\_RELEASE\_TOKEN for rc-bot (\#863 @M-Adoo)
+- build(tools): 🤖 migrate release tooling from cargo-workspaces to cargo-edit (\#858 @M-Adoo)
+- 💡 replace DisabledRipple with DisableInteractiveLayer (\#856 @M-Adoo)
 
 </details>
 
