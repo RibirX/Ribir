@@ -333,7 +333,6 @@ impl<V: 'static> Pipe<V> {
         };
         assert_eq!(*first_leaf, dummy);
         *first_leaf = leaf;
-        bind_update(node, pipe.observable);
       }
     });
     let _ = std::mem::replace(&mut children[0], first_child);
@@ -353,11 +352,12 @@ impl<V: 'static> Pipe<V> {
     TmpParent
       .x_with_children(children)
       .on_build(move |p| {
-        let GenRange::ParentOnly { parent, first_leaf } = node.dyn_info_mut().gen_range else {
+        let GenRange::ParentOnly { parent, first_leaf } = node.dyn_info().gen_range else {
           unreachable!()
         };
         assert_eq!(parent, dummy);
         node.init(p, GenRange::ParentOnly { parent: p, first_leaf });
+        bind_update(node, pipe.observable);
       })
   }
 }

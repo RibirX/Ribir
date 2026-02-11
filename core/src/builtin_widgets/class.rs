@@ -133,7 +133,9 @@ macro_rules! named_styles_impl {
 /// that applies each implementation sequentially to a `Widget`.
 ///
 /// The first implementation in the list runs first, and the last one is
-/// applied last (closest to the widget).
+/// applied last (closest to the widget). Therefore, the last implementation
+/// has the highest visual priority (e.g. `[BASE, SELECTED]` ->
+/// `BASE(SELECTED(child))`).
 ///
 /// # Example
 /// ```
@@ -385,9 +387,10 @@ impl<'c> ComposeChild<'c> for Class {
             })
             .unsubscribe_when_dropped();
 
-          compose_with_classes(writer.read().class.clone(), child)
-            .on_build(move |child_id| cls_child.init_for_single(child_id))
-            .attach_anonymous_data(u)
+          compose_with_classes(writer.read().class.clone(), child).on_build(move |child_id| {
+            cls_child.init_for_single(child_id);
+            child_id.attach_anonymous_data(u, BuildCtx::get_mut().tree_mut());
+          })
         }
       }
     };
@@ -1026,5 +1029,78 @@ mod tests {
 
     wnd.draw_frame();
     wnd.assert_root_size(Size::new(100., 100.));
+  }
+
+  #[test]
+  fn fix_pipe_parent_with_pipe_class() {
+    reset_test_env!();
+
+    class_names!(CLS_A, CLS_B);
+
+    let (expanded, w_expanded) = split_value(true);
+    let (cls_toggle, w_cls) = split_value(true);
+
+    let w = fn_widget! {
+      let mut classes = Classes::default();
+      // CLS_A and CLS_B use margin to create real wrapper nodes,
+      // matching gallery behavior (RAIL_ITEM_SELECTED/UNSELECTED use style_class with real props).
+      classes.insert(CLS_A, style_class! { margin: EdgeInsets::all(1.) });
+      classes.insert(CLS_B, style_class! { margin: EdgeInsets::all(2.) });
+
+      // Pipe parent: switches between MockMulti (horizontal) and MockStack (overlap)
+      let pipe_parent = pipe!(*$read(expanded)).map(move |is_horiz| {
+        if is_horiz {
+          MockMulti.into_multi_child()
+        } else {
+          MockStack {}.into_multi_child()
+        }
+      }).into_multi_child();
+
+      // Pipe class
+      let cls = pipe!(*$read(cls_toggle)).map(|v| {
+        if v { CLS_A } else { CLS_B }
+      });
+
+      let mut obj = FatObj::new(pipe_parent);
+      obj.with_class(cls);
+
+      @Providers {
+        providers: smallvec::smallvec![Provider::new(classes)],
+        @(obj) {
+          @MockBox { size: Size::new(10., 10.) }
+          @MockBox { size: Size::new(10., 10.) }
+        }
+      }
+    };
+
+    let wnd = TestWindow::from_widget(w);
+    wnd.draw_frame();
+    // MockMulti + margin 1 on each side: width=20+2, height=10+2
+    wnd.assert_root_size(Size::new(22., 12.));
+
+    // Toggle pipe parent: MockMulti -> MockStack
+    *w_expanded.write() = false;
+    wnd.draw_frame();
+    // MockStack + margin 1: width=10+2, height=10+2
+    wnd.assert_root_size(Size::new(12., 12.));
+
+    // Toggle class: CLS_A -> CLS_B (margin 1 -> margin 2)
+    *w_cls.write() = false;
+    wnd.draw_frame();
+    // MockStack + margin 2: width=10+4, height=10+4
+    wnd.assert_root_size(Size::new(14., 14.));
+
+    // Toggle pipe parent back: MockStack -> MockMulti
+    *w_expanded.write() = true;
+    wnd.draw_frame();
+    // MockMulti + margin 2: width=20+4, height=10+4
+    wnd.assert_root_size(Size::new(24., 14.));
+
+    // Simultaneous: toggle both class and parent on the same frame
+    *w_cls.write() = true; // CLS_B -> CLS_A (margin 2 -> margin 1)
+    *w_expanded.write() = false; // MockMulti -> MockStack
+    wnd.draw_frame();
+    // MockStack + margin 1: width=10+2, height=10+2
+    wnd.assert_root_size(Size::new(12., 12.));
   }
 }
