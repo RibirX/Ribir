@@ -34,13 +34,18 @@ jobs:
             exit 1
           fi
 
-      - name: Install tools
-        uses: taiki-e/install-action@v2
-        with:
-          tool: ribir-bot@0.1,cargo-edit
-
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+
+      - name: Install ribir-bot
+        uses: taiki-e/cache-cargo-install-action@v2
+        with:
+          tool: ribir-bot@0.1
+
+      - name: Install cargo-edit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-edit
 
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y libwebp-dev libasound2-dev pkg-config
