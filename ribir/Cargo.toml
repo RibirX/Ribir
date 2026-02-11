@@ -38,7 +38,6 @@ wasm-bindgen-futures.workspace = true
 
 [dev-dependencies]
 colored.workspace = true
-env_logger.workspace = true
 futures.workspace = true
 ribir_dev_helper = { path = "../dev-helper" }
 ribir_material = { path = "../themes/material" }
