@@ -81,9 +81,66 @@
 //!   }
 //! };
 //! ```
+//!
+//! ## Controlling Label Visibility
+//!
+//! By default, buttons display both icon and label when both are provided.
+//! You can use `ButtonLabelVisibility` provider to dynamically control this:
+//!
+//! ```
+//! # use ribir_core::prelude::*;
+//! # use ribir_widgets::prelude::*;
+//!
+//! // Static control - hide labels
+//! let _ = providers! {
+//!   providers: [Provider::new(ButtonLabelVisibility::Hide)],
+//!   @button! {
+//!     @Icon { @SpinnerProgress {} }
+//!     @ { "Hidden" } // Icon only
+//!   }
+//! };
+//!
+//! // Dynamic control
+//! let show_labels = Stateful::new(ButtonLabelVisibility::Show);
+//! let _ = providers! {
+//!   providers: [Provider::writer(show_labels.clone_writer(), None)],
+//!   @button! {
+//!     @Icon { @SpinnerProgress {} }
+//!     @ { "Dynamic" }
+//!   }
+//! };
+//! ```
 use ribir_core::prelude::*;
 
 use crate::prelude::*;
+
+/// Controls the visibility of button labels when both icon and label are
+/// present.
+///
+/// This provider allows higher-level components (like toolbars or responsive
+/// layouts) to control whether button labels should be visible, effectively
+/// switching between "extended" (icon + label) and "compact" (icon only) modes.
+///
+/// # Example
+/// ```
+/// # use ribir_core::prelude::*;
+/// # use ribir_widgets::prelude::*;
+///
+/// // Container provides the policy
+/// let _ = row! {
+///   providers: [Provider::new(ButtonLabelVisibility::Hide)],
+///   @button! { @Icon { @SpinnerProgress {} } @ { "Save" } }  // Renders as icon-only
+///   @button! { @Icon { @SpinnerProgress {} } @ { "Delete" } } // Renders as icon-only
+/// };
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+pub enum ButtonLabelVisibility {
+  /// Show label if provided (default behavior).
+  #[default]
+  Show,
+  /// Hide label, render as icon-only even if label is provided.
+  Hide,
+}
 
 /// Represents the default button, usually with a border.
 ///
@@ -276,37 +333,63 @@ impl<'c> ButtonChild<'c> {
   /// - If both an icon and a label are present, the `btn` class will be
   ///   assigned to the button, the `btn_icon` class will be assigned to the
   ///   icon, and the `btn_label` class will be assigned to the label.
+  ///
+  /// When both icon and label are present, the visibility of the label is
+  /// controlled by the `ButtonLabelVisibility` provider. If no provider is
+  /// found, defaults to `Show`.
   fn compose_to_widget(
     self,
     [btn, btn_leading_icon, btn_trialing_icon, btn_label, icon_only, label_only]: [ClassName; 6],
   ) -> Widget<'c> {
     let Self { label, icon } = self;
+
     match (label, icon) {
-      (None, None) => void!( class: btn ).into_widget(),
+      // Case 1: Neither - render empty
+      (None, None) => void!(class: btn).into_widget(),
+
+      // Case 2: Only icon - no change needed
       (None, Some(icon)) => fat_obj! {
         class: icon_only,
         @ { icon.unwrap() }
       }
       .into_widget(),
+
+      // Case 3: Only label - no change needed
       (Some(text), None) => text! { class: label_only, text }.into_widget(),
-      (Some(text), Some(icon)) => rdl! {
+
+      // Case 4: Both present - handle visibility
+      (Some(text), Some(icon)) => {
         let trailing_icon = icon.is_trailing();
-        let icon = @Class {
+
+        let label_visible = Variant::<ButtonLabelVisibility>::new_or_default(BuildCtx::get())
+          .map(|v| *v == ButtonLabelVisibility::Show);
+
+        let icon_widget = class! {
           class: if trailing_icon { btn_trialing_icon } else { btn_leading_icon },
           @ { icon.unwrap() }
-        }.into_widget();
+        };
 
-        let label = @Text { class: btn_label, text }.into_widget();
-        let items = if trailing_icon { [label, icon] } else { [icon, label] };
+        let label_widget = text! {
+          class: btn_label,
+          text,
+          visible: $clone(label_visible),
+        };
 
-        @Row {
-          class: btn,
+        let (first, second) = if trailing_icon {
+          (label_widget.into_widget(), icon_widget.into_widget())
+        } else {
+          (icon_widget.into_widget(), label_widget.into_widget())
+        };
+
+        row! {
+          class: label_visible.map(move |show| if show { btn } else { icon_only }),
           align_items: Align::Center,
           justify_content: JustifyContent::Center,
-          @ { items }
+          @ { first }
+          @ { second }
         }
+        .into_widget()
       }
-      .into_widget(),
     }
   }
 }
@@ -502,5 +585,26 @@ mod tests {
       }
     })
     .with_wnd_size(Size::new(640., 256.)),
+  );
+
+  widget_image_tests!(
+    button_label_visibility,
+    WidgetTester::new(self::column! {
+      @Row {
+        providers: [Provider::new(ButtonLabelVisibility::Show)],
+        @button! { @Icon { @miss_icon() } @ { "Show" } }
+        @filled_button! { @Icon { @miss_icon() } @ { "Show" } }
+        @text_button! { @Icon { @miss_icon() } @ { "Show" } }
+        @fab! { @Icon { @miss_icon() } @ { "Show" } }
+      }
+      @Row {
+        providers: [Provider::new(ButtonLabelVisibility::Hide)],
+        @button! { @Icon { @miss_icon() } @ { "Hide" } }
+        @filled_button! { @Icon { @miss_icon() } @ { "Hide" } }
+        @text_button! { @Icon { @miss_icon() } @ { "Hide" } }
+        @fab! { @Icon { @miss_icon() } @ { "Hide" } }
+      }
+    })
+    .with_wnd_size(Size::new(400., 128.)),
   );
 }
