@@ -49,8 +49,7 @@ jobs:
         if: steps.event.outputs.should_run == 'true'
         uses: taiki-e/cache-cargo-install-action@v2
         with:
-          tool: ribir-bot
-          version: 0.1
+          tool: ribir-bot@0.1
 
       - name: Parse Command
         if: steps.event.outputs.should_run == 'true'

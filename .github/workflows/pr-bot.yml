@@ -37,8 +37,7 @@ jobs:
       - name: Install ribir-bot
         uses: taiki-e/cache-cargo-install-action@v2
         with:
-          tool: ribir-bot
-          version: 0.1
+          tool: ribir-bot@0.1
 
       - uses: ./.github/actions/setup-gemini
 
