@@ -1,66 +1,73 @@
-//! External tool integrations (Gemini AI and GitHub CLI).
+//! External tool integrations (AI backend and GitHub CLI).
 
 use std::{
+  fs,
   io::Write as IoWrite,
+  path::PathBuf,
   process::{Command, Stdio},
+  time::{SystemTime, UNIX_EPOCH},
 };
 
 use semver::Version;
 
 use crate::{types::Result, utils::run_command};
 
-const PREFERRED_MODELS: &[&str] = &[
-  "gemini-3-flash-preview",
-  "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
-  "gemini-3-pro-preview",
-  "gemini-2.5-pro",
-];
+pub fn call_ai(prompt: &str) -> Result<String> {
+  const DEFAULT_PROFILE: &str = "ribir-bot";
+  let profile = std::env::var("RIBIR_BOT_CODEX_PROFILE")
+    .ok()
+    .filter(|p| !p.trim().is_empty())
+    .unwrap_or_else(|| DEFAULT_PROFILE.to_string());
+  let output_file = ai_output_file();
 
-pub fn call_gemini_with_fallback(prompt: &str) -> Result<String> {
-  let mut last_error = String::new();
-
-  for model in PREFERRED_MODELS {
-    eprintln!("Trying model: {model}");
-    match call_gemini(prompt, model) {
-      Ok(res) => {
-        eprintln!("✓ Success: {model}");
-        return Ok(res);
-      }
-      Err(e) => {
-        eprintln!("✗ Failed: {model} - {e}");
-        last_error = e;
-      }
-    }
-  }
-
-  Err(format!("All models failed. Last error: {last_error}").into())
-}
-
-fn call_gemini(prompt: &str, model: &str) -> std::result::Result<String, String> {
-  let mut child = Command::new("gemini")
-    .args(["--model", model, "--approval-mode", "yolo", "-o", "text"])
+  let mut child = Command::new("codex")
+    .args([
+      "exec",
+      "-p",
+      &profile,
+      "--sandbox",
+      "read-only",
+      "--skip-git-repo-check",
+      "--output-last-message",
+      output_file
+        .to_str()
+        .ok_or("Invalid output file path")?,
+      "-",
+    ])
     .stdin(Stdio::piped())
-    .stdout(Stdio::piped())
+    .stdout(Stdio::null())
     .stderr(Stdio::piped())
-    .spawn()
-    .map_err(|e| e.to_string())?;
+    .spawn()?;
 
   if let Some(mut stdin) = child.stdin.take() {
-    stdin
-      .write_all(prompt.as_bytes())
-      .map_err(|e| e.to_string())?;
+    stdin.write_all(prompt.as_bytes())?;
   }
 
-  let output = child
-    .wait_with_output()
-    .map_err(|e| e.to_string())?;
+  let output = child.wait_with_output()?;
 
-  if output.status.success() {
-    Ok(String::from_utf8_lossy(&output.stdout).into())
-  } else {
-    Err(String::from_utf8_lossy(&output.stderr).into())
+  if !output.status.success() {
+    return Err(
+      format!(
+        "codex exec failed (profile={}): {}",
+        profile,
+        String::from_utf8_lossy(&output.stderr)
+      )
+      .into(),
+    );
   }
+
+  let content = fs::read_to_string(&output_file)?;
+  let _ = fs::remove_file(&output_file);
+  Ok(content)
+}
+
+fn ai_output_file() -> PathBuf {
+  let pid = std::process::id();
+  let nanos = SystemTime::now()
+    .duration_since(UNIX_EPOCH)
+    .map(|d| d.as_nanos())
+    .unwrap_or(0);
+  std::env::temp_dir().join(format!("ribir-bot-ai-output-{pid}-{nanos}.txt"))
 }
 
 pub fn extract_json(s: &str) -> Option<String> {

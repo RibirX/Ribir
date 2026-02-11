@@ -402,7 +402,7 @@ pub fn cmd_release_verify() -> Result<()> {
   println!("\n🔧 Required tools:");
   for (cmd, args, name) in [
     ("gh", vec!["--version"], "GitHub CLI"),
-    ("gemini", vec!["--version"], "Gemini CLI"),
+    ("codex", vec!["--version"], "Codex CLI"),
     ("cargo", vec!["set-version", "--version"], "cargo-edit"),
   ] {
     let status = if Command::new(cmd).args(args).output().is_ok() { "✅" } else { "❌" };
@@ -764,7 +764,7 @@ fn generate_highlights(entries: &str, context: Option<&str>) -> Result<Vec<Highl
     );
   }
 
-  let response = call_gemini_with_fallback(&prompt)?;
+  let response = call_ai(&prompt)?;
   let json_str = extract_json(&response).ok_or("No JSON found in AI response")?;
 
   let parsed: HighlightsResponse = serde_json::from_str(&json_str)

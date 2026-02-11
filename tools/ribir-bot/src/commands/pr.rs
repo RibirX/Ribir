@@ -2,11 +2,9 @@
 
 use crate::{
   changelog::{MARKER_END as CHANGELOG_END_MARKER, MARKER_START as CHANGELOG_START_MARKER},
-  external::{
-    add_reaction, call_gemini_with_fallback, extract_json, gh_diff, gh_edit_body, gh_json,
-  },
+  external::{add_reaction, call_ai, extract_json, gh_diff, gh_edit_body, gh_json},
   types::{
-    Commit, Config, GeminiResponse, PRCommits, PRView, PrSubCmd, Result, SKIP_CHANGELOG_CHECKED,
+    AiResponse, Commit, Config, PRCommits, PRView, PrSubCmd, Result, SKIP_CHANGELOG_CHECKED,
   },
   utils::{sanitize_markdown, truncate},
 };
@@ -137,16 +135,16 @@ fn build_pr_prompt(pr: &PRView, body: &str, commits: &str, diff: &str, cmd: &PrS
   prompt
 }
 
-fn generate_pr_content(prompt: &str) -> Result<GeminiResponse> {
-  let result = call_gemini_with_fallback(prompt)?;
+fn generate_pr_content(prompt: &str) -> Result<AiResponse> {
+  let result = call_ai(prompt)?;
   let json_str = extract_json(&result).ok_or("No JSON found in response")?;
-  let response: GeminiResponse =
+  let response: AiResponse =
     serde_json::from_str(&json_str).map_err(|e| format!("Invalid JSON: {e}\nRaw: {result}"))?;
   sanitize_response(response)
 }
 
 fn update_pr_body(
-  body: &str, response: &GeminiResponse, needs_summary: bool, needs_changelog: bool,
+  body: &str, response: &AiResponse, needs_summary: bool, needs_changelog: bool,
 ) -> String {
   let mut result = body.to_string();
 
@@ -177,7 +175,7 @@ fn replace_section(body: &str, start_marker: &str, end_marker: &str, new_content
   }
 }
 
-fn sanitize_response(mut response: GeminiResponse) -> Result<GeminiResponse> {
+fn sanitize_response(mut response: AiResponse) -> Result<AiResponse> {
   response.summary = sanitize_markdown(&response.summary);
   response.changelog = sanitize_markdown(&response.changelog);
 
@@ -235,7 +233,7 @@ mod tests {
        placeholder\n\n{}\n\nOther content",
       SUMMARY_START_MARKER, SUMMARY_END_MARKER, CHANGELOG_START_MARKER, CHANGELOG_END_MARKER
     );
-    let response = GeminiResponse {
+    let response = AiResponse {
       summary: "Fixed a bug.".into(),
       changelog: "- fix(core): fix crash".into(),
       skip_changelog: false,
@@ -260,7 +258,7 @@ mod tests {
       SKIP_CHANGELOG_CHECKED,
       CHANGELOG_END_MARKER
     );
-    let response = GeminiResponse {
+    let response = AiResponse {
       summary: "New summary".into(),
       changelog: "- should not be used".into(),
       skip_changelog: false,
@@ -279,7 +277,7 @@ mod tests {
        entry\n\n{}\n\nOther content",
       SUMMARY_START_MARKER, SUMMARY_END_MARKER, CHANGELOG_START_MARKER, CHANGELOG_END_MARKER
     );
-    let response = GeminiResponse {
+    let response = AiResponse {
       summary: "New AI summary".into(),
       changelog: "- new(change): entry".into(),
       skip_changelog: false,
@@ -295,7 +293,7 @@ mod tests {
 
   #[test]
   fn test_sanitize_response_valid() {
-    let response = GeminiResponse {
+    let response = AiResponse {
       summary: "New feature".into(),
       changelog: "- feat(core): add".into(),
       skip_changelog: false,
@@ -305,21 +303,15 @@ mod tests {
 
   #[test]
   fn test_sanitize_response_empty_summary() {
-    let response = GeminiResponse {
-      summary: "   ".into(),
-      changelog: "- feat: x".into(),
-      skip_changelog: false,
-    };
+    let response =
+      AiResponse { summary: "   ".into(), changelog: "- feat: x".into(), skip_changelog: false };
     assert!(sanitize_response(response).is_err());
   }
 
   #[test]
   fn test_sanitize_response_invalid_changelog() {
-    let response = GeminiResponse {
-      summary: "OK".into(),
-      changelog: "no bullets".into(),
-      skip_changelog: false,
-    };
+    let response =
+      AiResponse { summary: "OK".into(), changelog: "no bullets".into(), skip_changelog: false };
     assert!(sanitize_response(response).is_err());
   }
 

@@ -17,8 +17,32 @@ cargo install --path .
 ### Dependencies
 
 - [GitHub CLI](https://cli.github.com/) (`gh`) - for GitHub operations
-- [Gemini CLI](https://github.com/anthropics/gemini) (`gemini`) - for AI generation
+- [Codex CLI](https://github.com/openai/codex) (`codex`) - for AI generation
 - [cargo-edit](https://github.com/killercup/cargo-edit) - for version management
+
+### Codex Profile
+
+`ribir-bot` uses a dedicated Codex profile by default: `ribir-bot`.
+
+- Default: `ribir-bot`
+- Override (optional): `RIBIR_BOT_CODEX_PROFILE=<profile>`
+
+Minimal `~/.codex/config.toml` example:
+
+```toml
+[model_providers.let2]
+name = "Internal Provider"
+base_url = "https://<your-provider>/v1"
+wire_api = "responses"
+experimental_bearer_token = "<token>"
+
+[profiles.ribir-bot]
+model = "gemini-3-flash"
+model_provider = "let2"
+approval_policy = "never"
+model_reasoning_effort = "medium"
+model_reasoning_summary = "concise"
+```
 
 ## Usage
 
@@ -124,7 +148,7 @@ src/
 ├── cli.rs        # Argument parsing and help text
 ├── types.rs      # Shared data types
 ├── utils.rs      # Utility functions
-├── external.rs   # Gemini AI and GitHub CLI integration
+├── external.rs   # AI backend and GitHub CLI integration
 ├── changelog.rs  # Changelog AST parsing and manipulation
 └── commands/
     ├── pr.rs        # PR body generation
@@ -138,7 +162,7 @@ src/
 
 1. Fetches PR data via `gh pr view`
 2. Detects placeholders in PR body (marked with HTML comments)
-3. Calls Gemini AI to generate summary and changelog entries
+3. Calls Codex AI to generate summary and changelog entries
 4. Updates PR body via `gh pr edit`
 
 ### Changelog Commands

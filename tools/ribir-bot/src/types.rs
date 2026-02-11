@@ -267,7 +267,7 @@ impl PrSubCmd {
 }
 
 #[derive(Deserialize, Serialize)]
-pub struct GeminiResponse {
+pub struct AiResponse {
   pub summary: String,
   pub changelog: String,
   #[serde(default)]

@@ -34,13 +34,14 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y libwebp-dev libasound2-dev pkg-config
 
-      - uses: ./.github/actions/setup-gemini
+      - uses: ./.github/actions/setup-codex
+        with:
+          config_toml: ${{ secrets.CODEX_CONFIG_TOML }}
 
       - name: Enter RC Phase
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATE_RELEASE_TOKEN }}
           GH_TOKEN: ${{ secrets.RIBIR_RELEASE }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"
         run: |
           git config user.name "github-actions[bot]"

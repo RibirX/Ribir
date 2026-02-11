@@ -81,7 +81,7 @@ For changes that don't need recording (tests, CI configs, infra, or unreleased f
 
 ### 2. PR Automation
 
-**Purpose:** Uses Gemini AI to automatically generate PR summaries and changelog entries.
+**Purpose:** Uses Codex AI to automatically generate PR summaries and changelog entries.
 
 **Location:** [tools/ribir-bot](../../tools/ribir-bot)
 
@@ -102,8 +102,8 @@ Ribir uses an AI-powered bot to analyze code changes and descriptions, automatic
 #### Requirements
 
 - `gh` CLI (authenticated)
-- `gemini` CLI (for AI generation)
-- `GEMINI_API_KEY` environment variable
+- `codex` CLI (for AI generation)
+- Codex `config.toml` configuration (for provider/model/auth)
 
 ---
 
@@ -266,7 +266,7 @@ After stable release, highlights appear in CHANGELOG.md:
 
 #### AI-Powered Generation
 
-During RC preparation, the system uses Gemini AI to analyze all changelog entries and generate the highlights section.
+During RC preparation, the system uses Codex AI to analyze all changelog entries and generate the highlights section.
 
 **Selection Criteria:**
 1. **Impact** - User-facing changes prioritized over internal refactors
@@ -403,7 +403,7 @@ The changelog automation provides the foundation for the entire release system:
 **Solutions:**
 - Confirm PR description contains placeholder text from template
 - Check GitHub Actions logs for errors
-- Ensure `GEMINI_API_KEY` secret is configured in repository settings
+- Ensure `CODEX_CONFIG_TOML` secret is configured in repository settings
 
 ### Changelog Bot Can't Find PRs
 
@@ -457,7 +457,7 @@ Highlights are optimized for 3-5 items. More than 5:
 - Choose only the most impactful
 - Use full changelog for comprehensive coverage
 
-### What if Gemini API is unavailable?
+### What if Codex or provider API is unavailable?
 
 The workflow will fail with an error message. You'll need to manually add the highlights section to CHANGELOG.md following the format documented above, then commit it to the RC preparation branch.
 
