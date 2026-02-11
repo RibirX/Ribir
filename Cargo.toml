@@ -89,7 +89,6 @@ lyon_geom = "1.0.6"
 lyon_path = "1.0.7"
 lyon_tessellation = "1.0.15"
 material-colors = "0.4.2"
-icrate = "0.0.4"
 paste = "1.0"
 pin-project-lite = "0.2.15"
 proc-macro2 = "1.0.101"
@@ -116,7 +115,6 @@ winit = { version = "0.30.11", default-features = false, features = [
 ] }
 zerocopy = "0.7.3"
 quick-xml = "0.38.4"
-macos-accessibility-client = { version = "0.0.1" }
 tokio = { version = "1.0" }
 
 # Logging / telemetry (used by debug server)
