@@ -36,16 +36,6 @@ tokio = { workspace = true, features = ["rt", "sync"]}
 wasm-bindgen-futures.workspace = true
 
 
-[target.'cfg(target_os = "macos")'.dependencies]
-icrate = { workspace = true, features = [
-  "Foundation",
-  "Foundation_NSAppleEventManager",
-  "objective-c",
-  "AppKit",
-  "AppKit_NSEvent",
-] }
-macos-accessibility-client = { workspace = true }
-
 [dev-dependencies]
 colored.workspace = true
 env_logger.workspace = true

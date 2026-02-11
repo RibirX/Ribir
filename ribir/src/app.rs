@@ -15,10 +15,7 @@ use ribir_core::{
 use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
 use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy};
 
-use crate::{
-  register_platform_app_events_handlers,
-  winit_shell_wnd::{RibirShell, ShellCmd, ShellWndHandle, WinitShellWnd, new_id},
-};
+use crate::winit_shell_wnd::{RibirShell, ShellCmd, ShellWndHandle, WinitShellWnd, new_id};
 
 mod app_event_handler;
 mod ui_executor;
@@ -37,20 +34,9 @@ pub struct App {
   ui_executor: ui_executor::UiExecutor,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct HotkeyEvent {
-  pub key_code: Option<KeyCode>,
-  pub modifiers: Option<ModifiersState>,
-}
-
 pub enum AppEvent {
   /// The event is sent when any future is waked to poll.
   FuturesWake,
-  /// The event is sent when the application is be required to open a url. For
-  /// example, it's launched from browser with a url.
-  OpenUrl(String),
-  /// The event is get global hotkey, it will receive the hotkey event.
-  Hotkey(HotkeyEvent),
   /// The event is sent when the application window focus changed.
   WndFocusChanged(WindowId, bool),
   /// The custom event, you can send any data with this event.
@@ -264,7 +250,6 @@ impl App {
       AppCtx::set_clipboard(Box::new(crate::clipboard::Clipboard::new().unwrap()));
 
       app();
-      register_platform_app_events_handlers()
     });
 
     let event_loop = App::take_event_loop();
