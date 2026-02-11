@@ -638,11 +638,30 @@ impl Texture for WgpuTexture {
 
 fn copy_row_data(src: &[u8], dst: &mut [u8], format: wgpu::TextureFormat) {
   if format == wgpu::TextureFormat::Bgra8Unorm {
-    for (s, d) in src.chunks_exact(4).zip(dst.chunks_exact_mut(4)) {
-      d[0] = s[2];
-      d[1] = s[1];
-      d[2] = s[0];
-      d[3] = s[3];
+    // Attempt to use u32 for faster copy and swap
+    let (pre_s, mid_s, _) = unsafe { src.align_to::<u32>() };
+    let (pre_d, mid_d, _) = unsafe { dst.align_to_mut::<u32>() };
+
+    if pre_s.is_empty() && pre_d.is_empty() {
+      for (s, d) in mid_s.iter().zip(mid_d.iter_mut()) {
+        #[cfg(target_endian = "little")]
+        {
+          // 0xAARRGGBB -> 0xAABBGGRR
+          *d = (*s & 0xFF00FF00) | ((*s & 0x00FF0000) >> 16) | ((*s & 0x000000FF) << 16);
+        }
+        #[cfg(target_endian = "big")]
+        {
+          // 0xBBGGRRAA -> 0xRRGGBBAA
+          *d = (*s & 0x00FF00FF) | ((*s & 0xFF000000) >> 16) | ((*s & 0x0000FF00) << 16);
+        }
+      }
+    } else {
+      for (s, d) in src.chunks_exact(4).zip(dst.chunks_exact_mut(4)) {
+        d[0] = s[2];
+        d[1] = s[1];
+        d[2] = s[0];
+        d[3] = s[3];
+      }
     }
   } else {
     dst.copy_from_slice(src);
