@@ -39,7 +39,9 @@ jobs:
         with:
           tool: ribir-bot@0.1
 
-      - uses: ./.github/actions/setup-gemini
+      - uses: ./.github/actions/setup-codex
+        with:
+          config_toml: ${{ secrets.CODEX_CONFIG_TOML }}
 
       - name: Handle Event
         id: event
@@ -67,22 +69,9 @@ jobs:
         if: steps.event.outputs.should_run == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           set -euo pipefail
-
-          # Create .geminiignore to exclude unsupported image formats (Gemini API only supports PNG/JPEG/WEBP)
-          cat > .geminiignore << 'EOF'
-          *.gif
-          *.GIF
-          *.heic
-          *.HEIC
-          *.tiff
-          *.TIFF
-          test_cases/**/*.png
-          EOF
-
-          echo "Gemini CLI: $(gemini --version || true)"
+          echo "Codex CLI: $(codex --version || true)"
           COMMAND="${{ steps.event.outputs.command }}"
           PR_ID="${{ steps.event.outputs.pr_id }}"
           CONTEXT="${{ steps.event.outputs.context }}"
@@ -110,14 +99,3 @@ jobs:
           else
             ribir-bot "${CMD[@]}" "$PR_ID"
           fi
-
-      - name: Dump Gemini error report
-        if: failure() && steps.event.outputs.should_run == 'true'
-        run: |
-          set -euo pipefail
-          ls /tmp/gemini-client-error-*.json 2>/dev/null || exit 0
-          echo "--- Gemini error report(s) ---"
-          for f in /tmp/gemini-client-error-*.json; do
-            echo "# $f"
-            cat "$f"
-          done

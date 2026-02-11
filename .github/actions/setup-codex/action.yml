@@ -1,0 +1,77 @@
+name: Setup Codex CLI
+description: Install Codex CLI and write Codex config.toml for ribir-bot
+
+inputs:
+  config_toml:
+    description: Full ~/.codex/config.toml content.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve Codex target
+      id: resolve
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ "${RUNNER_OS}" != "Linux" ]; then
+          echo "Unsupported RUNNER_OS=${RUNNER_OS}; setup-codex only supports Linux." >&2
+          exit 1
+        fi
+
+        case "${RUNNER_ARCH}" in
+          X64) binary="codex-x86_64-unknown-linux-musl" ;;
+          ARM64) binary="codex-aarch64-unknown-linux-musl" ;;
+          *)
+            echo "Unsupported RUNNER_ARCH=${RUNNER_ARCH}" >&2
+            exit 1
+            ;;
+        esac
+
+        version="0.99.0"
+        echo "CODEX_BINARY=${binary}" >> "$GITHUB_ENV"
+        echo "CODEX_VERSION=${version}" >> "$GITHUB_ENV"
+        echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+    - name: Cache Codex CLI
+      id: cache-codex
+      uses: actions/cache@v4
+      with:
+        path: ~/.local/codex-${{ steps.resolve.outputs.version }}
+        key: codex-cli-${{ steps.resolve.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
+
+    - name: Install Codex CLI (Linux)
+      if: steps.cache-codex.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p ~/.local/codex-${CODEX_VERSION}
+        curl -fsSL "https://github.com/openai/codex/releases/download/rust-v${CODEX_VERSION}/${CODEX_BINARY}.tar.gz" \
+          | tar -xz -C ~/.local/codex-${CODEX_VERSION}
+        chmod +x ~/.local/codex-${CODEX_VERSION}/${CODEX_BINARY}
+
+    - name: Add Codex to PATH
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p ~/.local/bin
+        ln -sf ~/.local/codex-${CODEX_VERSION}/${CODEX_BINARY} ~/.local/bin/codex
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+    - name: Verify Codex CLI
+      shell: bash
+      run: codex --version
+
+    - name: Configure Codex
+      env:
+        INPUT_CONFIG_TOML: ${{ inputs.config_toml }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p ~/.codex
+
+        if [ -z "${INPUT_CONFIG_TOML}" ]; then
+          echo "Missing required input: config_toml" >&2
+          exit 1
+        fi
+        printf '%s\n' "${INPUT_CONFIG_TOML}" > ~/.codex/config.toml
