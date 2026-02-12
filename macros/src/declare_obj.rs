@@ -170,6 +170,9 @@ impl DeclareObj {
         } else {
           quote_spanned! { expr.span() => let mut #name = #expr; }.to_tokens(tokens);
           self.gen_fields_tokens(&name, tokens);
+          if self.children.is_empty() {
+            name.to_tokens(tokens);
+          }
         }
       }
       ObjType::Var { name, fields_used } => {
