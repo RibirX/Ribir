@@ -939,3 +939,19 @@ fn fix_top_level_rdl_builtin() {
     };
   };
 }
+
+#[test]
+fn rdl_expression_parent_keeps_fatobj_return_when_setting_builtin_fields() {
+  reset_test_env!();
+
+  fn expression_parent() -> FatObj<Void> { FatObj::new(Void::default()) }
+
+  let w: FatObj<Void> = rdl! {
+    @(expression_parent()) {
+      background: Color::RED,
+    }
+  };
+
+  let (host, _fat_shell) = w.into_parts();
+  let _: Void = host;
+}
