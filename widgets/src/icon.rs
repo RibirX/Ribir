@@ -108,9 +108,22 @@ impl Render for IconRender {
     let child_size = ctx
       .perform_single_child_layout(BoxClamp::default())
       .unwrap_or_default();
-    let scale = icon_size / child_size.width.max(child_size.height);
+    let scale =
+      if child_size.is_empty() { 1. } else { icon_size / child_size.width.max(child_size.height) };
     self.scale.set(scale);
     clamp.clamp(Size::splat(icon_size))
+  }
+
+  fn place_children(&self, size: Size, ctx: &mut PlaceCtx) {
+    let child = ctx.assert_single_child();
+    let child_size = ctx.widget_box_size(child).unwrap_or_default();
+    let scale = self.scale.get();
+    let real_size = child_size * scale;
+    let offset = (size - real_size) / 2.0;
+    // Keep centering in layout coordinates; visual scaling is handled by transform.
+    let layout_offset =
+      if scale == 0. { offset } else { Size::new(offset.width / scale, offset.height / scale) };
+    ctx.update_position(child, Point::new(layout_offset.width, layout_offset.height));
   }
 
   fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
@@ -127,10 +140,7 @@ impl Render for IconRender {
       if real_size.greater_than(size).any() {
         painter.clip(Path::rect(&Rect::from_size(size)).into());
       }
-      let offset = (size - real_size) / 2.0;
-      painter
-        .translate(offset.width, offset.height)
-        .scale(scale, scale);
+      painter.scale(scale, scale);
     }
   }
 
@@ -152,7 +162,7 @@ impl<'c> IconChild<'c> {
       IconChild::Widget(child) => child,
     };
 
-    IconRender { scale: Cell::new(0.) }
+    IconRender { scale: Cell::new(1.) }
       .with_child(child)
       .into_widget()
   }
@@ -214,4 +224,33 @@ mod tests {
     .with_wnd_size(Size::splat(64.))
     .with_comparison(0.0002)
   );
+
+  #[test]
+  fn icon_padding_transform() {
+    reset_test_env!();
+
+    WidgetTester::new(fn_widget! {
+      @Icon {
+        padding: EdgeInsets::all(4.),
+        text_line_height: 24.,
+        @Container {
+          size: Size::new(20., 10.),
+          background: Color::RED,
+        }
+      }
+    })
+    .with_wnd_size(Size::splat(64.))
+    .on_initd(|wnd| {
+      wnd.draw_frame();
+      let icon = wnd.widget_id_by_path(&[0]);
+      let child = wnd.widget_id_by_path(&[0, 0]);
+
+      let icon_global = wnd.map_to_global(Point::zero(), icon);
+      let child_global = wnd.map_to_global(Point::zero(), child);
+      // Child is vertically centered in icon box: (24 - 10*1.2)/2 = 6.
+      assert_eq!(child_global - icon_global, Vector::new(0., 6.));
+      assert_eq!(wnd.map_from_global(child_global, icon), Point::new(0., 5.));
+    })
+    .create_wnd();
+  }
 }
