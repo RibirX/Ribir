@@ -157,6 +157,63 @@ fn writer_animate() -> Widget<'static> {
 
 Here, the `StateWriter` returned by `w.opacity()` implements the `AnimateState` trait. By setting the animation property through the `transition()` method, the animation is automatically triggered when the value is modified via the `StateWriter`.
 
+### How to choose `transition` and `transition_with_init`
+
+Ribir currently exposes two writer-bound transition APIs:
+
+- `transition(...)`: first animation starts from the current property value.
+- `transition_with_init(init, ...)`: first animation starts from your custom `init`.
+
+You may see `transition_with` in discussions. In current API, that behavior is
+covered by `transition(...)` (equivalent to using the current value as init).
+
+When to use:
+
+- Use `transition(...)` when the current property value is the correct starting point.
+- Use `transition_with_init(...)` when the first sync should animate from a virtual start value (for example, `opacity: 0. -> 1.`).
+
+Order rule (important):
+
+1. Install transition first (`transition` / `transition_with_init`).
+2. Then bind or write target values (`with_opacity`, `with_foreground`, `*$write(...) = ...`).
+
+If reversed, the first write happens before transition is installed, so the
+first animation will not run.
+
+Example 1 (like `RAIL_ITEM_LABEL`):
+
+```rust no_run
+use ribir::prelude::*;
+use ribir::material::md;
+
+fn label_fade(visible: PipeValue<bool>, w: Widget<'static>) -> Widget<'static> {
+  fn_widget! {
+    let mut label = @FatObj { @ { w } };
+    let effects = md::motion::spring::FAST.effects_transition(md::motion::duration::SHORT3);
+    label.opacity().transition_with_init(0., effects);
+    label.with_opacity(visible.map(|v| if v { 1. } else { 0. }));
+    label
+  }
+  .into_widget()
+}
+```
+
+Example 2 (like `RAIL_ITEM_SELECTED/UNSELECTED`):
+
+```rust no_run
+use ribir::prelude::*;
+use ribir::material::md;
+
+fn selected_item(w: Widget<'static>) -> Widget<'static> {
+  let mut item = FatObj::new(w);
+  let effects = md::motion::spring::FAST.effects_transition(md::motion::duration::SHORT3);
+  let palette = Palette::of(BuildCtx::get());
+  item.foreground().transition_with_init(palette.on_surface_variant().into(), effects);
+  item.with_foreground(palette.secondary());
+  item.into_widget()
+}
+```
+
 
 ## Advanced Animations
 
