@@ -100,21 +100,26 @@ impl WrapRender for BorderWidget {
 
     if !size.is_empty() {
       let (provider_ctx, mut painter) = ctx.provider_ctx_and_box_painter();
+      let radius = if let Some(r) = Provider::of::<Radius>(provider_ctx) {
+        limited_radius(&r, size)
+      } else {
+        Radius::all(0.)
+      };
       // Connecting adjacent borders implies that the styles of the neighboring
       // borders should match. If one of the adjacent borders is absent, the corner
       // radius will align with the existing border.
       let border = &self.border;
-      let first = border
-        .find_visible(SidePos::Top..SidePos::Top)
-        .map(|side| border.expand_continuous(side));
+      let uniform_painted = border.try_paint_uniform_stroke(size, &radius, &mut painter);
+      let first = (!uniform_painted)
+        .then(|| {
+          border
+            .find_visible(SidePos::Top..SidePos::Top)
+            .map(|side| border.expand_continuous(side))
+        })
+        .flatten();
 
       if let Some(rg) = first {
         let old_brush = painter.fill_brush().clone();
-        let radius = if let Some(r) = Provider::of::<Radius>(provider_ctx) {
-          limited_radius(&r, size)
-        } else {
-          Radius::all(0.)
-        };
         border.paint_continuous_borders(size, &rg, &radius, &mut painter);
 
         // if the first continuous border only has one side, there maybe existing
@@ -192,6 +197,44 @@ impl SidePos {
 }
 
 impl Border {
+  fn try_paint_uniform_stroke(&self, size: Size, radius: &Radius, painter: &mut Painter) -> bool {
+    let w = self.top.width;
+    let same_width = |v: f32| (v - w).abs() <= f32::EPSILON;
+    if !(w.is_finite()
+      && w > 0.
+      && same_width(self.right.width)
+      && same_width(self.bottom.width)
+      && same_width(self.left.width)
+      && self.top.color == self.right.color
+      && self.top.color == self.bottom.color
+      && self.top.color == self.left.color
+      && size.width > w
+      && size.height > w)
+    {
+      return false;
+    }
+
+    let half_w = w * 0.5;
+    let stroke_rect =
+      Rect::new(Point::new(half_w, half_w), Size::new(size.width - w, size.height - w));
+    let stroke_radius = Radius {
+      top_left: radius.top_left - half_w,
+      top_right: radius.top_right - half_w,
+      bottom_left: radius.bottom_left - half_w,
+      bottom_right: radius.bottom_right - half_w,
+    };
+    {
+      let mut painter = painter.save_guard();
+      painter
+        .set_style(PathStyle::Stroke)
+        .set_stroke_brush(self.top.color.clone())
+        .set_line_width(w)
+        .rect_round(&stroke_rect, &stroke_radius, true)
+        .stroke();
+    }
+    true
+  }
+
   fn paint_continuous_borders(
     &self, size: Size, rg: &Range<SidePos>, radius: &Radius, painter: &mut Painter,
   ) {

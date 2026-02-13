@@ -652,21 +652,108 @@ struct MaskLayer {
   mask_tex_idx: u32,
   @align(4)
   prev_mask_idx: i32,
+  @align(4)
+  kind: u32,
+  @align(4)
+  paint_style: u32,
+  @align(4)
+  stroke_half_width: f32,
+  @align(4)
+  aa_epsilon: f32,
+  p0: vec4<f32>,
+}
+
+fn sd_round_rect_mask(p: vec2<f32>, bmin: vec2<f32>, bmax: vec2<f32>, r4: vec4<f32>) -> f32 {
+    let c = (bmin + bmax) * 0.5;
+    let h = (bmax - bmin) * 0.5;
+    let q = p - c;
+
+    // Select the correct corner radius based on the quadrant
+    let r = select(
+      select(r4.x, r4.y, q.x > 0.0),
+      select(r4.w, r4.z, q.x > 0.0),
+      q.y > 0.0
+    );
+
+    let d = abs(q) - (h - vec2(r));
+    return min(max(d.x, d.y), 0.0) + length(max(d, vec2(0.0))) - r;
 }
 
 fn mask_sample(mask: MaskLayer, pos: vec2<f32>) -> f32 {
-    switch mask.mask_tex_idx {
-      case 0u: { return mask_tex_sampler(tex_0, mask, pos); }
-      case 1u: { return mask_tex_sampler(tex_1, mask, pos); }
-      case 2u: { return mask_tex_sampler(tex_2, mask, pos); }
-      case 3u: { return mask_tex_sampler(tex_3, mask, pos); }
-      case 4u: { return mask_tex_sampler(tex_4, mask, pos); }
-      case 5u: { return mask_tex_sampler(tex_5, mask, pos); }
-      case 6u: { return mask_tex_sampler(tex_6, mask, pos); }
-      case 7u: { return mask_tex_sampler(tex_7, mask, pos); }
-      // should not happen
+    switch mask.kind {
+      case 0u: {
+        switch mask.mask_tex_idx {
+          case 0u: { return mask_tex_sampler(tex_0, mask, pos); }
+          case 1u: { return mask_tex_sampler(tex_1, mask, pos); }
+          case 2u: { return mask_tex_sampler(tex_2, mask, pos); }
+          case 3u: { return mask_tex_sampler(tex_3, mask, pos); }
+          case 4u: { return mask_tex_sampler(tex_4, mask, pos); }
+          case 5u: { return mask_tex_sampler(tex_5, mask, pos); }
+          case 6u: { return mask_tex_sampler(tex_6, mask, pos); }
+          case 7u: { return mask_tex_sampler(tex_7, mask, pos); }
+          default: { return 0.; }
+        };
+      }
+      case 1u: {
+        let p = mat3x2(mask.t0, mask.t1, mask.t2) * vec3(pos, 1.);
+        let w = mask.stroke_half_width;
+        let is_stroke = mask.paint_style == 1u;
+        var alpha_sd = 1e6;
+
+        switch u32(mask.mask_tex_idx) {
+          case 1u: {
+            let c = (mask.min + mask.max) * 0.5;
+            let h = (mask.max - mask.min) * 0.5;
+            if is_stroke {
+              let out_h = h + vec2(w);
+              let out_d = abs(p - c) - out_h;
+              let out_sd = length(max(out_d, vec2(0.))) + min(max(out_d.x, out_d.y), 0.);
+
+              let in_h = max(h - vec2(w), vec2(0.));
+              let in_d = abs(p - c) - in_h;
+              let in_sd = length(max(in_d, vec2(0.))) + min(max(in_d.x, in_d.y), 0.);
+              
+              alpha_sd = max(out_sd, -in_sd);
+            } else {
+              let d = abs(p - c) - h;
+              alpha_sd = length(max(d, vec2(0.))) + min(max(d.x, d.y), 0.);
+            }
+          }
+          case 2u: { 
+            if is_stroke {
+              let out_min = mask.min - vec2(w);
+              let out_max = mask.max + vec2(w);
+              let out_r = mask.p0 + vec4(w);
+              let out_sd = sd_round_rect_mask(p, out_min, out_max, out_r);
+
+              let in_min = mask.min + vec2(w);
+              let in_max = mask.max - vec2(w);
+              let in_r = max(mask.p0 - vec4(w), vec4(0.));
+              let in_sd = sd_round_rect_mask(p, in_min, in_max, in_r);
+
+              alpha_sd = max(out_sd, -in_sd);
+            } else {
+              alpha_sd = sd_round_rect_mask(p, mask.min, mask.max, mask.p0);
+            }
+          }
+          case 3u: { 
+            let sd = length(p - mask.p0.xy) - mask.p0.z; 
+            alpha_sd = select(sd, abs(sd) - w, is_stroke);
+          }
+          default: {}
+        }
+        
+        let sx = length(mask.t0);
+        let sy = length(mask.t1);
+        // Use uniform analytical gradient to avoid 2x2 macroblock artifacts at SDF corners.
+        // It perfectly resolves the `fwidth` 2.0 spike that was causing transparent notch bugs.
+        let grad_len = max(sx, sy);
+        let aa = max(grad_len, mask.aa_epsilon);
+
+        return clamp(0.5 - alpha_sd / aa, 0.0, 1.0);
+      }
       default: { return 0.; }
-  };
+  }
 }
 
 

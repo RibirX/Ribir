@@ -207,10 +207,10 @@ impl GPUBackendImpl for WgpuImpl {
 
   fn new_texture(&mut self, size: DeviceSize, format: ColorFormat) -> Self::Texture {
     let mut wgpu_format = into_wgpu_format(format);
-    if let Some(s_fmt) = self.surface_format {
-      if try_into_color_format(s_fmt) == Some(format) {
-        wgpu_format = s_fmt;
-      }
+    if let Some(s_fmt) = self.surface_format
+      && try_into_color_format(s_fmt) == Some(format)
+    {
+      wgpu_format = s_fmt;
     }
     self.create_texture(size, wgpu_format)
   }

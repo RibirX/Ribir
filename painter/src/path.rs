@@ -16,6 +16,25 @@ pub struct Path {
   pub(crate) lyon_path: LyonPath,
   // the bounds of the path.
   bounds: Rect,
+  #[serde(skip)]
+  path_kind: PathKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum PathKind {
+  Rect {
+    rect: Rect,
+  },
+  Circle {
+    center: Point,
+    radius: f32,
+  },
+  RoundRect {
+    rect: Rect,
+    radius: Radius,
+  },
+  #[default]
+  Complex,
 }
 
 /// Stroke properties.
@@ -108,7 +127,14 @@ pub struct PathSampler {
 }
 
 impl Path {
-  pub(crate) fn new(lyon_path: LyonPath, bounds: Rect) -> Self { Self { lyon_path, bounds } }
+  #[allow(dead_code)]
+  pub(crate) fn new(lyon_path: LyonPath, bounds: Rect) -> Self {
+    Self { lyon_path, bounds, path_kind: PathKind::Complex }
+  }
+
+  pub(crate) fn with_kind(lyon_path: LyonPath, bounds: Rect, path_kind: PathKind) -> Self {
+    Self { lyon_path, bounds, path_kind }
+  }
 
   #[inline]
   pub fn builder() -> PathBuilder { PathBuilder::default() }
@@ -157,8 +183,15 @@ impl Path {
   /// Some points may become NaN/inf therefore this method can fail.
   pub fn transform(self, ts: &Transform) -> Self {
     let ts: &lyon_algorithms::geom::Transform<f32> = unsafe { std::mem::transmute(ts) };
-    self.lyon_path.transformed(ts).into()
+    let lyon_path = self.lyon_path.transformed(ts);
+    let bounds = lyon_algorithms::aabb::bounding_box(&lyon_path)
+      .to_rect()
+      .cast_unit();
+    Self { lyon_path, bounds, path_kind: PathKind::Complex }
   }
+
+  #[inline]
+  pub fn path_kind(&self) -> PathKind { self.path_kind }
 
   /// Create an sampler that can queries point at this path or usb-path of this
   /// path.
@@ -351,7 +384,7 @@ impl From<LyonPath> for Path {
     let bounds = lyon_algorithms::aabb::bounding_box(&lyon_path)
       .to_rect()
       .cast_unit();
-    Path { lyon_path, bounds }
+    Path { lyon_path, bounds, path_kind: PathKind::Complex }
   }
 }
 
