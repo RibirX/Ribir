@@ -20,17 +20,39 @@ pub trait AnimateState: AnimateStateSetter {
 
   /// Creates an animation that smoothly transitions a writer's value on every
   /// change.
+  ///
+  /// Use this when the current state value is already the correct "from"
+  /// value. The initial animation start value is `self.get()`.
   fn transition(self, transition: impl Transition + 'static) -> Stateful<Animate<Self>>
   where
     Self: Sized,
     Self::Value: PartialEq,
   {
-    let init_value = Local::of(self.get());
+    let init = self.get();
+    self.transition_with_init(init, transition)
+  }
+
+  /// Creates an animation that smoothly transitions a writer's value on every
+  /// change, with a specified initial value.
+  ///
+  /// Use this when the first observed target value should animate from a
+  /// custom initial value instead of the current state value.
+  ///
+  /// Typical case: call `transition_with_init(...)` before binding/writing the
+  /// property value, so the first sync can animate from `init_value`.
+  fn transition_with_init(
+    self, init_value: Self::Value, transition: impl Transition + 'static,
+  ) -> Stateful<Animate<Self>>
+  where
+    Self: Sized,
+    Self::Value: PartialEq,
+  {
+    let init_trigger = Local::of(self.get());
 
     let mut animate = Animate::declarer();
     animate
       .with_transition(transition)
-      .with_from(self.get())
+      .with_from(init_value)
       .with_state(self);
     let animate = animate.finish();
 
@@ -41,7 +63,7 @@ pub trait AnimateState: AnimateStateSetter {
         let animate = animate.clone_writer();
         move |_| animate.read().state.get()
       })
-      .merge(init_value)
+      .merge(init_trigger)
       .distinct_until_changed()
       .pairwise()
       .subscribe({

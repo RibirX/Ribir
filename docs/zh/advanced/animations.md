@@ -155,6 +155,63 @@ fn writer_animate() -> Widget<'static> {
 
 这里，`w.opacity()` 返回的 `StateWriter` 实现了 `AnimateState` trait。通过 `transition()` 方法设置动画属性后，当通过该 `StateWriter` 修改值时，动画会自动触发。
 
+### `transition_with` 与 `transition_with_init` 怎么选
+
+Ribir 当前公开 API 是 `transition(...)` 与 `transition_with_init(...)`。
+你可能会在讨论里看到 `transition_with`，其语义可理解为“使用当前值作为初始值”，对应现在的 `transition(...)`。
+
+`transition(...)`（可理解为 `transition_with(self.get(), ...)`）和
+`transition_with_init(init, ...)` 的区别只在“第一次动画的起点”：
+
+- `transition(...)`：第一次从“当前属性值”开始动画。
+- `transition_with_init(init, ...)`：第一次从你指定的 `init` 开始动画。
+
+何时使用：
+
+- 属性当前值已经是正确起点，用 `transition(...)`。
+- 你希望第一次同步就从一个虚拟起点过渡（例如 `opacity: 0. -> 1.`），用 `transition_with_init(...)`。
+
+关键顺序（非常重要）：
+
+1. 先安装 transition（`transition` / `transition_with_init`）。
+2. 再绑定或写入目标值（`with_opacity`、`with_foreground`、`*$write(...) = ...`）。
+
+如果顺序反过来，第一次写入发生在 transition 安装前，首次动画不会执行。
+
+示例 1（类似 `RAIL_ITEM_LABEL`）：
+
+```rust no_run
+use ribir::prelude::*;
+use ribir::material::md;
+
+fn label_fade(visible: PipeValue<bool>, w: Widget<'static>) -> Widget<'static> {
+  fn_widget! {
+    let mut label = @FatObj { @ { w } };
+    let effects = md::motion::spring::FAST.effects_transition(md::motion::duration::SHORT3);
+    label.opacity().transition_with_init(0., effects);
+    label.with_opacity(visible.map(|v| if v { 1. } else { 0. }));
+    label
+  }
+  .into_widget()
+}
+```
+
+示例 2（类似 `RAIL_ITEM_SELECTED/UNSELECTED`）：
+
+```rust no_run
+use ribir::prelude::*;
+use ribir::material::md;
+
+fn selected_item(w: Widget<'static>) -> Widget<'static> {
+  let mut item = FatObj::new(w);
+  let effects = md::motion::spring::FAST.effects_transition(md::motion::duration::SHORT3);
+  let palette = Palette::of(BuildCtx::get());
+  item.foreground().transition_with_init(palette.on_surface_variant().into(), effects);
+  item.with_foreground(palette.secondary());
+  item.into_widget()
+}
+```
+
 ## 高级动画
 
 ### 关键帧动画
