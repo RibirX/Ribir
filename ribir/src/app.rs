@@ -247,7 +247,10 @@ impl App {
 
     AppCtx::run(recv, shell, async move {
       #[cfg(not(target_arch = "wasm32"))]
-      AppCtx::set_clipboard(Box::new(crate::clipboard::Clipboard::new().unwrap()));
+      match crate::clipboard::Clipboard::new() {
+        Ok(clipboard) => AppCtx::set_clipboard(Box::new(clipboard)),
+        Err(err) => tracing::warn!("clipboard unavailable, continue without clipboard: {err}"),
+      }
 
       app();
     });

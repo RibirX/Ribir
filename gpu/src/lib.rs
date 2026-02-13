@@ -330,11 +330,11 @@ pub struct ImgPrimitive {
 #[repr(C, packed)]
 pub struct MaskLayer {
   /// A 2x3 column-major matrix, transform a vertex position to its mask texture
-  /// position.
+  /// position for atlas, or local position for sdf.
   pub transform: [f32; 6],
-  /// The min position this layer in the texture.
+  /// The min bound for atlas texture space, or local rect min for sdf.
   pub min: [f32; 2],
-  /// max min position this layer in the texture.
+  /// The max bound for atlas texture space, or local rect max for sdf.
   pub max: [f32; 2],
   /// The index of the texture(alpha) that contained this layer,
   /// `load_textures` method provide all textures a draw phase need.
@@ -343,6 +343,39 @@ pub struct MaskLayer {
   /// negative value means there isn't any more mask layer that needs to be
   /// applied.
   pub prev_mask_idx: i32,
+  /// 0 for atlas, 1 for sdf-rect.
+  pub kind: u32,
+  /// 0 for fill, 1 for stroke.
+  pub paint_style: u32,
+  /// half stroke width in local space when paint_style is stroke.
+  pub stroke_half_width: f32,
+  /// anti-aliasing epsilon.
+  pub aa_epsilon: f32,
+  /// generic sdf parameters. for circle: [cx, cy, r, 0], for round-rect: corner
+  /// radii.
+  pub p0: [f32; 4],
+}
+
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MaskKind {
+  Atlas = 0,
+  Sdf = 1,
+}
+
+#[repr(C, packed)]
+#[derive(AsBytes, Clone, Copy, Debug, PartialEq)]
+pub struct SdfMaskData {
+  /// A 2x3 column-major matrix, transform a view position to local position.
+  pub transform: [f32; 6],
+  /// 1=Rect, 2=RoundRect, 3=Circle.
+  pub shape_kind: u32,
+  /// Bit flags for fill/stroke/inverse/fill-rule.
+  pub flags: u32,
+  /// Generic parameters for sdf shape data.
+  pub p0: [f32; 4],
+  /// Generic parameters for sdf shape data.
+  pub p1: [f32; 4],
 }
 
 #[repr(C, packed)]

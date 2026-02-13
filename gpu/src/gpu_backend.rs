@@ -5,14 +5,14 @@ use ribir_geom::{
   DevicePoint, DeviceRect, DeviceSize, Point, Transform, rect_corners, transform_to_device_rect,
 };
 use ribir_painter::{
-  Color, ColorFormat, ColorMatrix, CommandBrush, FilterComposite, FilterLayer, FilterOp,
-  PaintCommand, PaintPath, PaintPathAction, PainterBackend, PaintingStyle, PathCommand, PixelImage,
-  Vertex, VertexBuffers, color::ColorFilterMatrix,
+  Color, ColorFormat, ColorMatrix, CommandBrush, FilterComposite, FilterLayer, FilterOp, LineCap,
+  LineJoin, PaintCommand, PaintPath, PaintPathAction, PainterBackend, PaintingStyle, PathCommand,
+  PathKind, PixelImage, StrokeOptions, Vertex, VertexBuffers, color::ColorFilterMatrix,
 };
 
 use crate::{
   ColorAttr, FilterPrimitive, GPUBackendImpl, GradientStopPrimitive, ImagePrimIndex, ImgPrimitive,
-  LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer, RadialGradientPrimIndex,
+  LinearGradientPrimIndex, LinearGradientPrimitive, MaskKind, MaskLayer, RadialGradientPrimIndex,
   RadialGradientPrimitive, TexturePrimIndex, TexturePrimitive,
 };
 
@@ -42,6 +42,7 @@ pub struct GPUBackend<Impl: GPUBackendImpl> {
   clip_layer_stack: Vec<ClipLayer>,
   skip_clip_cnt: usize,
   surface_color: Option<Color>,
+  frame_no: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -124,6 +125,7 @@ where
   }
 
   fn end_frame(&mut self) {
+    self.frame_no += 1;
     self.mask_layers.clear();
     self.tex_mgr.end_frame();
     self.gpu_impl.end_frame();
@@ -134,6 +136,61 @@ impl<Impl: GPUBackendImpl> GPUBackend<Impl>
 where
   Impl::Texture: Texture<Host = Impl>,
 {
+  fn support_sdf_stroke(style: &StrokeOptions) -> bool {
+    style.width > 0.0
+      && style.width.is_finite()
+      && style.miter_limit.is_finite()
+      && matches!(style.line_cap, LineCap::Butt)
+      && matches!(style.line_join, LineJoin::Miter | LineJoin::Bevel)
+  }
+
+  fn normalize_round_rect_radii(
+    rect: &ribir_geom::Rect, radius: &ribir_painter::Radius,
+  ) -> [f32; 4] {
+    let mut tl = radius.top_left;
+    let mut tr = radius.top_right;
+    let mut br = radius.bottom_right;
+    let mut bl = radius.bottom_left;
+
+    let w = rect.width().max(0.0);
+    let h = rect.height().max(0.0);
+    if w <= 0.0 || h <= 0.0 {
+      return [0.0; 4];
+    }
+
+    let tl_pos = tl.max(0.0);
+    let tr_pos = tr.max(0.0);
+    let br_pos = br.max(0.0);
+    let bl_pos = bl.max(0.0);
+
+    let sx_top = if tl_pos + tr_pos > 0.0 { w / (tl_pos + tr_pos) } else { 1.0 };
+    let sx_bottom = if bl_pos + br_pos > 0.0 { w / (bl_pos + br_pos) } else { 1.0 };
+    let sy_left = if tl_pos + bl_pos > 0.0 { h / (tl_pos + bl_pos) } else { 1.0 };
+    let sy_right = if tr_pos + br_pos > 0.0 { h / (tr_pos + br_pos) } else { 1.0 };
+    let s = sx_top
+      .min(sx_bottom)
+      .min(sy_left)
+      .min(sy_right)
+      .min(1.0);
+
+    if s < 1.0 {
+      if tl > 0.0 {
+        tl *= s;
+      }
+      if tr > 0.0 {
+        tr *= s;
+      }
+      if br > 0.0 {
+        br *= s;
+      }
+      if bl > 0.0 {
+        bl *= s;
+      }
+    }
+
+    [tl, tr, br, bl]
+  }
+
   pub fn new(mut gpu_impl: Impl) -> Self {
     let tex_mgr = TexturesMgr::new(&mut gpu_impl);
     Self {
@@ -157,6 +214,7 @@ where
       current_phase: CurrentPhase::None,
       viewport: DeviceRect::zero(),
       surface_color: Some(Color::WHITE),
+      frame_no: 0,
     }
   }
 
@@ -406,33 +464,33 @@ where
 
   fn begin_draw_phase(&mut self) {
     if !self.clip_layer_stack.is_empty() {
-      // clear unused mask layers and update mask index.
+      // clear unused mask nodes and update mask index.
       let mut retain_masks = Vec::with_capacity(self.clip_layer_stack.len());
       let mut mask_new_idx = vec![-1; self.mask_layers.len()];
       for s in self.clip_layer_stack.iter_mut() {
         if s.mask_head != -1 {
-          retain_masks.push(s.mask_head);
-          mask_new_idx[s.mask_head as usize] = retain_masks.len() as i32 - 1;
-          s.mask_head = retain_masks.len() as i32 - 1;
+          let old_idx = s.mask_head as usize;
+          if mask_new_idx[old_idx] == -1 {
+            retain_masks.push(self.mask_layers[old_idx].clone());
+            mask_new_idx[old_idx] = retain_masks.len() as i32 - 1;
+          }
+          s.mask_head = mask_new_idx[old_idx];
         }
       }
-      self.mask_layers = retain_masks
-        .iter()
-        .map(|&idx| {
-          let mut mask = self.mask_layers[idx as usize].clone();
-          if mask.prev_mask_idx != -1 {
-            mask.prev_mask_idx = mask_new_idx[mask.prev_mask_idx as usize];
-          }
-          mask
-        })
-        .collect();
 
-      // update the texture index of mask layers in new draw phase.
+      self.mask_layers = retain_masks;
+
+      // update the texture index of atlas masks in new draw phase.
       let tex_map = self.tex_ids_map.textures.clone();
       self.tex_ids_map.reset();
-      for l in self.mask_layers.iter_mut() {
-        let tex_id = tex_map[l.mask_tex_idx as usize];
-        l.mask_tex_idx = self.tex_ids_map.tex_idx(tex_id);
+      for mask in self.mask_layers.iter_mut() {
+        if mask.prev_mask_idx != -1 {
+          mask.prev_mask_idx = mask_new_idx[mask.prev_mask_idx as usize];
+        }
+        if mask.kind == MaskKind::Atlas as u32 {
+          let tex_id = tex_map[mask.mask_tex_idx as usize];
+          mask.mask_tex_idx = self.tex_ids_map.tex_idx(tex_id);
+        }
       }
     } else {
       self.tex_ids_map.reset();
@@ -502,6 +560,10 @@ where
       return false;
     }
 
+    if self.mask_layers.len() >= limits.max_mask_layers {
+      return false;
+    }
+
     let PaintPathAction::Paint { brush, .. } = &cmd.action else {
       return tex_used < limits.max_tex_load;
     };
@@ -544,6 +606,52 @@ where
   fn new_mask_layer(
     &mut self, view: &DeviceRect, matrix: &Transform, path: &PaintPath, style: &PaintingStyle,
   ) -> ([Point; 4], i32) {
+    let (paint_style, stroke_half_width) = match style {
+      PaintingStyle::Fill => (0, 0.0),
+      PaintingStyle::Stroke(opt) if Self::support_sdf_stroke(opt) => (1, opt.width * 0.5),
+      _ => (0, -1.0),
+    };
+
+    if stroke_half_width >= 0.0 {
+      let (kind, rect, p0) = match path.path_kind() {
+        PathKind::Rect { rect } => (1, rect, [0.; 4]),
+        PathKind::Circle { center, radius } => (
+          3,
+          ribir_geom::Rect::new(
+            Point::new(center.x - radius, center.y - radius),
+            ribir_geom::Size::new(radius * 2., radius * 2.),
+          ),
+          [center.x, center.y, radius, 0.],
+        ),
+        PathKind::RoundRect { rect, radius } => {
+          (2, rect, Self::normalize_round_rect_radii(&rect, &radius))
+        }
+        PathKind::Complex => (0, ribir_geom::Rect::zero(), [0.; 4]),
+      };
+
+      if kind > 0
+        && let Some(inv) = matrix.inverse()
+      {
+        let prev_mask_idx = self.current_clip_mask_index();
+        let node_idx = self.mask_layers.len() as i32;
+        self.mask_layers.push(MaskLayer {
+          transform: inv.to_array(),
+          min: rect.origin.to_array(),
+          max: Point::new(rect.max_x(), rect.max_y()).to_array(),
+          mask_tex_idx: kind,
+          prev_mask_idx,
+          kind: MaskKind::Sdf as u32,
+          paint_style,
+          stroke_half_width,
+          aa_epsilon: 1e-4,
+          p0,
+        });
+
+        let points = rect_corners(&view.to_f32().cast_unit());
+        return (points, node_idx);
+      }
+    }
+
     let (mask, mask_to_view) =
       self
         .tex_mgr
@@ -554,23 +662,28 @@ where
       *p = mask_to_view.transform_point(*p);
     }
 
-    let index = self.mask_layers.len();
+    let prev_mask_idx = self.current_clip_mask_index();
     let min_max = mask.rect.to_box2d().to_f32();
+    let node_idx = self.mask_layers.len() as i32;
     self.mask_layers.push(MaskLayer {
       // view to mask transform.
       transform: mask_to_view.inverse().unwrap().to_array(),
       min: min_max.min.to_array(),
       max: min_max.max.to_array(),
       mask_tex_idx: self.tex_ids_map.tex_idx(mask.tex_id),
-      prev_mask_idx: self.current_clip_mask_index(),
+      prev_mask_idx,
+      kind: MaskKind::Atlas as u32,
+      paint_style: 0,
+      stroke_half_width: 0.,
+      aa_epsilon: 0.,
+      p0: [0.; 4],
     });
-    (points, index as i32)
+    (points, node_idx)
   }
 
   fn draw_triangles(&mut self, output: &mut Impl::Texture) {
     let mut color = self.surface_color.take();
     let gpu_impl = &mut self.gpu_impl;
-
     self.tex_mgr.draw_alpha_textures(gpu_impl);
     if !self.mask_layers.is_empty() {
       gpu_impl.load_mask_layers(&self.mask_layers);
@@ -857,7 +970,7 @@ mod tests {
   use ribir_algo::Resource;
   use ribir_dev_helper::*;
   use ribir_geom::*;
-  use ribir_painter::{Brush, Painter, Path, Svg};
+  use ribir_painter::{Brush, LineCap, LineJoin, Painter, Path, Radius, StrokeOptions, Svg};
 
   use super::*;
 
@@ -946,6 +1059,39 @@ mod tests {
       .fill();
 
     painter
+  }
+
+  #[test]
+  fn normalize_round_rect_radii_clamps_and_scales() {
+    let rect = Rect::from_size(Size::new(100., 60.));
+    let radii = Radius::new(80., 80., 50., -2.);
+    let [tl, tr, br, bl] = GPUBackend::<crate::WgpuImpl>::normalize_round_rect_radii(&rect, &radii);
+
+    assert_eq!(br, -2.); // Negative offsets are perfectly forwarded
+    assert!(tl + tr <= rect.width() + 1e-4);
+    assert!(bl + br <= rect.width() + 1e-4);
+    assert!(tl + bl <= rect.height() + 1e-4);
+    assert!(tr + br <= rect.height() + 1e-4);
+  }
+
+  #[test]
+  fn sdf_stroke_gate_rules() {
+    let base = StrokeOptions {
+      width: 2.0,
+      miter_limit: 4.0,
+      line_cap: LineCap::Butt,
+      line_join: LineJoin::Miter,
+    };
+    assert!(GPUBackend::<crate::WgpuImpl>::support_sdf_stroke(&base));
+
+    let round_cap = StrokeOptions { line_cap: LineCap::Round, ..base.clone() };
+    assert!(!GPUBackend::<crate::WgpuImpl>::support_sdf_stroke(&round_cap));
+
+    let round_join = StrokeOptions { line_join: LineJoin::Round, ..base.clone() };
+    assert!(!GPUBackend::<crate::WgpuImpl>::support_sdf_stroke(&round_join));
+
+    let zero_width = StrokeOptions { width: 0.0, ..base };
+    assert!(!GPUBackend::<crate::WgpuImpl>::support_sdf_stroke(&zero_width));
   }
 
   painter_backend_eq_image_test!(stroke_include_border, comparison = 0.0004);
@@ -1043,15 +1189,14 @@ mod tests {
     let commands = (0..64)
       .map(|i| {
         let color = if i % 2 == 0 { Color::GREEN } else { Color::RED };
-        PaintCommand::Path(PathCommand {
-          paint_bounds: circle.bounds(None),
-          path: circle.clone().into(),
-          transform: Transform::translation(i as f32 * 8., i as f32 * 8.),
-          action: PaintPathAction::Paint {
+        PaintCommand::Path(PathCommand::new(
+          circle.clone().into(),
+          PaintPathAction::Paint {
             brush: CommandBrush::Color(color),
             painting_style: PaintingStyle::Fill,
           },
-        })
+          Transform::translation(i as f32 * 8., i as f32 * 8.),
+        ))
       })
       .collect();
 

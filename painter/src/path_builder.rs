@@ -6,18 +6,49 @@ use lyon_algorithms::path::{
 };
 use ribir_geom::{Angle, Point, Rect, Vector};
 
-use crate::{Path, Radius};
+use crate::{Path, PathKind, Radius};
 
-#[derive(Default)]
 pub struct PathBuilder {
   pub(crate) lyon_builder: LyonBuilder,
+  path_kind: BuildPathKind,
+}
+
+#[derive(Default)]
+enum BuildPathKind {
+  #[default]
+  Empty,
+  Known(PathKind),
+  Complex,
+}
+
+impl Default for PathBuilder {
+  fn default() -> Self {
+    Self { lyon_builder: LyonBuilder::default(), path_kind: BuildPathKind::Empty }
+  }
 }
 
 impl PathBuilder {
+  fn set_known_kind(&mut self, kind: PathKind) {
+    self.path_kind = match self.path_kind {
+      BuildPathKind::Empty => BuildPathKind::Known(kind),
+      _ => BuildPathKind::Complex,
+    };
+  }
+
+  fn set_complex_kind(&mut self) { self.path_kind = BuildPathKind::Complex; }
+
+  fn finish_kind(&self) -> PathKind {
+    match self.path_kind {
+      BuildPathKind::Known(kind) => kind,
+      BuildPathKind::Empty | BuildPathKind::Complex => PathKind::Complex,
+    }
+  }
+
   /// Starts a new path by emptying the list of sub-paths.
   /// Call this method when you want to create a new path.
   #[inline]
   pub fn begin_path(&mut self, at: Point) -> &mut Self {
+    self.set_complex_kind();
     self.lyon_builder.begin(at.to_untyped());
     self
   }
@@ -34,6 +65,7 @@ impl PathBuilder {
   /// coordinates with a straight line.
   #[inline]
   pub fn line_to(&mut self, to: Point) -> &mut Self {
+    self.set_complex_kind();
     self.lyon_builder.line_to(to.to_untyped());
     self
   }
@@ -41,6 +73,7 @@ impl PathBuilder {
   /// Adds a cubic Bezier curve to the current path.
   #[inline]
   pub fn bezier_curve_to(&mut self, ctrl1: Point, ctrl2: Point, to: Point) {
+    self.set_complex_kind();
     self
       .lyon_builder
       .cubic_bezier_to(ctrl1.to_untyped(), ctrl2.to_untyped(), to.to_untyped());
@@ -49,6 +82,7 @@ impl PathBuilder {
   /// Adds a quadratic Bézier curve to the current path.
   #[inline]
   pub fn quadratic_curve_to(&mut self, ctrl: Point, to: Point) {
+    self.set_complex_kind();
     self
       .lyon_builder
       .quadratic_bezier_to(ctrl.to_untyped(), to.to_untyped());
@@ -58,6 +92,7 @@ impl PathBuilder {
   /// points and radius. The arc is automatically connected to the path's latest
   /// point with a straight line, if necessary for the specified
   pub fn arc_to(&mut self, center: Point, radius: f32, start_angle: Angle, end_angle: Angle) {
+    self.set_complex_kind();
     let sweep_angle = end_angle - start_angle;
     let arc = Arc {
       start_angle,
@@ -80,6 +115,7 @@ impl PathBuilder {
   pub fn ellipse_to(
     &mut self, center: Point, radius: Vector, start_angle: Angle, end_angle: Angle,
   ) {
+    self.set_complex_kind();
     let sweep_angle = end_angle - start_angle;
     let arc = Arc {
       start_angle,
@@ -97,6 +133,7 @@ impl PathBuilder {
 
   #[inline]
   pub fn segment(&mut self, from: Point, to: Point) -> &mut Self {
+    self.set_complex_kind();
     self
       .lyon_builder
       .add_line_segment(&LineSegment { from: from.to_untyped(), to: to.to_untyped() });
@@ -117,6 +154,7 @@ impl PathBuilder {
   ///   exclude area).
   #[inline]
   pub fn ellipse(&mut self, center: Point, radius: Vector, rotation: f32, is_positive: bool) {
+    self.set_complex_kind();
     let winding = if is_positive { Winding::Positive } else { Winding::Negative };
     self.lyon_builder.add_ellipse(
       center.to_untyped(),
@@ -138,6 +176,11 @@ impl PathBuilder {
   ///   be used to exclude area).
   #[inline]
   pub fn rect(&mut self, rect: &Rect, is_positive: bool) -> &mut Self {
+    if is_positive {
+      self.set_known_kind(PathKind::Rect { rect: *rect });
+    } else {
+      self.set_complex_kind();
+    }
     let winding = if is_positive { Winding::Positive } else { Winding::Negative };
     self
       .lyon_builder
@@ -158,6 +201,11 @@ impl PathBuilder {
   ///   exclude area).
   #[inline]
   pub fn circle(&mut self, center: Point, radius: f32, is_positive: bool) -> &mut Self {
+    if is_positive {
+      self.set_known_kind(PathKind::Circle { center, radius });
+    } else {
+      self.set_complex_kind();
+    }
     let winding = if is_positive { Winding::Positive } else { Winding::Negative };
     self
       .lyon_builder
@@ -175,6 +223,11 @@ impl PathBuilder {
   ///   be used to exclude area).
   #[inline]
   pub fn rect_round(&mut self, rect: &Rect, radius: &Radius, is_positive: bool) -> &mut Self {
+    if is_positive {
+      self.set_known_kind(PathKind::RoundRect { rect: *rect, radius: *radius });
+    } else {
+      self.set_complex_kind();
+    }
     let radius: &BorderRadii = unsafe { std::mem::transmute(radius) };
     let winding = if is_positive { Winding::Positive } else { Winding::Negative };
     self
@@ -187,7 +240,12 @@ impl PathBuilder {
   #[inline]
   pub fn build(self) -> Path {
     // todo: we can store an anti-aliasing flag for the path.
-    self.lyon_builder.build().into()
+    let path_kind = self.finish_kind();
+    let path = self.lyon_builder.build();
+    let bounds = lyon_algorithms::aabb::bounding_box(&path)
+      .to_rect()
+      .cast_unit();
+    Path::with_kind(path, bounds, path_kind)
   }
 
   /// Construct a path from the current state of the builder, and use the given
@@ -195,7 +253,8 @@ impl PathBuilder {
   ///
   /// Caller must ensure that the bounds are correct.
   pub fn build_with_bounds(self, bounds: Rect) -> Path {
+    let path_kind = self.finish_kind();
     let path = self.lyon_builder.build();
-    Path::new(path, bounds)
+    Path::with_kind(path, bounds, path_kind)
   }
 }
