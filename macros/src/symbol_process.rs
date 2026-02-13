@@ -245,6 +245,11 @@ impl Fold for DollarRefsCtx {
     syn::fold::fold_expr_closure(&mut *this, i)
   }
 
+  fn fold_expr_async(&mut self, i: syn::ExprAsync) -> syn::ExprAsync {
+    let mut this = self.push_code_stack();
+    syn::fold::fold_expr_async(&mut *this, i)
+  }
+
   fn fold_item_const(&mut self, i: syn::ItemConst) -> syn::ItemConst {
     self.new_local_var(&i.ident);
     syn::fold::fold_item_const(self, i)
@@ -335,19 +340,12 @@ impl Fold for DollarRefsCtx {
   fn fold_expr(&mut self, i: Expr) -> Expr {
     match i {
       Expr::Closure(c) if c.capture.is_some() => {
-        self.new_dollar_scope(None);
-        let c = self.fold_expr_closure(c);
-        let dollar_scope = self.pop_dollar_scope(false);
-
-        if !dollar_scope.is_empty() {
-          Expr::Verbatim(quote_spanned!(c.span() => {
-            #dollar_scope
-
-            #c
-          }))
-        } else {
-          Expr::Closure(self.fold_expr_closure(c))
-        }
+        let span = c.span();
+        self.fold_move_capture_expr(c, span, Self::fold_expr_closure, Expr::Closure)
+      }
+      Expr::Async(a) if a.capture.is_some() => {
+        let span = a.span();
+        self.fold_move_capture_expr(a, span, Self::fold_expr_async, Expr::Async)
       }
       _ => syn::fold::fold_expr(self, i),
     }
@@ -391,6 +389,26 @@ impl DollarRef {
 }
 
 impl DollarRefsCtx {
+  fn fold_move_capture_expr<T>(
+    &mut self, expr: T, span: Span, fold: impl FnOnce(&mut Self, T) -> T,
+    wrap: impl FnOnce(T) -> Expr,
+  ) -> Expr {
+    self.new_dollar_scope(None);
+    let expr = fold(self, expr);
+    let wrapped = wrap(expr);
+    let dollar_scope = self.pop_dollar_scope(false);
+
+    if !dollar_scope.is_empty() {
+      Expr::Verbatim(quote_spanned!(span => {
+        #dollar_scope
+
+        #wrapped
+      }))
+    } else {
+      wrapped
+    }
+  }
+
   #[inline]
   pub fn top_level() -> Self { Self::default() }
 
