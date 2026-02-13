@@ -212,6 +212,28 @@ fn pipe_with_clone_does_not_track_dependency() {
 }
 
 #[test]
+fn dollar_auto_clone_in_async_move() {
+  reset_test_env!();
+
+  let state = Stateful::new(0);
+  let state_w = state.clone_writer();
+
+  let _w = fn_widget! {
+    @Button {
+      on_tap: move |_| {
+        AppCtx::spawn_local(async move {
+          let v = *$read(state);
+          *$write(state) = v + 1;
+        });
+      },
+      @ { "Tap" }
+    }
+  };
+
+  *state_w.write() = 10;
+}
+
+#[test]
 fn pipe_single_parent() {
   reset_test_env!();
 
