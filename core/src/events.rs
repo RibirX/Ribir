@@ -1,8 +1,8 @@
-use std::{any::Any, ptr::NonNull};
+use std::{any::Any, cell::UnsafeCell, ptr::NonNull};
 
 use self::dispatcher::DispatchInfo;
 use crate::{
-  builtin_widgets::MixFlags,
+  builtin_widgets::{MixFlags, providers::ProviderCursor},
   context::{WidgetCtx, WidgetCtxImpl},
   prelude::ProviderCtx,
   query::QueryHandle,
@@ -39,7 +39,7 @@ pub struct CommonEvent {
   // The framework guarantees the validity of this pointer at all times; therefore, refrain from
   // using a reference to prevent introducing lifetimes in `CommonEvent` and maintain cleaner code.
   tree: NonNull<WidgetTree>,
-  provider_ctx: ProviderCtx,
+  cursor: UnsafeCell<ProviderCursor>,
   target: WidgetId,
   propagation: bool,
   prevent_default: bool,
@@ -115,6 +115,16 @@ impl CommonEvent {
   /// was fired.
   #[inline]
   pub fn button_num(&self) -> u32 { self.mouse_buttons().bits().count_ones() }
+
+  /// Get a read-only provider context that is scoped to `id`.
+  ///
+  /// The returned context does not change this event's `current_target`.
+  /// You can pass it to `Provider::of`/`Provider::state_of` style APIs.
+  pub fn provider_ctx_at(&self, id: WidgetId) -> Option<&ProviderCtx> {
+    id.get(self.tree())?;
+    self.sync_cursor_to(id);
+    Some(self.cursor_mut().inner())
+  }
 }
 
 pub enum Event {
@@ -307,14 +317,13 @@ impl CommonEvent {
       id: target,
       propagation: true,
       prevent_default: false,
-      provider_ctx: ProviderCtx::collect_from(target, unsafe { tree.as_ref() }),
+      cursor: UnsafeCell::new(ProviderCursor::new()),
       tree,
     }
   }
 
   pub(crate) fn bubble_to_parent(&mut self, id: WidgetId) -> bool {
     if let Some(parent) = id.parent(self.tree()) {
-      self.provider_ctx.pop_providers_for(id);
       self.id = parent;
       true
     } else {
@@ -322,17 +331,28 @@ impl CommonEvent {
     }
   }
 
-  pub(crate) fn capture_to_child(&mut self, id: WidgetId, buffer: &mut SmallVec<[QueryHandle; 1]>) {
-    let tree = unsafe { self.tree.as_ref() };
-    self
-      .provider_ctx
-      .push_providers_for(id, tree, buffer);
+  pub(crate) fn capture_to_child(
+    &mut self, id: WidgetId, _buffer: &mut SmallVec<[QueryHandle; 1]>,
+  ) {
     self.id = id;
   }
 
   fn pick_info<R>(&self, f: impl FnOnce(&DispatchInfo) -> R) -> R {
     f(&self.window().dispatcher.borrow().info)
   }
+
+  /// # Safety
+  /// The `UnsafeCell` is only used to allow interior mutability through `&self`
+  /// (required by `AsRef<ProviderCtx>` during event bubbling). Only one
+  /// mutable reference is ever live at a time.
+  #[inline]
+  #[allow(clippy::mut_from_ref)]
+  fn cursor_mut(&self) -> &mut ProviderCursor { unsafe { &mut *self.cursor.get() } }
+
+  fn sync_cursor_to(&self, target: WidgetId) { self.cursor_mut().sync_to(target, self.tree()); }
+
+  #[inline]
+  fn ensure_cursor_synced(&self) { self.sync_cursor_to(self.id); }
 }
 
 impl WidgetCtxImpl for CommonEvent {
@@ -343,9 +363,15 @@ impl WidgetCtxImpl for CommonEvent {
 }
 
 impl AsRef<ProviderCtx> for CommonEvent {
-  fn as_ref(&self) -> &ProviderCtx { &self.provider_ctx }
+  fn as_ref(&self) -> &ProviderCtx {
+    self.ensure_cursor_synced();
+    self.cursor_mut().inner()
+  }
 }
 
 impl AsMut<ProviderCtx> for CommonEvent {
-  fn as_mut(&mut self) -> &mut ProviderCtx { &mut self.provider_ctx }
+  fn as_mut(&mut self) -> &mut ProviderCtx {
+    self.ensure_cursor_synced();
+    self.cursor_mut().inner_mut()
+  }
 }
