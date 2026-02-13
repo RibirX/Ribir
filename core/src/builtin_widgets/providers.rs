@@ -679,6 +679,86 @@ impl Drop for ProviderCtx {
   }
 }
 
+/// A cursor that lazily builds and incrementally syncs a [`ProviderCtx`] to any
+/// widget position in the tree.
+///
+/// Construction is zero-cost (`ProviderCursor::new()`). The underlying
+/// `ProviderCtx` is only materialized the first time the cursor is synced to a
+/// concrete widget via [`sync_to`](Self::sync_to). Subsequent syncs use
+/// LCA-based incremental push/pop to move the cursor efficiently.
+pub(crate) struct ProviderCursor {
+  ctx: ProviderCtx,
+  synced_to: Option<WidgetId>,
+}
+
+impl ProviderCursor {
+  /// Create a new cursor with an empty provider context. No tree traversal
+  /// happens until [`sync_to`](Self::sync_to) is called.
+  pub(crate) fn new() -> Self { Self { ctx: ProviderCtx::default(), synced_to: None } }
+
+  /// Ensure the inner [`ProviderCtx`] reflects the providers visible to
+  /// `target`. If the cursor is already synced to `target` this is a no-op.
+  ///
+  /// First call materializes the full ancestor chain via `collect_from`.
+  /// Subsequent calls use an LCA-based incremental algorithm that pops
+  /// providers up to the Lowest Common Ancestor and pushes providers down to
+  /// the new target.
+  pub(crate) fn sync_to(&mut self, target: WidgetId, tree: &WidgetTree) {
+    let Some(from) = self.synced_to else {
+      self.ctx = ProviderCtx::collect_from(target, tree);
+      self.synced_to = Some(target);
+      return;
+    };
+
+    if from == target {
+      return;
+    }
+
+    let Some(lca) = from.lowest_common_ancestor(target, tree) else {
+      self.ctx = ProviderCtx::collect_from(target, tree);
+      self.synced_to = Some(target);
+      return;
+    };
+
+    // Pop from current position up to LCA.
+    let mut pop = from;
+    while pop != lca {
+      self.ctx.pop_providers_for(pop);
+      pop = pop
+        .parent(tree)
+        .expect("ancestor path must have a parent before lowest common ancestor");
+    }
+
+    // Collect the path from LCA down to target.
+    let mut path = vec![];
+    let mut push = target;
+    while push != lca {
+      path.push(push);
+      push = push
+        .parent(tree)
+        .expect("ancestor path must have a parent before lowest common ancestor");
+    }
+
+    // Push providers in ancestor-first order.
+    let mut buffer = SmallVec::new();
+    for id in path.into_iter().rev() {
+      self.ctx.push_providers_for(id, tree, &mut buffer);
+    }
+
+    self.synced_to = Some(target);
+  }
+
+  /// Direct access to the inner context.  The caller must ensure the cursor has
+  /// been synced to the desired position beforehand.
+  #[inline]
+  pub(crate) fn inner(&self) -> &ProviderCtx { &self.ctx }
+
+  /// Mutable access to the inner context.  The caller must ensure the cursor
+  /// has been synced to the desired position beforehand.
+  #[inline]
+  pub(crate) fn inner_mut(&mut self) -> &mut ProviderCtx { &mut self.ctx }
+}
+
 struct ProvidersRender {
   providers: Providers,
   render: Box<dyn RenderQueryable>,

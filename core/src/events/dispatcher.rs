@@ -498,6 +498,88 @@ mod tests {
   }
 
   #[test]
+  fn provider_lookup_in_bubble_path() {
+    reset_test_env!();
+
+    let (record, w_record) = split_value(vec![]);
+    let w_record2 = w_record.clone_writer();
+
+    let w = fn_widget! {
+      @Providers {
+        providers: [Provider::new(10i32)],
+        @MockBox {
+          size: Size::new(100., 100.),
+          on_tap: move |e| $write(w_record).push(*Provider::of::<i32>(e).unwrap()),
+          @Providers {
+            providers: [Provider::new(20i32)],
+            @MockBox {
+              size: Size::new(100., 100.),
+              on_tap: move |e| $write(w_record2).push(*Provider::of::<i32>(e).unwrap()),
+            }
+          }
+        }
+      }
+    };
+
+    let wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
+    wnd.draw_frame();
+
+    wnd.process_cursor_move(Point::new(50., 50.));
+    wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
+    wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
+    wnd.run_frame_tasks();
+
+    assert_eq!(&*record.read(), &[20, 10]);
+  }
+
+  #[test]
+  fn scoped_provider_ctx_at() {
+    reset_test_env!();
+
+    let child_id = Stateful::new(None::<WidgetId>);
+    let c_child_id = child_id.clone_writer();
+    let r_child_id = child_id.clone_reader();
+    let (record, w_record) = split_value(vec![]);
+
+    let w = fn_widget! {
+      @Providers {
+        providers: [Provider::new(10i32)],
+        @MockBox {
+          size: Size::new(100., 100.),
+          on_tap: move |e| {
+            let current = e.current_target();
+            $write(w_record).push(*Provider::of::<i32>(e).unwrap());
+            let child = $read(r_child_id).expect("child id should be set after mounted");
+            {
+              let ctx = e.provider_ctx_at(child).expect("target should be a valid widget id");
+              $write(w_record).push(*Provider::of::<i32>(ctx).unwrap());
+            }
+            assert_eq!(e.current_target(), current);
+            $write(w_record).push(*Provider::of::<i32>(e).unwrap());
+          },
+          @Providers {
+            providers: [Provider::new(20i32)],
+            @MockBox {
+              size: Size::new(100., 100.),
+              on_mounted: move |e| *$write(c_child_id) = Some(e.id),
+            }
+          }
+        }
+      }
+    };
+
+    let wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
+    wnd.draw_frame();
+
+    wnd.process_cursor_move(Point::new(50., 50.));
+    wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
+    wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
+    wnd.run_frame_tasks();
+
+    assert_eq!(&*record.read(), &[10, 20, 10]);
+  }
+
+  #[test]
   fn enter_leave() {
     reset_test_env!();
 

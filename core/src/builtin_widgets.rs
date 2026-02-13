@@ -95,7 +95,7 @@ mod text;
 pub use text::*;
 mod tooltips;
 pub use tooltips::*;
-mod providers;
+pub(crate) mod providers;
 pub use providers::*;
 mod border;
 pub use border::*;
