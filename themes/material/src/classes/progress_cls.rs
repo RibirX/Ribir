@@ -87,7 +87,7 @@ pub(super) fn init(classes: &mut Classes) {
       let indicator2 = @Expanded { flex: 0.};
       let track2 = @Expanded { flex: 1. };
 
-      @Animate {
+      let infinite_animate = @Animate {
         transition: indeterminate_trans(),
         state: keyframes! {
           state: (
@@ -106,20 +106,24 @@ pub(super) fn init(classes: &mut Classes) {
           95% => (0., 0., 0., 1.),
         },
         from: (0., 0., 0., 1.)
-      }.run();
+      };
+      infinite_animate.run();
 
-      @Flex {
-        class: LINEAR_PROGRESS,
-        align_items: Align::Stretch,
-        @(indicator1) { @md_base_linear_indicator(host) }
-        @(track1) { @linear_base_track(Void::default().into_widget()) }
-        @(indicator2) {
-          @Margin {
-            margin: EdgeInsets::only_left(4.),
-            @md_base_linear_indicator(Void::default().into_widget())
+      @FatObj {
+        on_disposed: move |_| infinite_animate.stop(),
+        @Flex {
+          class: LINEAR_PROGRESS,
+          align_items: Align::Stretch,
+          @(indicator1) { @md_base_linear_indicator(host) }
+          @(track1) { @linear_base_track(Void::default().into_widget()) }
+          @(indicator2) {
+            @Margin {
+              margin: EdgeInsets::only_left(4.),
+              @md_base_linear_indicator(Void::default().into_widget())
+            }
           }
+          @(track2) { @linear_base_track(Void::default().into_widget()) }
         }
-        @(track2) { @linear_base_track(Void::default().into_widget()) }
       }
     }
     .into_widget()
