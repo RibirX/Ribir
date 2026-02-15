@@ -62,6 +62,7 @@ pub struct WgpuImpl {
   textures_bind: Option<wgpu::BindGroup>,
   mask_layers_uniform: Uniform<MaskLayer>,
   limits: DrawPhaseLimits,
+  surface_format: Option<wgpu::TextureFormat>,
 }
 
 macro_rules! command_encoder {
@@ -205,8 +206,13 @@ impl GPUBackendImpl for WgpuImpl {
   }
 
   fn new_texture(&mut self, size: DeviceSize, format: ColorFormat) -> Self::Texture {
-    let format = into_wgpu_format(format);
-    self.create_texture(size, format)
+    let mut wgpu_format = into_wgpu_format(format);
+    if let Some(s_fmt) = self.surface_format {
+      if try_into_color_format(s_fmt) == Some(format) {
+        wgpu_format = s_fmt;
+      }
+    }
+    self.create_texture(size, wgpu_format)
   }
 
   fn load_textures(&mut self, textures: &[&Self::Texture]) {
@@ -533,6 +539,17 @@ impl Texture for WgpuTexture {
     let origin = wgpu::Origin3d { x: dist.min_x() as u32, y: dist.min_y() as u32, z: 0 };
     let bytes_per_pixel = self.color_format().bytes_per_pixel();
 
+    let data_encoded;
+    let data = if self.format() == wgpu::TextureFormat::Bgra8Unorm {
+      let len = data.len();
+      let mut new_data = vec![0; len];
+      copy_row_data(data, &mut new_data, self.format());
+      data_encoded = Some(new_data);
+      data_encoded.as_ref().unwrap()
+    } else {
+      data
+    };
+
     backend.queue.write_texture(
       wgpu::TexelCopyTextureInfo {
         texture: self.inner_tex.texture(),
@@ -622,11 +639,7 @@ impl Texture for WgpuTexture {
   }
 
   fn color_format(&self) -> ColorFormat {
-    match self.format() {
-      wgpu::TextureFormat::R8Unorm => ColorFormat::Alpha8,
-      wgpu::TextureFormat::Rgba8Unorm | wgpu::TextureFormat::Bgra8Unorm => ColorFormat::Rgba8,
-      _ => panic!("not a valid texture as image"),
-    }
+    try_into_color_format(self.format()).expect("not a valid texture as image")
   }
 
   fn size(&self) -> DeviceSize { self.size() }
@@ -746,6 +759,10 @@ impl WgpuImpl {
       limits.max_texture_dimension_2d as i32,
     );
 
+    let max_filter_matrix_len = (((uniform_bytes - size_of::<FilterPrimitive>()) & 0xFFFFFF00)
+      / size_of::<f32>()) // the matrix size must be aligned to 16 bytes
+    .min(128 * 128);
+
     let limits = DrawPhaseLimits {
       max_tex_load: TEX_PER_DRAW,
       texture_size: texture_size_limit,
@@ -754,11 +771,7 @@ impl WgpuImpl {
       max_linear_gradient_primitives: uniform_bytes / size_of::<LinearGradientPrimitive>(),
       max_gradient_stop_primitives: uniform_bytes / size_of::<GradientStopPrimitive>(),
       max_mask_layers: uniform_bytes / size_of::<MaskLayer>(),
-      // Limit the max filter kernel size to avoid shader compilation hanging on macOS Metal.
-      // 127x127 kernel (16129 elements) is sufficient for most blur/filter effects.
-      max_filter_matrix_len: (((uniform_bytes - size_of::<FilterPrimitive>()) & 0xFFFFFF00)
-        / size_of::<f32>()) // the matrix size must be aligned to 16 bytes
-      .min(128 * 128),
+      max_filter_matrix_len,
       max_texture_primitives: uniform_bytes / size_of::<TexturePrimitive>(),
     };
 
@@ -766,6 +779,21 @@ impl WgpuImpl {
       Uniform::new(&device, wgpu::ShaderStages::FRAGMENT, limits.max_mask_layers);
     let clear_tex_pass = ClearTexturePass::new(&device);
     let texs_layout = textures_layout(&device);
+
+    let surface_format = surface.as_ref().map(|surface| {
+      use wgpu::TextureFormat::*;
+      let formats = HashSet::from_iter(
+        surface
+          .get_capabilities(&adapter)
+          .formats
+          .into_iter(),
+      );
+      *formats
+        .get(&Rgba8Unorm)
+        .or_else(|| formats.get(&Bgra8Unorm))
+        .expect("No suitable format found for the surface!")
+    });
+
     let gpu_impl = WgpuImpl {
       device,
       queue,
@@ -785,36 +813,27 @@ impl WgpuImpl {
       textures_bind: None,
       mask_layers_uniform,
       limits,
+      surface_format,
     };
 
-    let surface = surface.map(|surface| {
-      use wgpu::TextureFormat::*;
-      let formats = HashSet::from_iter(
-        surface
-          .get_capabilities(&adapter)
-          .formats
-          .into_iter(),
-      );
-      let format = *formats
-        .get(&Rgba8Unorm)
-        .or_else(|| formats.get(&Bgra8Unorm))
-        .expect("No suitable format found for the surface!");
+    let surface = surface
+      .zip(surface_format)
+      .map(|(surface, format)| {
+        let config = wgpu::SurfaceConfiguration {
+          usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+            | wgpu::TextureUsages::COPY_SRC
+            | wgpu::TextureUsages::COPY_DST,
+          format,
+          width: 0,
+          height: 0,
+          present_mode: wgpu::PresentMode::Fifo,
+          alpha_mode: wgpu::CompositeAlphaMode::Auto,
+          view_formats: vec![format],
+          desired_maximum_frame_latency: 2,
+        };
 
-      let config = wgpu::SurfaceConfiguration {
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-          | wgpu::TextureUsages::COPY_SRC
-          | wgpu::TextureUsages::COPY_DST,
-        format,
-        width: 0,
-        height: 0,
-        present_mode: wgpu::PresentMode::Fifo,
-        alpha_mode: wgpu::CompositeAlphaMode::Auto,
-        view_formats: vec![format],
-        desired_maximum_frame_latency: 2,
-      };
-
-      Surface { surface, config, current_texture: None }
-    });
+        Surface { surface, config, current_texture: None }
+      });
 
     (gpu_impl, surface)
   }
@@ -883,6 +902,14 @@ fn into_wgpu_format(format: ColorFormat) -> wgpu::TextureFormat {
   match format {
     ColorFormat::Rgba8 => wgpu::TextureFormat::Rgba8Unorm,
     ColorFormat::Alpha8 => wgpu::TextureFormat::R8Unorm,
+  }
+}
+
+fn try_into_color_format(format: wgpu::TextureFormat) -> Option<ColorFormat> {
+  match format {
+    wgpu::TextureFormat::R8Unorm => Some(ColorFormat::Alpha8),
+    wgpu::TextureFormat::Rgba8Unorm | wgpu::TextureFormat::Bgra8Unorm => Some(ColorFormat::Rgba8),
+    _ => None,
   }
 }
 
