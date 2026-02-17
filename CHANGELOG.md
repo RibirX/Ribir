@@ -10,6 +10,43 @@ For older versions:
 
 <!-- next-header -->
 
+## [0.4.0-alpha.58](https://github.com/RibirX/Ribir/releases/tag/v0.4.0-alpha.58) - 2026-02-17
+
+### 🎨 Features
+
+- **core**: introduce ProviderCursor for lazy and incremental provider sync in events (\#893 @M-Adoo)
+- **macros**: support automatic cloning of dollar-prefixed variables in async move blocks (\#894 @wjian23)
+- **widgets**: add ButtonLabelVisibility to control label visibility (\#886 @M-Adoo)
+- 🤖 migrate ribir-bot AI backend from Gemini to Codex CLI (\#890 @M-Adoo)
+
+### 🐛 Fixed
+
+- **core**: fix subscription timing for reactive parents and classes to ensure consistent updates (\#884 @M-Adoo)
+- **macros**: ensure rdl\! returns the object when using expression parent with no children (\#891 @M-Adoo)
+- **widgets**: correct layout distribution for centered buttons and linear containers (\#884 @M-Adoo)
+- **widgets**: fix icon child positioning and coordinate mapping by moving offset to place\_children (\#892 @M-Adoo)
+
+### 🔄 Changed
+
+- **core**: unify XSingleChild and XMultiChild into a generic XChild container (\#884 @M-Adoo)
+
+### ⚡ Performance
+
+- **gpu**: optimize BGRA to RGBA conversion in debug snapshots (\#882 @wjian23)
+
+### 💥 Breaking
+
+- **core**: remove AppEvent::Hotkey and AppEvent::OpenUrl events and their macOS-specific implementations (\#885 @M-Adoo)
+- **core**: replace implicit parent conversions with explicit IntoSingleChild and IntoMultiChild traits (\#884 @M-Adoo)
+
+<details>
+<summary>🔧 Internal</summary>
+
+- build: 🤖 use cache-cargo-install-action for ribir-bot in all workflows (#883 @M-Adoo)
+- 💡 migrate CLI logging from `env_logger` to `tracing` (#889 @M-Adoo)
+
+</details>
+
 ## [0.4.0-alpha.57](https://github.com/RibirX/Ribir/releases/tag/v0.4.0-alpha.57) - 2026-02-10
 
 ### 🎨 Features
@@ -48,8 +85,8 @@ For older versions:
 <details>
 <summary>🔧 Internal</summary>
 
-- build(tools): 🤖 use cache-cargo-install-action for ribir-bot in workflows (#877 @M-Adoo)
-- build(tools): 🤖 use annotated tag for releases (#874 @M-Adoo)
+- build(tools): 🤖 use cache-cargo-install-action for ribir-bot in workflows (\#877 @M-Adoo)
+- build(tools): 🤖 use annotated tag for releases (\#874 @M-Adoo)
 
 </details>
 
