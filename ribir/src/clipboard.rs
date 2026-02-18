@@ -1,7 +1,7 @@
 use std::{borrow::Cow, io::Error};
 
 use arboard::ImageData;
-use ribir_core::prelude::{ColorFormat, PixelImage, log::warn};
+use ribir_core::prelude::{ColorFormat, PixelImage, tracing::warn};
 
 pub struct Clipboard {
   pub clipboard: arboard::Clipboard,

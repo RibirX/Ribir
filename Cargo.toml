@@ -82,7 +82,6 @@ image = { version = "0.25.6", default-features = false, features = ["rayon"] }
 image-webp = "0.2"
 webp-animation = "0.9"
 indextree = { version = "4.7.3", features = ["deser"] }
-log = "0.4.27"
 lyon_algorithms = "1.0.5"
 lyon_geom = "1.0.6"
 lyon_path = "1.0.7"
@@ -117,7 +116,7 @@ quick-xml = "0.38.4"
 tokio = { version = "1.0" }
 
 # Logging / telemetry (used by debug server)
-tracing = "0.1.41"
+tracing = { version = "0.1.41", features = ["log"] }
 tracing-log = "0.2.0"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "fmt", "registry"] }
 tokio-stream = { version = "0.1.17", features = ["sync", "time"] }

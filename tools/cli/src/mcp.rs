@@ -124,14 +124,14 @@ fn resolve_port_from_inputs(
     let entry_canonical = canonicalize(&entry.project_path);
 
     if entry_canonical != cwd_canonical {
-      log::info!(
+      tracing::info!(
         "Discovered nearest debug server on port {} for {} (current dir: {})",
         entry.port,
         entry.project_path.display(),
         cwd.display()
       );
     } else {
-      log::info!(
+      tracing::info!(
         "Discovered debug server on port {} for {}",
         entry.port,
         entry.project_path.display()
@@ -158,7 +158,7 @@ fn resolve_port_for_serve_from_inputs(
   match resolve_port_from_inputs(explicit_port, cwd, registry) {
     Ok(resolved) => resolved,
     Err(err) => {
-      log::info!(
+      tracing::info!(
         "No debug session discovered for {}; starting MCP server in fallback mode. Reason: {}",
         cwd.display(),
         err

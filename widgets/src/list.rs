@@ -88,11 +88,11 @@ use crate::prelude::*;
 /// list! {
 ///   select_mode: ListSelectMode::None,
 ///   @ListItem {
-///     on_tap: move |_| log::info!("Item tapped"),
+///     on_tap: move |_| tracing::info!("Item tapped"),
 ///     @ListItemHeadline { @ { "Press Me" } }
 ///   }
 ///   @ListItem {
-///     on_tap: move |_| log::info!("Another tap"),
+///     on_tap: move |_| tracing::info!("Another tap"),
 ///     @ListItemHeadline { @ { "Press Me Too" } }
 ///   }
 /// };
@@ -116,7 +116,7 @@ use crate::prelude::*;
 ///     @ListItemHeadline { @ { "Checkbox Controlled" } }
 ///     @Trailing {
 ///       @TextButton {
-///         on_tap: move |_| log::info!("Star clicked"),
+///         on_tap: move |_| tracing::info!("Star clicked"),
 ///         @Icon { @svg_registry::get_or_default("star") }
 ///       }
 ///     }

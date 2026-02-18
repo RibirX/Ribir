@@ -73,7 +73,7 @@ pub fn register_port(port: u16) -> io::Result<PathBuf> {
   let mut file = fs::File::create(&file_path)?;
   file.write_all(json.as_bytes())?;
 
-  log::info!("Registered debug port {} for project: {}", port, project_path.display());
+  tracing::info!("Registered debug port {} for project: {}", port, project_path.display());
 
   Ok(file_path)
 }
@@ -82,9 +82,9 @@ pub fn register_port(port: u16) -> io::Result<PathBuf> {
 pub fn unregister_port(registry_file: &Path) {
   if let Err(e) = fs::remove_file(registry_file) {
     if e.kind() != io::ErrorKind::NotFound {
-      log::warn!("Failed to unregister debug port: {}", e);
+      tracing::warn!("Failed to unregister debug port: {}", e);
     }
   } else {
-    log::info!("Unregistered debug port");
+    tracing::info!("Unregistered debug port");
   }
 }

@@ -813,7 +813,7 @@ impl Bundle {
       .project_out_directory(self.target_dir.clone().unwrap_or(profile_dir))
       .target(tauri_utils::platform::target_triple()?)
       .package_types(package_types)
-      .log_level(if self.verbose { log::Level::Debug } else { log::Level::Info })
+      .log_level(if self.verbose { tracing::log::Level::Debug } else { tracing::log::Level::Info })
       .build()?;
 
     if self.verbose {

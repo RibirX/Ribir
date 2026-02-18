@@ -40,7 +40,6 @@ pub enum Measure {
 }
 
 pub mod prelude {
-  pub use log;
   pub use ribir_algo::*;
   pub use ribir_geom::*;
   pub use ribir_macros::*;
@@ -48,6 +47,7 @@ pub mod prelude {
   #[doc(hidden)]
   pub use rxrust::prelude::*;
   pub use smallvec;
+  pub use tracing;
 
   pub use super::{
     Measure, MeasureExt,

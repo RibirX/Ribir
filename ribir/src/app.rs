@@ -382,7 +382,7 @@ impl Drop for AppRunGuard {
 impl EventSender {
   pub fn send(&self, e: AppEvent) {
     if let Err(err) = self.0.send_event(RibirAppEvent::App(e)) {
-      log::error!("{}", err)
+      tracing::error!("{}", err)
     }
   }
 }
@@ -390,7 +390,7 @@ impl EventSender {
 impl CmdSender {
   pub fn send(&self, cmd: ShellCmd) {
     if let Err(err) = self.0.send_event(RibirAppEvent::Cmd(cmd)) {
-      log::error!("{}", err)
+      tracing::error!("{}", err)
     }
   }
 }

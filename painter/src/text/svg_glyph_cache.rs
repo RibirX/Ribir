@@ -1,13 +1,13 @@
 use std::{borrow::Cow, collections::BTreeMap, io::prelude::*, ops::RangeInclusive};
 
 use ahash::{HashMap, HashSet};
-use log::warn;
 use quick_xml::{
   events::{BytesStart, Event, attributes::Attribute},
   name::QName,
   reader::Reader,
 };
 use rustybuzz::ttf_parser::GlyphId;
+use tracing::warn;
 
 use crate::Svg;
 

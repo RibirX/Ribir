@@ -16,7 +16,7 @@ version.workspace = true
 ahash.workspace = true
 tokio = {workspace = true, optional = true, features=["sync"]}
 guillotiere.workspace = true
-log.workspace = true
+tracing.workspace = true
 rayon.workspace = true
 ribir_algo = { workspace = true }
 ribir_geom = { workspace = true }

@@ -155,7 +155,7 @@ impl Router {
         .into_widget()
       })
       .unwrap_or_else(|| {
-        log::warn!("No route found for: {}", path);
+        tracing::warn!("No route found for: {}", path);
         Void::default().into_widget()
       })
   }
@@ -172,7 +172,7 @@ impl ComposeChild<'static> for Router {
         .extend(child.into_iter().filter(|route| {
           route
             .check_path()
-            .inspect_err(|e| log::error!("Invalid route path '{}': {}", &route.path, e))
+            .inspect_err(|e| tracing::error!("Invalid route path '{}': {}", &route.path, e))
             .is_ok()
         }));
 

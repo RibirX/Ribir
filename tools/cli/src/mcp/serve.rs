@@ -481,7 +481,7 @@ impl ToolFlowCtx {
 pub async fn mcp_serve(port: u16, port_source: PortSource) -> Result<()> {
   bind_current_port(port, port_source);
 
-  log::info!(
+  tracing::info!(
     "Starting MCP stdio server, connecting to debug server on port {} (source: {})",
     port,
     port_source.as_label()
@@ -499,7 +499,7 @@ pub async fn mcp_serve(port: u16, port_source: PortSource) -> Result<()> {
     let request: Value = match serde_json::from_slice(&message) {
       Ok(r) => r,
       Err(e) => {
-        log::error!("Failed to parse JSON-RPC request: {}", e);
+        tracing::error!("Failed to parse JSON-RPC request: {}", e);
         continue;
       }
     };
@@ -687,13 +687,13 @@ async fn handle_request(client: &reqwest::Client, request: Value) -> Value {
         json
       }
       Err(e) => {
-        log::error!("Failed to parse response: {}", e);
+        tracing::error!("Failed to parse response: {}", e);
         json_rpc_error(request["id"].clone(), -32603, format!("Parse error: {}", e))
       }
     },
     Err(e) if is_connection_error(&e) => handle_fallback(request, port, port_source).await,
     Err(e) => {
-      log::error!("Request failed: {}", e);
+      tracing::error!("Request failed: {}", e);
       json_rpc_error(request["id"].clone(), -32603, format!("Request failed: {}", e))
     }
   }
@@ -778,7 +778,7 @@ where
   match serde_json::from_value(args) {
     Ok(v) => v,
     Err(e) => {
-      log::warn!("Invalid tool arguments, falling back to defaults: {}", e);
+      tracing::warn!("Invalid tool arguments, falling back to defaults: {}", e);
       T::default()
     }
   }
@@ -927,7 +927,7 @@ async fn launch_new_session(
     .stdin(Stdio::null());
   append_cargo_args(&mut cmd, args.cargo_args.as_ref());
 
-  log::info!("Launching: {:?}", cmd);
+  tracing::info!("Launching: {:?}", cmd);
   ctx.step(StepCode::StartLaunchCmdReady);
 
   let mut child = match cmd.spawn() {
@@ -1095,7 +1095,10 @@ fn append_cargo_args(cmd: &mut tokio::process::Command, cargo_args: Option<&Carg
         }
         Err(e) => {
           // Preserve user intent instead of silently dropping args on parse errors.
-          log::warn!("Failed to parse cargo_args string as shell words: {}. Using raw string.", e);
+          tracing::warn!(
+            "Failed to parse cargo_args string as shell words: {}. Using raw string.",
+            e
+          );
           cmd.arg(s);
         }
       }
@@ -1202,7 +1205,7 @@ async fn wait_for_debug_server_ready(port: u16) -> bool {
   {
     Ok(c) => c,
     Err(e) => {
-      log::warn!("Failed to create readiness-check client: {}", e);
+      tracing::warn!("Failed to create readiness-check client: {}", e);
       return false;
     }
   };

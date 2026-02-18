@@ -1,11 +1,12 @@
 //! Debug-focused tracing integration.
 //!
 //! This module is intentionally gated behind the `debug` feature.
+//!
 //! It provides:
 //! - a best-effort global `tracing` subscriber initialization
 //! - a `log` -> `tracing` bridge
 //! - a lightweight layer that forwards structured JSON events to the debug
-//!   server
+//!   server server
 
 use std::{
   fmt,

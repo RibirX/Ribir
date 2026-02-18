@@ -15,7 +15,7 @@ version.workspace = true
 [dependencies]
 bitflags = "2.3.0"
 image = {workspace = true, optional = true}
-log.workspace = true
+tracing.workspace = true
 lyon_algorithms = {version = "1.0.3", features = ["serialization"]}
 lyon_tessellation = {version = "1.0.3", features = ["serialization"], optional = true}
 material-colors = {workspace = true}
