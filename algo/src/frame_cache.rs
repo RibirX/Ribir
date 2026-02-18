@@ -879,7 +879,7 @@ impl<'a, K: Hash + Eq, V> Drop for FrameDrain<'a, K, V> {
     while self.next().is_some() {}
 
     if self.size > 0 {
-      log::info!(
+      tracing::info!(
         "Frame[{}]: cache hit percent is {:.1}%",
         self.label,
         self.cache.len() as f32 / self.size as f32

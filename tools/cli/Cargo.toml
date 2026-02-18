@@ -22,8 +22,7 @@ serde = {workspace = true, features = ["derive"]}
 serde-value = "0.7.0"
 serde_with = "3.14.0"
 toml = "0.9.*"
-log = { workspace = true, features = ["kv", "kv_std"]}
-tracing = { workspace = true }
+tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 semver = "1.0"
 dirs.workspace = true

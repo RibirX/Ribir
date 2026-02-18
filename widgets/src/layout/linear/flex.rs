@@ -1,4 +1,4 @@
-use ribir_core::prelude::{log::warn, *};
+use ribir_core::prelude::{tracing::warn, *};
 
 use super::{Direction, Expanded, JustifyContent};
 

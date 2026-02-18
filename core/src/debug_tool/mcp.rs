@@ -174,7 +174,7 @@ pub async fn handle_mcp_request(
 
   match request.method.as_str() {
     "initialize" => {
-      log::info!("MCP: initialize request from client");
+      tracing::info!("MCP: initialize request from client");
 
       #[derive(Deserialize)]
       struct McpSchemaInit {
@@ -193,13 +193,13 @@ pub async fn handle_mcp_request(
     }
 
     "notifications/initialized" => {
-      log::info!("MCP: client initialized");
+      tracing::info!("MCP: client initialized");
       // Notification - return success with no result
       JsonRpcResponse::result(id, Value::Null)
     }
 
     "tools/list" => {
-      log::info!("MCP: tools/list request");
+      tracing::info!("MCP: tools/list request");
 
       #[derive(Deserialize)]
       struct McpSchemaTools {
@@ -219,7 +219,7 @@ pub async fn handle_mcp_request(
     "tools/call" => handle_tool_call(request.params, state, id).await,
 
     "resources/list" => {
-      log::info!("MCP: resources/list request");
+      tracing::info!("MCP: resources/list request");
 
       #[derive(Deserialize)]
       struct McpSchemaResources {
@@ -238,7 +238,7 @@ pub async fn handle_mcp_request(
     "resources/read" => handle_read_resource(request.params, state, id).await,
 
     _ => {
-      log::warn!("MCP: unknown method: {}", request.method);
+      tracing::warn!("MCP: unknown method: {}", request.method);
       JsonRpcResponse::error(id, -32601, format!("Method not found: {}", request.method))
     }
   }
@@ -254,7 +254,7 @@ async fn handle_tool_call(
     Err(e) => return JsonRpcResponse::error(id, -32602, format!("Invalid params: {}", e)),
   };
 
-  log::info!("MCP: tools/call - {}", params.name);
+  tracing::info!("MCP: tools/call - {}", params.name);
 
   // Helper to extract common arguments
   let args = params.arguments.as_ref();

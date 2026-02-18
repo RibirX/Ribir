@@ -36,7 +36,7 @@ impl From<MouseButton> for MouseButtons {
       MouseButton::Back => MouseButtons::FOURTH,
       MouseButton::Forward => MouseButtons::FIFTH,
       MouseButton::Other(v) => {
-        log::warn!("Not support the mouse button {} now", v);
+        tracing::warn!("Not support the mouse button {} now", v);
         MouseButtons::default()
       }
     }

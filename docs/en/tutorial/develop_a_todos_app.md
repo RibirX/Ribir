@@ -163,7 +163,7 @@ fn main() {
     .debounce(Duration::from_secs(5), AppCtx::scheduler())
     .subscribe(move |_| {
       if let Err(err) = save_todos.read().save() {
-        log::error!("Save tasks failed: {}", err);
+        tracing::error!("Save tasks failed: {}", err);
       }
     });
     todos
@@ -475,7 +475,7 @@ fn main() {
     .debounce(Duration::from_secs(5), AppCtx::scheduler())
     .subscribe(move |_| {
       if let Err(err) = save_todos.read().save() {
-        log::error!("Save tasks failed: {}", err);
+        tracing::error!("Save tasks failed: {}", err);
       }
     });
     todos

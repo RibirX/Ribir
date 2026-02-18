@@ -1,9 +1,9 @@
 use std::{cell::RefCell, future::Future, pin::Pin, sync::LazyLock};
 
-use log::warn;
 use ribir_algo::Rc;
 use ribir_painter::{TypographyStore, font_db::FontDB};
 use rxrust::LocalScheduler;
+use tracing::warn;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;

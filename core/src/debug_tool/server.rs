@@ -386,7 +386,7 @@ pub fn start_debug_server() -> mpsc::Sender<DebugCommand> {
           break;
         }
         Err(err) => {
-          log::warn!("Debug server bind failed on {}: {}", addr, err);
+          tracing::warn!("Debug server bind failed on {}: {}", addr, err);
         }
       }
     }
@@ -397,7 +397,7 @@ pub fn start_debug_server() -> mpsc::Sender<DebugCommand> {
           listener = Some(found);
         }
         Err(e) => {
-          log::error!("Failed to bind debug server on {}:0: {}", bind_host, e);
+          tracing::error!("Failed to bind debug server on {}:0: {}", bind_host, e);
           return;
         }
       }
@@ -407,7 +407,7 @@ pub fn start_debug_server() -> mpsc::Sender<DebugCommand> {
       let local_addr = match listener.local_addr() {
         Ok(addr) => addr,
         Err(err) => {
-          log::error!("Failed to read debug server address: {}", err);
+          tracing::error!("Failed to read debug server address: {}", err);
           return;
         }
       };
@@ -418,7 +418,7 @@ pub fn start_debug_server() -> mpsc::Sender<DebugCommand> {
       let port = local_addr.port();
       let url = format!("http://{}", local_addr);
       let ui_url = format!("{}/ui", url);
-      log::info!("Debug server listening on {} (open /ui)", url);
+      tracing::info!("Debug server listening on {} (open /ui)", url);
       println!("Debug server listening on {} (open /ui)", url);
       eprintln!("RIBIR_DEBUG_URL={}", url);
       eprintln!("RIBIR_DEBUG_UI={}", ui_url);
@@ -1113,7 +1113,7 @@ fn encode_png_response(img: &PixelImage) -> axum::response::Response {
 async fn mcp_sse_handler(
   State(state): State<Arc<DebugServerState>>,
 ) -> Sse<impl futures::Stream<Item = Result<Event, std::convert::Infallible>>> {
-  log::info!("MCP: SSE connection established");
+  tracing::info!("MCP: SSE connection established");
 
   // Build the message endpoint URL
   let endpoint_url = {
@@ -1144,7 +1144,7 @@ async fn mcp_sse_handler(
 async fn mcp_message_handler(
   State(state): State<Arc<DebugServerState>>, Json(payload): Json<super::mcp::JsonRpcRequest>,
 ) -> Json<super::mcp::JsonRpcResponse> {
-  log::info!("MCP: message method={}", payload.method);
+  tracing::info!("MCP: message method={}", payload.method);
 
   let response = super::mcp::handle_mcp_request(payload, state).await;
   Json(response)

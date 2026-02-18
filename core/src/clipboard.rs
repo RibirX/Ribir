@@ -1,7 +1,7 @@
 use std::{borrow::Cow, io::Error};
 
-use log::warn;
 use ribir_painter::PixelImage;
+use tracing::warn;
 
 pub trait Clipboard {
   // read the string from the clipboard

@@ -139,13 +139,13 @@ fn paint_group(g: &usvg::Group, painter: &mut crate::Painter) {
         painter.apply_alpha(g.opacity().get());
 
         if g.clip_path().is_some() {
-          log::warn!("[painter]: not support `clip path` in svg, ignored!");
+          tracing::warn!("[painter]: not support `clip path` in svg, ignored!");
         }
         if g.mask().is_some() {
-          log::warn!("[painter]: not support `mask` in svg, ignored!");
+          tracing::warn!("[painter]: not support `mask` in svg, ignored!");
         }
         if !g.filters().is_empty() {
-          log::warn!("[painter]: not support `filters` in svg, ignored!");
+          tracing::warn!("[painter]: not support `filters` in svg, ignored!");
         }
         paint_group(g, &mut painter);
       }
@@ -182,7 +182,7 @@ fn paint_group(g: &usvg::Group, painter: &mut crate::Painter) {
       }
       usvg::Node::Image(_) => {
         // todo;
-        log::warn!("[painter]: not support draw embed image in svg, ignored!");
+        tracing::warn!("[painter]: not support draw embed image in svg, ignored!");
       }
       usvg::Node::Text(t) => paint_group(t.flattened(), &mut painter),
     }
@@ -249,7 +249,7 @@ fn brush_from_usvg_paint(paint: &usvg::Paint, opacity: usvg::Opacity) -> (Brush,
       (Brush::RadialGradient(gradient), matrix_convert(radial_gradient.transform()))
     }
     paint => {
-      log::warn!("[painter]: not support `{paint:?}` in svg, use black instead!");
+      tracing::warn!("[painter]: not support `{paint:?}` in svg, use black instead!");
       (Color::BLACK.into(), Transform::identity())
     }
   }
