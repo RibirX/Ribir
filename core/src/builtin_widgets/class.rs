@@ -37,9 +37,13 @@
 //! App::run(w).with_app_theme(theme_fn);
 //! ```
 
-use std::hash::Hash;
+use std::{cell::RefCell, convert::Infallible, hash::Hash, rc::Rc};
 
 use pipe::PipeNode;
+use rxrust::{
+  observable::boxed::LocalBoxedObservable,
+  subscription::{BoxedSubscription, IntoBoxedSubscription, SubscriptionGuard},
+};
 use smallvec::{SmallVec, smallvec};
 
 use crate::{pipe::GenRange, prelude::*, ticker::FrameMsg, window::WindowId};
@@ -193,9 +197,9 @@ pub struct ClassName(&'static str);
 // previous version's binary. See `[`ClassName::type_info`]`.
 pub type ClassImpl = fn(Widget) -> Widget;
 
-#[derive(Default, Clone, PartialEq, Debug)]
+#[derive(Default)]
 pub struct ClassList {
-  classes: SmallVec<[ClassName; 1]>,
+  classes: SmallVec<[PipeValue<Option<ClassName>>; 1]>,
 }
 
 impl ClassList {
@@ -203,10 +207,12 @@ impl ClassList {
   pub fn new() -> Self { Self::default() }
 
   #[inline]
-  pub fn push(&mut self, class: ClassName) { self.classes.push(class); }
+  pub fn push<K: ?Sized>(&mut self, class: impl RInto<PipeValue<Option<ClassName>>, K>) {
+    self.classes.push(class.r_into());
+  }
 
   #[inline]
-  pub fn pop(&mut self) -> Option<ClassName> { self.classes.pop() }
+  pub fn pop(&mut self) -> Option<PipeValue<Option<ClassName>>> { self.classes.pop() }
 
   #[inline]
   pub fn len(&self) -> usize { self.classes.len() }
@@ -215,20 +221,66 @@ impl ClassList {
   pub fn is_empty(&self) -> bool { self.classes.is_empty() }
 
   #[inline]
-  pub fn iter(&self) -> std::slice::Iter<'_, ClassName> { self.classes.iter() }
+  pub fn iter(&self) -> std::slice::Iter<'_, PipeValue<Option<ClassName>>> { self.classes.iter() }
+
+  #[inline]
+  pub(crate) fn current(&self) -> ClassSnapshot {
+    self
+      .classes
+      .iter()
+      .map(|class| match class {
+        PipeValue::Value(v) => *v,
+        PipeValue::Pipe { init_value, .. } => *init_value,
+      })
+      .collect()
+  }
+
+  pub(crate) fn into_runtime_parts(self) -> (ClassSnapshot, ClassItemStreams) {
+    let mut snapshot = SmallVec::new();
+    let mut streams = SmallVec::new();
+    for (idx, v) in self.classes.into_iter().enumerate() {
+      match v {
+        PipeValue::Value(v) => snapshot.push(v),
+        PipeValue::Pipe { init_value, pipe } => {
+          snapshot.push(init_value);
+          let stream = pipe
+            .with_effect(ModifyEffect::FRAMEWORK)
+            .into_observable();
+          streams.push((idx, stream));
+        }
+      }
+    }
+    (snapshot, streams)
+  }
+
+  pub(crate) fn from_snapshot(snapshot: ClassSnapshot) -> Self {
+    let classes = snapshot
+      .into_iter()
+      .map(PipeValue::Value)
+      .collect();
+    Self { classes }
+  }
+}
+
+impl PartialEq for ClassList {
+  fn eq(&self, other: &Self) -> bool { self.current() == other.current() }
+}
+
+impl Clone for ClassList {
+  fn clone(&self) -> Self { Self::from_snapshot(self.current()) }
 }
 
 impl IntoIterator for ClassList {
-  type Item = ClassName;
-  type IntoIter = smallvec::IntoIter<[ClassName; 1]>;
+  type Item = PipeValue<Option<ClassName>>;
+  type IntoIter = smallvec::IntoIter<[PipeValue<Option<ClassName>>; 1]>;
 
   #[inline]
   fn into_iter(self) -> Self::IntoIter { self.classes.into_iter() }
 }
 
 impl<'a> IntoIterator for &'a ClassList {
-  type Item = &'a ClassName;
-  type IntoIter = std::slice::Iter<'a, ClassName>;
+  type Item = &'a PipeValue<Option<ClassName>>;
+  type IntoIter = std::slice::Iter<'a, PipeValue<Option<ClassName>>>;
 
   #[inline]
   fn into_iter(self) -> Self::IntoIter { self.classes.iter() }
@@ -236,12 +288,23 @@ impl<'a> IntoIterator for &'a ClassList {
 
 impl FromIterator<ClassName> for ClassList {
   fn from_iter<T: IntoIterator<Item = ClassName>>(iter: T) -> Self {
+    Self {
+      classes: iter
+        .into_iter()
+        .map(|v| PipeValue::Value(Some(v)))
+        .collect(),
+    }
+  }
+}
+
+impl FromIterator<PipeValue<Option<ClassName>>> for ClassList {
+  fn from_iter<T: IntoIterator<Item = PipeValue<Option<ClassName>>>>(iter: T) -> Self {
     Self { classes: iter.into_iter().collect() }
   }
 }
 
 /// This widget is used to apply class to its child widget by the `ClassName`.
-#[derive(Default, Clone, PartialEq)]
+#[derive(Default)]
 pub struct Class {
   pub class: ClassList,
 }
@@ -251,6 +314,19 @@ pub struct Class {
 #[macro_export]
 macro_rules! class {
   ($($t: tt)*) => { fn_widget! { @Class { $($t)* } } };
+}
+
+#[macro_export]
+macro_rules! class_list {
+  ($($class:expr),* $(,)?) => {{
+    let mut list = $crate::prelude::ClassList::new();
+    $(
+      let class_item: $crate::prelude::PipeValue<Option<$crate::prelude::ClassName>> =
+        $crate::prelude::RInto::r_into($class);
+      list.push(class_item);
+    )*
+    list
+  }};
 }
 
 /// This macro is utilized to define class names; ensure that your name is
@@ -303,7 +379,7 @@ impl Classes {
     Provider::Setup(Box::new(ClassesReaderSetup(this)))
   }
 
-  fn remove_intersects_class(&self, map: &mut ProviderCtx) -> Vec<(TypeInfo, Box<dyn Query>)> {
+  fn take_overridden_from(&self, map: &mut ProviderCtx) -> Vec<(TypeInfo, Box<dyn Query>)> {
     map.remove_key_value_if(|info| {
       ClassName::from_info(info).is_some_and(|name| self.store.contains_key(&name))
     })
@@ -319,7 +395,7 @@ struct ClassesRestore {
 
 impl ProviderSetup for Classes {
   fn setup(self: Box<Self>, map: &mut ProviderCtx) -> Box<dyn ProviderRestore> {
-    let overrides = self.remove_intersects_class(map);
+    let overrides = self.take_overridden_from(map);
     let classes = Box::new(Setup::new(*self)).setup(map);
     Box::new(ClassesRestore { overrides, classes })
   }
@@ -328,7 +404,7 @@ impl ProviderSetup for Classes {
 impl<R: StateReader<Value = Classes> + Query> ProviderSetup for ClassesReaderSetup<R> {
   fn setup(self: Box<Self>, map: &mut ProviderCtx) -> Box<dyn ProviderRestore> {
     let classes = self.0;
-    let overrides = classes.read().remove_intersects_class(map);
+    let overrides = classes.read().take_overridden_from(map);
     let classes = Box::new(Setup::from_state(classes)).setup(map);
     Box::new(ClassesRestore { overrides, classes })
   }
@@ -355,54 +431,91 @@ impl<'c> ComposeChild<'c> for Class {
   type Child = Widget<'c>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    let f = move || {
-      match this.try_into_value() {
-        Ok(c) => compose_with_classes(c.class, child),
-        Err(writer) => {
-          // Dynamic case: the whole Class is stateful
-
-          let ctx = BuildCtx::get();
-          let dummy = GenRange::Single(ctx.tree().dummy_id());
-          let cls_child = ClassNode::empty_node(dummy.clone());
-          let orig_child = ClassNode::empty_node(dummy);
-          let orig_child2 = orig_child.clone();
-          let child = child.on_build(move |orig_id| orig_child2.init_for_single(orig_id));
-
-          let cls_child2 = cls_child.clone();
-          let orig_child2 = orig_child.clone();
-          let wnd_id = ctx.window().id();
-          let sampler = ctx
-            .window()
-            .frame_tick_stream()
-            .filter(|msg| matches!(msg, FrameMsg::NewFrame(_)));
-
-          let u = pipe!($read(writer).class.clone())
-            .with_effect(ModifyEffect::FRAMEWORK)
-            .into_observable()
-            .distinct_until_changed()
-            .skip(1)
-            .sample(sampler)
-            .subscribe(move |new_classes| {
-              classes_update(&cls_child2, &orig_child2, new_classes, wnd_id);
-            })
-            .unsubscribe_when_dropped();
-
-          compose_with_classes(writer.read().class.clone(), child).on_build(move |child_id| {
-            cls_child.init_for_single(child_id);
-            child_id.attach_anonymous_data(u, BuildCtx::get_mut().tree_mut());
-          })
-        }
-      }
+    let f = move || match this.try_into_value() {
+      Ok(c) => compose_from_value(c, child),
+      Err(writer) => compose_from_writer(writer, child),
     };
     FnWidget::new(f).into_widget()
   }
 }
 
+fn compose_from_value<'w>(class: Class, child: Widget<'w>) -> Widget<'w> {
+  let (snapshot, streams) = class.class.into_runtime_parts();
+  if streams.is_empty() {
+    compose_with_classes(snapshot, child)
+  } else {
+    let ctx = BuildCtx::get();
+    let runtime = Rc::new(NestedClassRuntime::new(ctx.window().id(), ctx.tree().dummy_id()));
+    runtime
+      .build_layers(
+        snapshot,
+        &streams
+          .iter()
+          .map(|(i, _)| *i)
+          .collect::<Vec<_>>(),
+        child,
+      )
+      .on_build(move |child_id| {
+        attach_runtime_and_rebind(child_id, runtime.clone(), streams);
+      })
+  }
+}
+
+fn compose_from_writer<'w>(
+  writer: impl StateWriter<Value = Class>, child: Widget<'w>,
+) -> Widget<'w> {
+  let ctx = BuildCtx::get();
+  let runtime = Rc::new(NestedClassRuntime::new(ctx.window().id(), ctx.tree().dummy_id()));
+  let (current, streams) = Class::extract_runtime_parts_and_freeze(&writer);
+  let manager = LayerManager::new(ctx.window().id(), ctx.tree().dummy_id(), current);
+  let child = manager.wrap_child(child);
+  let runtime_build = runtime.clone();
+
+  let dynamic_indices: Vec<usize> = streams.iter().map(|(i, _)| *i).collect();
+  manager
+    .build_initial(child, &move |classes, child| {
+      runtime_build.build_layers(classes, &dynamic_indices, child)
+    })
+    .on_build(move |child_id| {
+      attach_runtime_and_rebind(child_id, runtime.clone(), streams);
+      attach_outer_stream_subscription(child_id, writer, runtime, manager);
+    })
+}
+
+fn attach_runtime_and_rebind(
+  child_id: WidgetId, runtime: Rc<NestedClassRuntime>, streams: ClassItemStreams,
+) {
+  child_id.attach_anonymous_data(runtime.clone(), BuildCtx::get_mut().tree_mut());
+  runtime.rebind_dynamic_streams(streams);
+}
+
+fn attach_outer_stream_subscription(
+  child_id: WidgetId, writer: impl StateWriter<Value = Class>, runtime: Rc<NestedClassRuntime>,
+  manager: LayerManager<ClassSnapshot>,
+) {
+  let stream_writer = writer.clone_writer();
+  let callback_writer = writer.clone_writer();
+  let stream = pipe!($read(stream_writer).class.current())
+    .with_effect(ModifyEffect::FRAMEWORK)
+    .into_observable();
+  let sampler = BuildCtx::get()
+    .window()
+    .frame_tick_stream()
+    .filter(|msg| matches!(msg, FrameMsg::NewFrame(_)));
+  let u = stream
+    .sample(sampler)
+    .subscribe(move |_| {
+      runtime.refresh_from_state(&callback_writer, &manager);
+    })
+    .unsubscribe_when_dropped();
+  child_id.attach_anonymous_data(u, BuildCtx::get_mut().tree_mut());
+}
+
 /// Compose a widget with multiple classes, chaining them in reverse order.
-fn compose_with_classes(classes: ClassList, child: Widget) -> Widget {
+fn compose_with_classes(classes: ClassSnapshot, child: Widget) -> Widget {
   let mut widget = child;
-  for cls in classes.classes.into_iter().rev() {
-    widget = apply_class(Some(cls), widget);
+  for cls in classes.into_iter().rev() {
+    widget = apply_class(cls, widget);
   }
   widget
 }
@@ -411,6 +524,9 @@ fn apply_class(class: Option<ClassName>, w: Widget) -> Widget {
   if let Some(cls_impl) = class_impl(class) { cls_impl(w) } else { w }
 }
 
+/// Resolve the class implementation for a given class name.
+/// Override providers (set via `Class::provider`) take precedence over the
+/// `Classes` store in the theme.
 fn class_impl(class: Option<ClassName>) -> Option<ClassImpl> {
   let cls = class?;
   let ctx = BuildCtx::get();
@@ -457,82 +573,222 @@ impl Class {
     let setup = Setup::custom(name.type_info(), Box::new(Queryable(cls_impl)));
     Provider::Setup(Box::new(setup))
   }
+
+  fn extract_runtime_parts_and_freeze(
+    writer: &impl StateWriter<Value = Self>,
+  ) -> (ClassSnapshot, ClassItemStreams) {
+    let mut class = writer.silent();
+    let list = std::mem::take(&mut class.class);
+    let (snapshot, streams) = list.into_runtime_parts();
+    class.class = ClassList::from_snapshot(snapshot.clone());
+    (snapshot, streams)
+  }
 }
 
-type ClassNode = PipeNode;
+type ClassSnapshot = SmallVec<[Option<ClassName>; 1]>;
+type ClassItemStreams =
+  SmallVec<[(usize, LocalBoxedObservable<'static, Option<ClassName>, Infallible>); 1]>;
+type LayerManagers = SmallVec<[Option<LayerManager<Option<ClassName>>>; 1]>;
 
-/// Update the class chain when the whole Class is changed.
-fn classes_update(node: &ClassNode, orig: &ClassNode, classes: ClassList, wnd_id: WindowId) {
-  let wnd =
-    AppCtx::get_window(wnd_id).expect("This handle is not valid because the window is closed");
+struct NestedClassRuntime {
+  wnd_id: WindowId,
+  dummy_id: WidgetId,
+  managers: RefCell<LayerManagers>,
+  subscriptions: RefCell<SmallVec<[SubscriptionGuard<BoxedSubscription>; 1]>>,
+}
 
-  let child_id = node.dyn_info().host_id();
-  let orig_id = orig.dyn_info().host_id();
-  if child_id.is_dropped(wnd.tree()) {
-    return;
-  }
-
-  let child_holder = child_id.place_holder(wnd.tree_mut());
-
-  let old_child_node = node.take_data();
-  let _guard = BuildCtx::init_for(child_id, wnd.tree);
-  let ctx = BuildCtx::get_mut();
-
-  let class_node =
-    std::mem::replace(child_id.get_node_mut(ctx.tree_mut()).unwrap(), old_child_node);
-
-  *orig_id.get_node_mut(ctx.tree_mut()).unwrap() = Box::new(orig.clone());
-  let new_id = ctx.build(compose_with_classes(classes, Widget::from_id(orig_id)));
-
-  let tree = ctx.tree_mut();
-
-  if child_id != new_id {
-    class_node.update_track_id(new_id);
-  }
-
-  new_id.wrap_node(tree, |render| {
-    node.replace_data(render);
-    class_node
-  });
-
-  if new_id != child_id {
-    new_id
-      .query_all_iter::<PipeNode>(tree)
-      .for_each(|node| node.dyn_info_mut().replace(child_id, new_id));
-    child_holder.replace(new_id, tree);
-  }
-
-  if orig_id != child_id {
-    child_id.dispose_subtree(tree);
-  }
-
-  let mut stack: SmallVec<[WidgetId; 1]> = smallvec![new_id];
-  while let Some(w) = stack.pop() {
-    // Skip the original child subtree as it does not consist of new widgets.
-    if w != child_id {
-      w.on_mounted_subtree(tree);
-      stack.extend(w.children(tree).rev());
+impl NestedClassRuntime {
+  fn new(wnd_id: WindowId, dummy_id: WidgetId) -> Self {
+    Self {
+      wnd_id,
+      dummy_id,
+      managers: RefCell::new(SmallVec::new()),
+      subscriptions: RefCell::new(SmallVec::new()),
     }
   }
 
-  node.dyn_info_mut().gen_range = GenRange::Single(new_id);
-  let marker = tree.dirty_marker();
-  marker.mark(new_id, DirtyPhase::Layout);
-  if new_id != orig_id && new_id.ancestor_of(orig_id, tree) {
-    marker.mark(orig_id, DirtyPhase::Layout);
+  fn build_layers<'w>(
+    &self, classes: ClassSnapshot, dynamic_indices: &[usize], child: Widget<'w>,
+  ) -> Widget<'w> {
+    let mut widget = child;
+    let mut managers = SmallVec::new();
+    // Iterate in reverse so the last class wraps closest to the child (innermost).
+    // Managers are pushed in reverse iteration order, then reversed so that
+    // managers[i] corresponds to classes[i].
+    for (idx, cls) in classes.into_iter().enumerate().rev() {
+      if dynamic_indices.contains(&idx) {
+        let manager = LayerManager::new(self.wnd_id, self.dummy_id, cls);
+        widget = manager.wrap_child(widget);
+        widget = manager.build_initial(widget, &apply_class);
+        managers.push(Some(manager));
+      } else {
+        widget = apply_class(cls, widget);
+        managers.push(None);
+      }
+    }
+    managers.reverse();
+    *self.managers.borrow_mut() = managers;
+    widget
+  }
+
+  fn refresh_from_state(
+    &self, writer: &impl StateWriter<Value = Class>, manager: &LayerManager<ClassSnapshot>,
+  ) {
+    let (snapshot, streams) = Class::extract_runtime_parts_and_freeze(writer);
+    let dynamic_indices: Vec<usize> = streams.iter().map(|(i, _)| *i).collect();
+    manager.update(snapshot, &|classes, child| self.build_layers(classes, &dynamic_indices, child));
+    self.rebind_dynamic_streams(streams);
+  }
+
+  fn rebind_dynamic_streams(&self, streams: ClassItemStreams) {
+    let mut subscriptions = self.subscriptions.borrow_mut();
+    subscriptions.clear();
+
+    let managers = self.managers.borrow();
+    for (idx, stream) in streams {
+      if let Some(Some(manager)) = managers.get(idx) {
+        subscriptions.push(manager.mount_stream(stream, apply_class));
+      }
+    }
+  }
+}
+
+#[derive(Clone)]
+struct LayerManager<T> {
+  outer: PipeNode,
+  inner: PipeNode,
+  wnd_id: WindowId,
+  prev: Rc<RefCell<T>>,
+}
+
+impl<T> LayerManager<T>
+where
+  T: Clone + PartialEq + 'static,
+{
+  fn new(wnd_id: WindowId, dummy_id: WidgetId, prev: T) -> Self {
+    let dummy = GenRange::Single(dummy_id);
+    Self {
+      outer: PipeNode::empty_node(dummy.clone()),
+      inner: PipeNode::empty_node(dummy),
+      wnd_id,
+      prev: Rc::new(RefCell::new(prev)),
+    }
+  }
+
+  fn wrap_child<'w>(&self, child: Widget<'w>) -> Widget<'w> {
+    let inner = self.inner.clone();
+    child.on_build(move |inner_id| inner.init_for_single(inner_id))
+  }
+
+  fn build_initial<'w>(
+    &self, child: Widget<'w>, apply: &impl Fn(T, Widget) -> Widget,
+  ) -> Widget<'w> {
+    let outer = self.outer.clone();
+    apply(self.prev.borrow().clone(), child)
+      .on_build(move |outer_id| outer.init_for_single(outer_id))
+  }
+
+  fn mount_stream(
+    &self, stream: LocalBoxedObservable<'static, T, Infallible>, apply: fn(T, Widget) -> Widget,
+  ) -> SubscriptionGuard<BoxedSubscription> {
+    let wnd = AppCtx::get_window(self.wnd_id)
+      .expect("This handle is not valid because the window is closed");
+    let sampler = wnd
+      .frame_tick_stream()
+      .filter(|msg| matches!(msg, FrameMsg::NewFrame(_)));
+    let manager = self.clone();
+    stream
+      .sample(sampler)
+      .subscribe(move |current| {
+        manager.update(current, &apply);
+      })
+      .into_boxed()
+      .unsubscribe_when_dropped()
+  }
+
+  fn update(&self, next: T, apply: &impl Fn(T, Widget) -> Widget) -> bool {
+    if *self.prev.borrow() == next {
+      return false;
+    }
+
+    let wnd = AppCtx::get_window(self.wnd_id)
+      .expect("This handle is not valid because the window is closed");
+
+    let old_host = self.outer.dyn_info().host_id();
+    let inner_host = self.inner.dyn_info().host_id();
+    if old_host.is_dropped(wnd.tree()) {
+      return false;
+    }
+
+    let holder = old_host.place_holder(wnd.tree_mut());
+
+    let original_render = self.outer.take_data();
+    let _guard = BuildCtx::init_for(old_host, wnd.tree);
+    let ctx = BuildCtx::get_mut();
+
+    let pipe_wrapper =
+      std::mem::replace(old_host.get_node_mut(ctx.tree_mut()).unwrap(), original_render);
+
+    *inner_host.get_node_mut(ctx.tree_mut()).unwrap() = Box::new(self.inner.clone());
+    let next_prev = next.clone();
+    let new_id = ctx.build(apply(next, Widget::from_id(inner_host)));
+
+    let tree = ctx.tree_mut();
+
+    if old_host != new_id {
+      pipe_wrapper.update_track_id(new_id);
+    }
+
+    new_id.wrap_node(tree, |render| {
+      self.outer.replace_data(render);
+      pipe_wrapper
+    });
+
+    if new_id != old_host {
+      new_id
+        .query_all_iter::<PipeNode>(tree)
+        .for_each(|node| node.dyn_info_mut().replace(old_host, new_id));
+      holder.replace(new_id, tree);
+    }
+
+    if inner_host != old_host {
+      old_host.dispose_subtree(tree);
+    }
+
+    let mut stack: SmallVec<[WidgetId; 1]> = smallvec![new_id];
+    while let Some(w) = stack.pop() {
+      // Skip the preserved inner subtree — it is not newly created.
+      if w != old_host {
+        w.on_mounted_subtree(tree);
+        stack.extend(w.children(tree).rev());
+      }
+    }
+
+    self.outer.dyn_info_mut().gen_range = GenRange::Single(new_id);
+    let marker = tree.dirty_marker();
+    marker.mark(new_id, DirtyPhase::Layout);
+    if new_id != inner_host && new_id.ancestor_of(inner_host, tree) {
+      marker.mark(inner_host, DirtyPhase::Layout);
+    }
+
+    *self.prev.borrow_mut() = next_prev;
+    true
   }
 }
 
 impl From<ClassName> for ClassList {
   #[inline]
-  fn from(v: ClassName) -> Self { ClassList { classes: smallvec![v] } }
+  fn from(v: ClassName) -> Self { ClassList { classes: smallvec![PipeValue::Value(Some(v))] } }
 }
 
 impl From<Option<ClassName>> for ClassList {
   #[inline]
-  fn from(v: Option<ClassName>) -> Self {
-    if let Some(v) = v { ClassList { classes: smallvec![v] } } else { ClassList::default() }
-  }
+  fn from(v: Option<ClassName>) -> Self { ClassList { classes: smallvec![PipeValue::Value(v)] } }
+}
+
+impl From<PipeValue<Option<ClassName>>> for ClassList {
+  #[inline]
+  fn from(v: PipeValue<Option<ClassName>>) -> Self { ClassList { classes: smallvec![v] } }
 }
 
 impl<const N: usize> From<[ClassName; N]> for ClassList {
@@ -603,6 +859,79 @@ mod tests {
   }
 
   #[test]
+  fn switch_class_back_to_current_in_same_frame_skip_rebuild() {
+    reset_test_env!();
+
+    class_names!(COUNT_CLS);
+
+    let (apply_cnt, w_apply_cnt) = split_value(0usize);
+    let (cls, w_cls) = split_value(COUNT_CLS);
+    let wnd = TestWindow::from_widget(fn_widget! {
+      let cls = cls.clone_watcher();
+      let w_apply_cnt = w_apply_cnt.clone_writer();
+      let mut classes = Classes::default();
+      classes.insert(COUNT_CLS, |w| {
+        *Provider::write_of::<usize>(BuildCtx::get()).unwrap() += 1;
+        w
+      });
+
+      @Providers {
+        providers: smallvec![
+          classes.into_provider(),
+          Provider::writer(w_apply_cnt.clone_writer(), None),
+        ],
+        @Container {
+          class: pipe!(*$read(cls)),
+          hint_size: Size::new(100., 100.),
+        }
+      }
+    });
+
+    wnd.draw_frame();
+    assert_eq!(*apply_cnt.read(), 1);
+
+    *w_cls.write() = EMPTY;
+    *w_cls.write() = COUNT_CLS;
+    wnd.draw_frame();
+    assert_eq!(*apply_cnt.read(), 1);
+  }
+
+  #[test]
+  fn switch_class_not_remount_inner_child() {
+    reset_test_env!();
+
+    let (mounted_cnt, w_mounted_cnt) = split_value(0usize);
+    let (cls, w_cls) = split_value(EMPTY);
+    let wnd = TestWindow::from_widget(fn_widget! {
+      let cls = cls.clone_watcher();
+      let mounted_cnt = w_mounted_cnt.clone_writer();
+      @Providers {
+        providers: smallvec![initd_classes().into_provider()],
+        @Container {
+          class: pipe!(*$read(cls)),
+          @MockBox {
+            size: Size::new(20., 20.),
+            on_mounted: move |_| {
+              *$write(mounted_cnt) += 1;
+            }
+          }
+        }
+      }
+    });
+
+    wnd.draw_frame();
+    assert_eq!(*mounted_cnt.read(), 1);
+
+    *w_cls.write() = MARGIN;
+    wnd.draw_frame();
+    assert_eq!(*mounted_cnt.read(), 1);
+
+    *w_cls.write() = EMPTY;
+    wnd.draw_frame();
+    assert_eq!(*mounted_cnt.read(), 1);
+  }
+
+  #[test]
 
   fn on_disposed_of_class_nodes() {
     reset_test_env!();
@@ -611,16 +940,18 @@ mod tests {
 
     let (cls, w_cls) = split_value(ON_DISPOSED);
 
-    static mut DISPOSED: bool = false;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static DISPOSED: AtomicBool = AtomicBool::new(false);
+    DISPOSED.store(false, Ordering::Relaxed);
 
     let wnd = TestWindow::from_widget(fn_widget! {
       let cls = cls.clone_watcher();
       let mut classes = initd_classes();
-      classes.insert(ON_DISPOSED, move |w| {
+      classes.insert(ON_DISPOSED, |w| {
         fn_widget! {
           @MockBox {
             size: Size::zero(),
-              on_disposed: move |_| unsafe { DISPOSED = true },
+            on_disposed: move |_| DISPOSED.store(true, Ordering::Relaxed),
             @ { w }
           }
         }
@@ -636,11 +967,11 @@ mod tests {
     });
 
     wnd.draw_frame();
-    assert!(unsafe { !DISPOSED });
+    assert!(!DISPOSED.load(Ordering::Relaxed));
 
     *w_cls.write() = MARGIN;
     wnd.draw_frame();
-    assert!(unsafe { DISPOSED });
+    assert!(DISPOSED.load(Ordering::Relaxed));
   }
 
   #[test]
@@ -958,6 +1289,365 @@ mod tests {
     *w_inner.write() = true;
     wnd.draw_frame();
     assert_eq!(*inner_apply.read(), 3);
+  }
+
+  #[test]
+  fn nested_pipe_item_updates_only_target_layer() {
+    reset_test_env!();
+
+    class_names!(NESTED_OUTER, NESTED_MID_A, NESTED_MID_B, NESTED_INNER);
+
+    #[derive(Default)]
+    struct OuterApply(usize);
+    #[derive(Default)]
+    struct MidApply(usize);
+    #[derive(Default)]
+    struct InnerApply(usize);
+
+    let (outer_apply, w_outer_apply) = split_value(OuterApply::default());
+    let (mid_apply, w_mid_apply) = split_value(MidApply::default());
+    let (inner_apply, w_inner_apply) = split_value(InnerApply::default());
+    let (mid_toggle, w_mid_toggle) = split_value(false);
+
+    let wnd = TestWindow::from_widget(fn_widget! {
+      let mid_toggle = mid_toggle.clone_watcher();
+      let mut classes = Classes::default();
+      classes.insert(NESTED_OUTER, |w| {
+        Provider::write_of::<OuterApply>(BuildCtx::get()).unwrap().0 += 1;
+        w
+      });
+      classes.insert(NESTED_MID_A, |w| {
+        Provider::write_of::<MidApply>(BuildCtx::get()).unwrap().0 += 1;
+        w
+      });
+      classes.insert(NESTED_MID_B, |w| {
+        Provider::write_of::<MidApply>(BuildCtx::get()).unwrap().0 += 1;
+        w
+      });
+      classes.insert(NESTED_INNER, |w| {
+        Provider::write_of::<InnerApply>(BuildCtx::get()).unwrap().0 += 1;
+        w
+      });
+
+      @Providers {
+        providers: smallvec![
+          classes.into_provider(),
+          Provider::writer(w_outer_apply.clone_writer(), None),
+          Provider::writer(w_mid_apply.clone_writer(), None),
+          Provider::writer(w_inner_apply.clone_writer(), None),
+        ],
+        @MockBox {
+          size: Size::new(100., 100.),
+          class: class_list![
+            NESTED_OUTER,
+            pipe!(*$read(mid_toggle))
+              .map(|v| Some(if v { NESTED_MID_A } else { NESTED_MID_B }))
+              .with_init_value(Some(NESTED_MID_B)),
+            NESTED_INNER,
+          ],
+        }
+      }
+    });
+    wnd.draw_frame();
+    assert_eq!(outer_apply.read().0, 1);
+    assert_eq!(mid_apply.read().0, 1);
+    assert_eq!(inner_apply.read().0, 1);
+
+    *w_mid_toggle.write() = true;
+    wnd.draw_frame();
+    assert_eq!(outer_apply.read().0, 1);
+    assert_eq!(mid_apply.read().0, 2);
+    assert_eq!(inner_apply.read().0, 1);
+  }
+
+  #[test]
+  fn nested_pipe_item_equal_short_circuit() {
+    reset_test_env!();
+
+    class_names!(NESTED_EQ_OUTER, NESTED_EQ_MID_A, NESTED_EQ_MID_B, NESTED_EQ_INNER);
+
+    #[derive(Default)]
+    struct MidApply(usize);
+
+    let (mid_apply, w_mid_apply) = split_value(MidApply::default());
+    let (mid_toggle, w_mid_toggle) = split_value(true);
+
+    let wnd = TestWindow::from_widget(fn_widget! {
+      let mid_toggle = mid_toggle.clone_watcher();
+      let mut classes = Classes::default();
+      classes.insert(NESTED_EQ_OUTER, empty_cls);
+      classes.insert(NESTED_EQ_INNER, empty_cls);
+      classes.insert(NESTED_EQ_MID_A, |w| {
+        Provider::write_of::<MidApply>(BuildCtx::get()).unwrap().0 += 1;
+        w
+      });
+      classes.insert(NESTED_EQ_MID_B, |w| {
+        Provider::write_of::<MidApply>(BuildCtx::get()).unwrap().0 += 1;
+        w
+      });
+
+      @Providers {
+        providers: smallvec![
+          classes.into_provider(),
+          Provider::writer(w_mid_apply.clone_writer(), None),
+        ],
+        @MockBox {
+          size: Size::new(100., 100.),
+          class: class_list![
+            NESTED_EQ_OUTER,
+            pipe!(*$read(mid_toggle))
+              .map(|v| Some(if v { NESTED_EQ_MID_A } else { NESTED_EQ_MID_B }))
+              .with_init_value(Some(NESTED_EQ_MID_A)),
+            NESTED_EQ_INNER,
+          ],
+        }
+      }
+    });
+    wnd.draw_frame();
+    assert_eq!(mid_apply.read().0, 1);
+
+    *w_mid_toggle.write() = true;
+    wnd.draw_frame();
+    assert_eq!(mid_apply.read().0, 1);
+  }
+
+  #[test]
+  fn outer_pipe_equal_rebind_inner_subscriptions() {
+    reset_test_env!();
+
+    class_names!(OUTER_EQ_REBIND_OUTER, OUTER_EQ_REBIND_MID_A, OUTER_EQ_REBIND_MID_B);
+
+    #[derive(Default)]
+    struct OuterApply(usize);
+    #[derive(Default)]
+    struct MidApply(usize);
+
+    let (outer_apply, w_outer_apply) = split_value(OuterApply::default());
+    let (mid_apply, w_mid_apply) = split_value(MidApply::default());
+    let (use_first, w_use_first) = split_value(true);
+    let (inner_a, w_inner_a) = split_value(false);
+    let (inner_b, w_inner_b) = split_value(false);
+
+    let wnd = TestWindow::from_widget(fn_widget! {
+      let use_first = use_first.clone_watcher();
+      let inner_a = inner_a.clone_watcher();
+      let inner_b = inner_b.clone_watcher();
+      let mut classes = Classes::default();
+      classes.insert(OUTER_EQ_REBIND_OUTER, |w| {
+        Provider::write_of::<OuterApply>(BuildCtx::get()).unwrap().0 += 1;
+        w
+      });
+      classes.insert(OUTER_EQ_REBIND_MID_A, |w| {
+        Provider::write_of::<MidApply>(BuildCtx::get()).unwrap().0 += 1;
+        w
+      });
+      classes.insert(OUTER_EQ_REBIND_MID_B, |w| {
+        Provider::write_of::<MidApply>(BuildCtx::get()).unwrap().0 += 1;
+        w
+      });
+
+      @Providers {
+        providers: smallvec![
+          classes.into_provider(),
+          Provider::writer(w_outer_apply.clone_writer(), None),
+          Provider::writer(w_mid_apply.clone_writer(), None),
+        ],
+        @MockBox {
+          size: Size::new(100., 100.),
+          class: pipe!(*$read(use_first)).map(move |use_first| {
+            let source = if use_first {
+              pipe!(*$read(inner_a))
+                .map(|v| Some(if v { OUTER_EQ_REBIND_MID_A } else { OUTER_EQ_REBIND_MID_B }))
+                .with_init_value(Some(OUTER_EQ_REBIND_MID_B))
+            } else {
+              pipe!(*$read(inner_b))
+                .map(|v| Some(if v { OUTER_EQ_REBIND_MID_A } else { OUTER_EQ_REBIND_MID_B }))
+                .with_init_value(Some(OUTER_EQ_REBIND_MID_B))
+            };
+            class_list![OUTER_EQ_REBIND_OUTER, source]
+          }),
+        }
+      }
+    });
+    wnd.draw_frame();
+    let outer_after_first = outer_apply.read().0;
+    let mid_after_first = mid_apply.read().0;
+    assert_eq!(outer_after_first, 1);
+    assert_eq!(mid_after_first, 1);
+
+    *w_use_first.write() = false;
+    wnd.draw_frame();
+    assert_eq!(outer_apply.read().0, outer_after_first);
+    assert_eq!(mid_apply.read().0, mid_after_first);
+
+    *w_inner_b.write() = true;
+    wnd.draw_frame();
+    assert_eq!(mid_apply.read().0, mid_after_first + 1);
+
+    *w_inner_a.write() = true;
+    wnd.draw_frame();
+    assert_eq!(mid_apply.read().0, mid_after_first + 1);
+  }
+
+  #[test]
+  fn outer_pipe_shape_change_rebuild() {
+    reset_test_env!();
+
+    class_names!(OUTER_SHAPE_A, OUTER_SHAPE_B, OUTER_SHAPE_C);
+
+    #[derive(Default)]
+    struct AApply(usize);
+    #[derive(Default)]
+    struct BApply(usize);
+    #[derive(Default)]
+    struct CApply(usize);
+
+    let (a_apply, w_a_apply) = split_value(AApply::default());
+    let (b_apply, w_b_apply) = split_value(BApply::default());
+    let (c_apply, w_c_apply) = split_value(CApply::default());
+    let (with_tail, w_with_tail) = split_value(true);
+
+    let wnd = TestWindow::from_widget(fn_widget! {
+      let with_tail = with_tail.clone_watcher();
+      let mut classes = Classes::default();
+      classes.insert(OUTER_SHAPE_A, |w| {
+        Provider::write_of::<AApply>(BuildCtx::get()).unwrap().0 += 1;
+        w
+      });
+      classes.insert(OUTER_SHAPE_B, |w| {
+        Provider::write_of::<BApply>(BuildCtx::get()).unwrap().0 += 1;
+        w
+      });
+      classes.insert(OUTER_SHAPE_C, |w| {
+        Provider::write_of::<CApply>(BuildCtx::get()).unwrap().0 += 1;
+        w
+      });
+
+      @Providers {
+        providers: smallvec![
+          classes.into_provider(),
+          Provider::writer(w_a_apply.clone_writer(), None),
+          Provider::writer(w_b_apply.clone_writer(), None),
+          Provider::writer(w_c_apply.clone_writer(), None),
+        ],
+        @MockBox {
+          size: Size::new(100., 100.),
+          class: pipe!(*$read(with_tail)).map(|with_tail| {
+            if with_tail {
+              class_list![OUTER_SHAPE_A, OUTER_SHAPE_B, OUTER_SHAPE_C]
+            } else {
+              class_list![OUTER_SHAPE_A, OUTER_SHAPE_B]
+            }
+          }),
+        }
+      }
+    });
+    wnd.draw_frame();
+    let a_first = a_apply.read().0;
+    let b_first = b_apply.read().0;
+    let c_first = c_apply.read().0;
+    assert_eq!(a_first, 1);
+    assert_eq!(b_first, 1);
+    assert_eq!(c_first, 1);
+
+    *w_with_tail.write() = false;
+    wnd.draw_frame();
+    assert_eq!(a_apply.read().0, a_first + 1);
+    assert_eq!(b_apply.read().0, b_first + 1);
+    assert_eq!(c_apply.read().0, c_first);
+  }
+
+  #[test]
+  fn outer_and_inner_pipe_together() {
+    reset_test_env!();
+
+    class_names!(OUTER_INNER_A, OUTER_INNER_B_A, OUTER_INNER_B_B, OUTER_INNER_C);
+
+    #[derive(Default)]
+    struct AApply(usize);
+    #[derive(Default)]
+    struct BApply(usize);
+    #[derive(Default)]
+    struct CApply(usize);
+
+    let (a_apply, w_a_apply) = split_value(AApply::default());
+    let (b_apply, w_b_apply) = split_value(BApply::default());
+    let (c_apply, w_c_apply) = split_value(CApply::default());
+    let (with_tail, w_with_tail) = split_value(true);
+    let (mid_toggle, w_mid_toggle) = split_value(false);
+
+    let wnd = TestWindow::from_widget(fn_widget! {
+      let with_tail = with_tail.clone_watcher();
+      let mid_toggle = mid_toggle.clone_watcher();
+      let mut classes = Classes::default();
+      classes.insert(OUTER_INNER_A, |w| {
+        Provider::write_of::<AApply>(BuildCtx::get()).unwrap().0 += 1;
+        w
+      });
+      classes.insert(OUTER_INNER_B_A, |w| {
+        Provider::write_of::<BApply>(BuildCtx::get()).unwrap().0 += 1;
+        w
+      });
+      classes.insert(OUTER_INNER_B_B, |w| {
+        Provider::write_of::<BApply>(BuildCtx::get()).unwrap().0 += 1;
+        w
+      });
+      classes.insert(OUTER_INNER_C, |w| {
+        Provider::write_of::<CApply>(BuildCtx::get()).unwrap().0 += 1;
+        w
+      });
+
+      @Providers {
+        providers: smallvec![
+          classes.into_provider(),
+          Provider::writer(w_a_apply.clone_writer(), None),
+          Provider::writer(w_b_apply.clone_writer(), None),
+          Provider::writer(w_c_apply.clone_writer(), None),
+        ],
+        @MockBox {
+          size: Size::new(100., 100.),
+          class: pipe!(*$read(with_tail)).map(move |with_tail| {
+            let mid = pipe!(*$read(mid_toggle))
+              .map(|v| Some(if v { OUTER_INNER_B_A } else { OUTER_INNER_B_B }))
+              .with_init_value(Some(OUTER_INNER_B_B));
+            if with_tail {
+              class_list![OUTER_INNER_A, mid, OUTER_INNER_C]
+            } else {
+              class_list![OUTER_INNER_A, mid]
+            }
+          }),
+        }
+      }
+    });
+    wnd.draw_frame();
+    let a_start = a_apply.read().0;
+    let b_start = b_apply.read().0;
+    let c_start = c_apply.read().0;
+    assert_eq!(a_start, 1);
+    assert_eq!(b_start, 1);
+    assert_eq!(c_start, 1);
+
+    *w_mid_toggle.write() = true;
+    wnd.draw_frame();
+
+    *w_with_tail.write() = false;
+    wnd.draw_frame();
+
+    *w_mid_toggle.write() = false;
+    wnd.draw_frame();
+
+    *w_with_tail.write() = true;
+    wnd.draw_frame();
+    assert_eq!(a_apply.read().0, a_start + 2);
+    assert_eq!(c_apply.read().0, c_start + 1);
+    assert!(b_apply.read().0 >= b_start + 2);
+
+    let b_before_final_inner_update = b_apply.read().0;
+    *w_mid_toggle.write() = true;
+    wnd.draw_frame();
+    assert_eq!(a_apply.read().0, a_start + 2);
+    assert_eq!(c_apply.read().0, c_start + 1);
+    assert!(b_apply.read().0 > b_before_final_inner_update);
   }
 
   // the track_id is bind after the class, when the class is changed and wrap with
