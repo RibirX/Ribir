@@ -13,6 +13,7 @@ pub struct DrawAlphaTrianglesPass {
   vertices_buffer: VerticesBuffer<()>,
   pipeline: wgpu::RenderPipeline,
   size_uniform: Uniform<u32>,
+  current_range: (Range<wgpu::BufferAddress>, Range<wgpu::BufferAddress>),
 }
 
 impl DrawAlphaTrianglesPass {
@@ -78,25 +79,32 @@ impl DrawAlphaTrianglesPass {
       cache: None,
     });
 
-    Self { vertices_buffer, pipeline, size_uniform }
+    Self { vertices_buffer, pipeline, size_uniform, current_range: (0..0, 0..0) }
+  }
+
+  pub fn reset(&mut self) {
+    self.vertices_buffer.reset();
+    self.size_uniform.reset();
   }
 
   pub fn load_alpha_vertices(
     &mut self, buffers: &VertexBuffers<()>, device: &wgpu::Device, queue: &wgpu::Queue,
-  ) {
-    self
+  ) -> Option<()> {
+    self.current_range = self
       .vertices_buffer
-      .write_buffer(buffers, device, queue);
+      .write_buffer(buffers, device, queue)?;
+    Some(())
+  }
+
+  pub fn load_size(&mut self, queue: &wgpu::Queue, size: [u32; 2]) -> Option<u32> {
+    self.size_uniform.write_buffer(queue, &size)
   }
 
   pub fn draw_alpha_triangles(
     &mut self, indices: &Range<u32>, texture: &WgpuTexture, scissor: Option<DeviceRect>,
-    queue: &wgpu::Queue, encoder: &mut wgpu::CommandEncoder,
+    _queue: &wgpu::Queue, encoder: &mut wgpu::CommandEncoder, size_offset: u32,
   ) {
     let color_attachments = texture.color_attachments(None);
-    self
-      .size_uniform
-      .write_buffer(queue, &texture.size().to_u32().to_array());
 
     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
       label: Some("Alpha triangles render pass"),
@@ -106,19 +114,33 @@ impl DrawAlphaTrianglesPass {
       occlusion_query_set: None,
       multiview_mask: None,
     });
-    rpass.set_bind_group(0, self.size_uniform.bind_group(), &[]);
-    rpass.set_vertex_buffer(0, self.vertices_buffer.vertices().slice(..));
-    rpass.set_index_buffer(self.vertices_buffer.indices().slice(..), wgpu::IndexFormat::Uint32);
-
-    if let Some(scissor) = scissor {
-      rpass.set_scissor_rect(
-        scissor.min_x() as u32,
-        scissor.min_y() as u32,
-        scissor.width() as u32,
-        scissor.height() as u32,
+    rpass.set_bind_group(0, self.size_uniform.bind_group(), &[size_offset]);
+    if !indices.is_empty() {
+      rpass.set_vertex_buffer(
+        0,
+        self
+          .vertices_buffer
+          .vertices()
+          .slice(self.current_range.0.clone()),
       );
+      rpass.set_index_buffer(
+        self
+          .vertices_buffer
+          .indices()
+          .slice(self.current_range.1.clone()),
+        wgpu::IndexFormat::Uint32,
+      );
+
+      if let Some(scissor) = scissor {
+        rpass.set_scissor_rect(
+          scissor.min_x() as u32,
+          scissor.min_y() as u32,
+          scissor.width() as u32,
+          scissor.height() as u32,
+        );
+      }
+      rpass.set_pipeline(&self.pipeline);
+      rpass.draw_indexed(indices.clone(), 0, 0..SAMPLE_COUNT)
     }
-    rpass.set_pipeline(&self.pipeline);
-    rpass.draw_indexed(indices.clone(), 0, 0..SAMPLE_COUNT)
   }
 }

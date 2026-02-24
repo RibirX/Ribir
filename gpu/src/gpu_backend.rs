@@ -685,9 +685,8 @@ where
     let mut color = self.surface_color.take();
     let gpu_impl = &mut self.gpu_impl;
     self.tex_mgr.draw_alpha_textures(gpu_impl);
-    if !self.mask_layers.is_empty() {
-      gpu_impl.load_mask_layers(&self.mask_layers);
-    }
+    let mask_offset =
+      if !self.mask_layers.is_empty() { gpu_impl.load_mask_layers(&self.mask_layers) } else { 0 };
 
     let textures = self.tex_ids_map.all_textures();
     let max_textures = gpu_impl.limits().max_tex_load;
@@ -705,19 +704,18 @@ where
     match current_phase {
       CurrentPhase::None => {
         if color.is_some() {
-          gpu_impl.draw_color_triangles(output, 0..0, color.take())
+          gpu_impl.draw_color_triangles(output, 0..0, color.take(), mask_offset)
         }
       }
       CurrentPhase::Color if !self.color_vertices_buffer.indices.is_empty() => {
         gpu_impl.load_color_vertices(&self.color_vertices_buffer);
         let rg = 0..self.color_vertices_buffer.indices.len() as u32;
-        gpu_impl.draw_color_triangles(output, rg, color.take())
+        gpu_impl.draw_color_triangles(output, rg, color.take(), mask_offset)
       }
       CurrentPhase::Img if !self.img_vertices_buffer.indices.is_empty() => {
-        gpu_impl.load_img_primitives(&self.img_prims);
-        gpu_impl.load_img_vertices(&self.img_vertices_buffer);
+        let prims_offset = gpu_impl.load_img_data(&self.img_prims, &self.img_vertices_buffer);
         let rg = 0..self.img_vertices_buffer.indices.len() as u32;
-        gpu_impl.draw_img_triangles(output, rg, color.take())
+        gpu_impl.draw_img_triangles(output, rg, color.take(), mask_offset, prims_offset)
       }
       CurrentPhase::RadialGradient
         if !self
@@ -725,11 +723,20 @@ where
           .indices
           .is_empty() =>
       {
-        gpu_impl.load_radial_gradient_primitives(&self.radial_gradient_prims);
-        gpu_impl.load_radial_gradient_stops(&self.radial_gradient_stops);
-        gpu_impl.load_radial_gradient_vertices(&self.radial_gradient_vertices_buffer);
+        let (prims_offset, stops_offset) = gpu_impl.load_radial_gradient_data(
+          &self.radial_gradient_prims,
+          &self.radial_gradient_stops,
+          &self.radial_gradient_vertices_buffer,
+        );
         let rg = 0..self.radial_gradient_vertices_buffer.indices.len() as u32;
-        gpu_impl.draw_radial_gradient_triangles(output, rg, color.take())
+        gpu_impl.draw_radial_gradient_triangles(
+          output,
+          rg,
+          color.take(),
+          mask_offset,
+          prims_offset,
+          stops_offset,
+        )
       }
       CurrentPhase::LinearGradient
         if !self
@@ -737,20 +744,29 @@ where
           .indices
           .is_empty() =>
       {
-        gpu_impl.load_linear_gradient_primitives(&self.linear_gradient_prims);
-        gpu_impl.load_linear_gradient_stops(&self.linear_gradient_stops);
-        gpu_impl.load_linear_gradient_vertices(&self.linear_gradient_vertices_buffer);
+        let (prims_offset, stops_offset) = gpu_impl.load_linear_gradient_data(
+          &self.linear_gradient_prims,
+          &self.linear_gradient_stops,
+          &self.linear_gradient_vertices_buffer,
+        );
         let rg = 0..self.linear_gradient_vertices_buffer.indices.len() as u32;
-        gpu_impl.draw_linear_gradient_triangles(output, rg, color.take())
+        gpu_impl.draw_linear_gradient_triangles(
+          output,
+          rg,
+          color.take(),
+          mask_offset,
+          prims_offset,
+          stops_offset,
+        )
       }
       CurrentPhase::Filter(filters) => {
-        self.draw_filter(&filters, output);
+        self.draw_filter(&filters, output, mask_offset);
       }
       _ => {}
     }
   }
 
-  fn draw_filter(&mut self, filter: &FilterPhase, output: &mut Impl::Texture) {
+  fn draw_filter(&mut self, filter: &FilterPhase, output: &mut Impl::Texture, mask_offset: u32) {
     let mask_origin: DevicePoint = filter.view_rect.origin.cast().cast_unit();
     let size = filter.view_rect.size;
 
@@ -761,6 +777,10 @@ where
     let mut tex_b = self
       .gpu_impl
       .new_texture(size, ColorFormat::Rgba8);
+
+    // flush explicitly to ensure WGPU synchronizes draw commands to the output
+    // texture before copying
+    self.gpu_impl.flush_draw_commands();
 
     // Initial Copy: Output -> tex_a
     self.gpu_impl.copy_texture_from_texture(
@@ -832,18 +852,23 @@ where
         let src_tex = unsafe { &*p_src };
         let dst_tex = unsafe { &mut *p_dst };
 
-        self
-          .gpu_impl
-          .load_filter_primitive(&prim, &matrix);
-        self
-          .gpu_impl
-          .load_filter_vertices(&self.filter_vertices_buffer);
+        // mask_offset is passed from draw_triangles and remains valid during
+        // the filter pass thanks to wgpu_impl not clearing it mid-draw.
+        let prims_offset =
+          self
+            .gpu_impl
+            .load_filter_data(&prim, &matrix, &self.filter_vertices_buffer);
         let indices = 0..self.filter_vertices_buffer.indices.len() as u32;
 
         // Draw Op, clearing dst first
-        self
-          .gpu_impl
-          .draw_filter_triangles(dst_tex, src_tex, indices, Some(Color::TRANSPARENT));
+        self.gpu_impl.draw_filter_triangles(
+          dst_tex,
+          src_tex,
+          indices,
+          Some(Color::TRANSPARENT),
+          mask_offset,
+          prims_offset,
+        );
 
         std::mem::swap(&mut p_src, &mut p_dst);
       }
@@ -879,16 +904,21 @@ where
         let src_tex = unsafe { &*p_src };
         let dst_tex = unsafe { &mut *p_dst };
 
-        self.gpu_impl.load_texture_primitives(&[prim]);
-        self
+        // mask_offset remains valid for the composite draw as well.
+        let prims_offset = self
           .gpu_impl
-          .load_texture_vertices(&self.texture_vertices_buffer);
+          .load_texture_data(&[prim], &self.texture_vertices_buffer);
         let indices = 0..self.texture_vertices_buffer.indices.len() as u32;
 
         // Draw src_tex OVER dst_tex with composition.
-        self
-          .gpu_impl
-          .draw_texture_triangles(dst_tex, indices, None, src_tex);
+        self.gpu_impl.draw_texture_triangles(
+          dst_tex,
+          indices,
+          None,
+          src_tex,
+          mask_offset,
+          prims_offset,
+        );
 
         // 4. Swap back so p_src holds the Final Result
         std::mem::swap(&mut p_src, &mut p_dst);

@@ -192,8 +192,8 @@ pub fn wgpu_render_commands(
       .new_texture(rect.size, ColorFormat::Rgba8);
     backend.begin_frame(surface);
     backend.draw_commands(rect, commands, &Transform::identity(), &mut texture);
-    let img = texture.copy_as_image(&rect, backend.get_impl_mut());
     backend.end_frame();
+    let img = texture.copy_as_image(&rect, backend.get_impl_mut());
     block_on(img).unwrap()
   };
 

@@ -1,20 +1,35 @@
 //! WGSL Shader code for the GPU implementation.
 
+use super::primitive_pool::PrimitivePoolMode;
 use crate::DrawPhaseLimits;
 
-pub fn radial_gradient_shader(limits: &DrawPhaseLimits) -> String {
-  basic_template(limits.max_mask_layers)
-    + &format!(
-      r#"
+pub fn radial_gradient_shader(limits: &DrawPhaseLimits, pool_mode: PrimitivePoolMode) -> String {
+  let primitive_and_stops_decl = match pool_mode {
+    PrimitivePoolMode::Uniform => {
+      format!(
+        r#"
 @group(2) @binding(0)
 var<uniform> prims: array<Primitive, {}>;
 
 @group(3) @binding(0)
 var<uniform> stops: array<StopPair, {}>;
     "#,
-      limits.max_radial_gradient_primitives,
-      limits.max_gradient_stop_primitives / 2,
-    )
+        limits.max_radial_gradient_primitives,
+        limits.max_gradient_stop_primitives / 2,
+      )
+    }
+    PrimitivePoolMode::Storage => r#"
+@group(2) @binding(0)
+var<storage, read> prims: array<Primitive>;
+
+@group(3) @binding(0)
+var<storage, read> stops: array<StopPair>;
+    "#
+    .to_string(),
+  };
+
+  basic_template(limits.max_mask_layers)
+    + &primitive_and_stops_decl
     + r#"
 struct Vertex {
   @location(0) pos: vec2<f32>,
@@ -189,18 +204,31 @@ fn unpackUnorm4x8(packed: u32) -> vec4<f32> {
 }"#
 }
 
-pub fn linear_gradient_shader(limits: &DrawPhaseLimits) -> String {
-  basic_template(limits.max_mask_layers)
-    + &format!(
-      r#"
+pub fn linear_gradient_shader(limits: &DrawPhaseLimits, pool_mode: PrimitivePoolMode) -> String {
+  let primitive_and_stops_decl = match pool_mode {
+    PrimitivePoolMode::Uniform => {
+      format!(
+        r#"
 @group(2) @binding(0)
 var<uniform> prims: array<Primitive, {}>;
 
 @group(3) @binding(0)
 var<uniform> stops: array<StopPair, {}>;"#,
-      limits.max_linear_gradient_primitives,
-      limits.max_gradient_stop_primitives / 2,
-    )
+        limits.max_linear_gradient_primitives,
+        limits.max_gradient_stop_primitives / 2,
+      )
+    }
+    PrimitivePoolMode::Storage => r#"
+@group(2) @binding(0)
+var<storage, read> prims: array<Primitive>;
+
+@group(3) @binding(0)
+var<storage, read> stops: array<StopPair>;"#
+      .to_string(),
+  };
+
+  basic_template(limits.max_mask_layers)
+    + &primitive_and_stops_decl
     + r#"
 struct Vertex {
   @location(0) pos: vec2<f32>,
@@ -371,14 +399,24 @@ pub fn color_triangles_shader(max_mask_layers: usize) -> String {
  "#
 }
 
-pub fn img_triangles_shader(limits: &DrawPhaseLimits) -> String {
-  basic_template(limits.max_mask_layers)
-    + &format!(
-      "
+pub fn img_triangles_shader(limits: &DrawPhaseLimits, pool_mode: PrimitivePoolMode) -> String {
+  let primitives_decl = match pool_mode {
+    PrimitivePoolMode::Uniform => {
+      format!(
+        "
       @group(2) @binding(0) 
       var<uniform> primtives: array<ImgPrimitive, {}>;",
-      limits.max_image_primitives
-    )
+        limits.max_image_primitives
+      )
+    }
+    PrimitivePoolMode::Storage => "
+      @group(2) @binding(0)
+      var<storage, read> primtives: array<ImgPrimitive>;"
+      .to_string(),
+  };
+
+  basic_template(limits.max_mask_layers)
+    + &primitives_decl
     + r#"
   struct VertexInput {
     @location(0) pos: vec2<f32>,
@@ -475,11 +513,24 @@ pub fn img_triangles_shader(limits: &DrawPhaseLimits) -> String {
   "#
 }
 
-pub fn filter_triangles_shader(limits: &DrawPhaseLimits) -> String {
-  let filter_shader = r#"
+pub fn filter_triangles_shader(limits: &DrawPhaseLimits, pool_mode: PrimitivePoolMode) -> String {
+  let primitive_decl = match pool_mode {
+    PrimitivePoolMode::Uniform => "
+  @group(2) @binding(0) 
+  var<uniform> filter_primitive: FilterPrimitive;"
+      .to_string(),
+    PrimitivePoolMode::Storage => "
+  @group(2) @binding(0) 
+  var<storage, read> filter_primitive: FilterPrimitive;"
+      .to_string(),
+  };
+
+  let filter_shader_head = r#"
   // Since a the different alignment between WebGPU and WebGL, we not use 
   // mat3x2<f32> in the struct, but use vec2<f32> instead. Then, we compose it.
   struct FilterPrimitive {
+    /// color matrix of [f32; 4 * 4]
+    color_matrix: mat4x4<f32>,
     /// The origin of the image placed in texture.
     /// Used to locate the original image position in the texture.
     sample_offset: vec2<f32>,
@@ -508,8 +559,6 @@ pub fn filter_triangles_shader(limits: &DrawPhaseLimits) -> String {
     /// base color
     base_color: vec4<f32>,
 
-    /// color matrix of [f32; 4 * 4]
-    color_matrix: mat4x4<f32>,
 
     kernel_matrix: array<vec4<f32>,"#
     .to_string()
@@ -517,8 +566,9 @@ pub fn filter_triangles_shader(limits: &DrawPhaseLimits) -> String {
     + r#">,
   }
 
-  @group(2) @binding(0) 
-  var<uniform> filter_primitive: FilterPrimitive;
+"#;
+
+  let filter_shader_tail = r#"
 
   @group(3) @binding(0)
   var original_tex: texture_2d<f32>;
@@ -611,6 +661,7 @@ pub fn filter_triangles_shader(limits: &DrawPhaseLimits) -> String {
       return textureSampleLevel(tex, s_sampler, sample_pos, 0.);
   }
   "#;
+  let filter_shader = filter_shader_head + &primitive_decl + filter_shader_tail;
   basic_template(limits.max_mask_layers) + &filter_shader
 }
 
@@ -769,14 +820,24 @@ fn mask_tex_sampler(tex: texture_2d<f32>, mask: MaskLayer, pos: vec2<f32>) -> f3
 "#
 }
 
-pub fn texture_triangles_shader(limits: &DrawPhaseLimits) -> String {
-  basic_template(limits.max_mask_layers)
-    + &format!(
-      "
+pub fn texture_triangles_shader(limits: &DrawPhaseLimits, pool_mode: PrimitivePoolMode) -> String {
+  let primitives_decl = match pool_mode {
+    PrimitivePoolMode::Uniform => {
+      format!(
+        "
       @group(2) @binding(0) 
       var<uniform> primtives: array<TexturePrimitive, {}>;",
-      limits.max_texture_primitives
-    )
+        limits.max_texture_primitives
+      )
+    }
+    PrimitivePoolMode::Storage => "
+      @group(2) @binding(0)
+      var<storage, read> primtives: array<TexturePrimitive>;"
+      .to_string(),
+  };
+
+  basic_template(limits.max_mask_layers)
+    + &primitives_decl
     + r#"
     struct VertexInput {
         @location(0) pos: vec2<f32>,
@@ -807,7 +868,7 @@ pub fn texture_triangles_shader(limits: &DrawPhaseLimits) -> String {
         return output;
     }
 
-    @group(2) @binding(1)
+    @group(3) @binding(0)
     var input_tex: texture_2d<f32>;
 
     @fragment
