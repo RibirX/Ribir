@@ -62,7 +62,7 @@
 //! };
 //! ```
 #[derive(Debug)]
-pub struct KeyFrames<S: AnimateStateSetter> {
+pub struct KeyFrames<S: AnimateState> {
   /// The state for the keyframes.
   pub state: S,
   /// The keyframes that specify the animation frames.
@@ -75,7 +75,7 @@ pub struct KeyFrame<S> {
   pub state_value: S,
 }
 
-impl<S: AnimateStateSetter> KeyFrames<S> {
+impl<S: AnimateState> KeyFrames<S> {
   /// Creates a new `KeyFrames` instance with the given state and keyframes.
   ///
   /// # Arguments
@@ -100,16 +100,16 @@ impl<S: AnimateStateSetter> KeyFrames<S> {
   }
 
   #[allow(clippy::type_complexity)]
-  /// Converts the `KeyFrames` into a `LerpFnState` that can be used for
+  /// Converts the `KeyFrames` into a `CustomLerpState` that can be used for
   /// animations.
   pub fn into_lerp_fn_state(
     self,
-  ) -> LerpFnState<S, impl FnMut(&S::Value, &S::Value, f32) -> S::Value>
+  ) -> CustomLerpState<S, impl FnMut(&S::Value, &S::Value, f32) -> S::Value>
   where
     S::Value: Lerp,
   {
     let Self { state, frames } = self;
-    LerpFnState::new(state, move |from, to, rate| {
+    CustomLerpState::from_state(state, move |from, to, rate| {
       let idx = frames
         .binary_search_by(|f| f.rate.total_cmp(&rate))
         .unwrap_or_else(|idx| idx);
@@ -195,7 +195,7 @@ macro_rules! keyframes {
 }
 pub use keyframes;
 
-use super::{AnimateStateSetter, Lerp, LerpFnState};
+use super::{AnimateState, CustomLerpState, Lerp};
 #[cfg(test)]
 mod tests {
   use super::*;

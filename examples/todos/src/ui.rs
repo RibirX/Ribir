@@ -166,8 +166,8 @@ where
     if !stagger.has_ever_run() {
       *$write(item.opacity()) = 0.;
       let fly_in = stagger.push_state(
-        (item.transform(), item.opacity()),
-        (Transform::translation(0., 64.), 0.),
+        animate_state_pack!(item.transform(), item.opacity()),
+        animate_state_pack!(Transform::translation(0., 64.), 0.),
       );
       // items not displayed until the stagger animation is started.
       watch!($read(fly_in).is_running()).filter(|v| *v).take(1).subscribe(move |_| {
