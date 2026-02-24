@@ -90,22 +90,22 @@ pub(super) fn init(classes: &mut Classes) {
       let infinite_animate = @Animate {
         transition: indeterminate_trans(),
         state: keyframes! {
-          state: (
+          state: animate_state_pack!(
             part_writer!(&mut indicator1.flex),
             part_writer!(&mut track1.flex),
             part_writer!(&mut indicator2.flex),
             part_writer!(&mut track2.flex),
           ),
-          15% => (0., 0., 0.15, 0.85),
-          45% => (0., 0.5, 0.5, 0.),
-          55% => (0.15, 0.6, 0.25, 0.),
-          60% => (0.35, 0.65, 0., 0.),
-          60% => (0., 0., 0.35, 0.65),
-          80% => (0., 0.4, 0.6, 0.),
-          95% => (0., 1., 0., 0.),
-          95% => (0., 0., 0., 1.),
+          15% => animate_state_pack!(0., 0., 0.15, 0.85),
+          45% => animate_state_pack!(0., 0.5, 0.5, 0.),
+          55% => animate_state_pack!(0.15, 0.6, 0.25, 0.),
+          60% => animate_state_pack!(0.35, 0.65, 0., 0.),
+          60% => animate_state_pack!(0., 0., 0.35, 0.65),
+          80% => animate_state_pack!(0., 0.4, 0.6, 0.),
+          95% => animate_state_pack!(0., 1., 0., 0.),
+          95% => animate_state_pack!(0., 0., 0., 1.),
         },
-        from: (0., 0., 0., 1.)
+        from: animate_state_pack!(0., 0., 0., 1.)
       };
       infinite_animate.run();
 
@@ -147,9 +147,9 @@ pub(super) fn init(classes: &mut Classes) {
 
       // We use a custom lerp function to calculate the angle without
       // considering if there is a short arc to traverse.
-      LerpFnState::new(part_writer!(&mut indicator.end), lerp_angle)
+      CustomLerpState::from_writer(part_writer!(&mut indicator.end), lerp_angle)
         .transition(DETERMINATE_TRANS);
-      LerpFnState::new(part_writer!(&mut track.start), lerp_angle)
+      CustomLerpState::from_writer(part_writer!(&mut track.start), lerp_angle)
         .transition(DETERMINATE_TRANS);
       let center = md::SIZE_48 / 2.;
       @Stack {
@@ -170,18 +170,21 @@ pub(super) fn init(classes: &mut Classes) {
       let pi = Angle::pi();
       let infinite_animate = @Animate {
         state: keyframes!{
-          state: (part_writer!(&mut indicator.start), part_writer!(&mut indicator.end)),
-          20% => (pi * 0.5, pi * 1.),
-          35% => (pi * 0.75, pi * 1.99),
-          50% => (pi * 1.25, pi * 2.75),
-          50% => (pi * -0.75, pi * 0.75),
-          65% => (pi * 0.24, pi * 1.),
-          80% => (pi * 1.23, pi * 1.5),
-          100% => (pi * 2., pi * 2.1),
-          100% => (pi * 0., pi * 0.1),
+          state: animate_state_pack!(
+            part_writer!(&mut indicator.start),
+            part_writer!(&mut indicator.end)
+          ),
+          20% => animate_state_pack!(pi * 0.5, pi * 1.),
+          35% => animate_state_pack!(pi * 0.75, pi * 1.99),
+          50% => animate_state_pack!(pi * 1.25, pi * 2.75),
+          50% => animate_state_pack!(pi * -0.75, pi * 0.75),
+          65% => animate_state_pack!(pi * 0.24, pi * 1.),
+          80% => animate_state_pack!(pi * 1.23, pi * 1.5),
+          100% => animate_state_pack!(pi * 2., pi * 2.1),
+          100% => animate_state_pack!(pi * 0., pi * 0.1),
         },
         transition: indeterminate_trans(),
-        from: (Angle::zero(), pi * 0.1),
+        from: animate_state_pack!(Angle::zero(), pi * 0.1),
       };
       infinite_animate.run();
       @FatObj {

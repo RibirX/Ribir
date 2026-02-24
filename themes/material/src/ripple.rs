@@ -53,7 +53,7 @@ fn init_ripple_launcher(
   this: &impl StateWriter<Value = Ripple>, layer: &mut FatObj<Stateful<PressedLayer>>,
 ) {
   rdl! {
-    let circle_state = LerpFnState::new(
+    let circle_state = CustomLerpState::from_writer(
       part_writer!(&mut layer.area),
       move |_, to, factor| {
         let LayerArea::Circle { center, radius, constrain_to_bounds } = *to else { unreachable!() };
@@ -61,12 +61,12 @@ fn init_ripple_launcher(
       }
     );
     let ripple_grow = @Animate {
-      state: (circle_state, part_writer!(&mut layer.draw_opacity)),
+      state: animate_state_pack!(circle_state, part_writer!(&mut layer.draw_opacity)),
       transition: EasingTransition {
         easing: md::easing::EMPHASIZED_DECELERATE,
         duration: md::easing::duration::SHORT3,
       },
-      from: (LayerArea::FullContent, 0.),
+      from: animate_state_pack!(LayerArea::FullContent, 0.),
     };
 
     let fade_out = @Animate {

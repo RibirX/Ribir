@@ -61,7 +61,7 @@ pub(super) fn init(classes: &mut Classes) {
 
     fn_widget! {
       let enter = @Animate {
-        state: LerpFnState::new(check.clone_writer(), move |_, _, rate| {
+        state: CustomLerpState::from_writer(check.clone_writer(), move |_, _, rate| {
           let sub_path = sampler.normalized_sub_path(0f32..rate);
           Resource::new(sub_path)
         }),
@@ -90,9 +90,9 @@ pub(super) fn init(classes: &mut Classes) {
         background: BuildCtx::color().on_this_color(BuildCtx::get()),
       };
       let enter = @Animate {
-        state: (icon.width(), icon.height()),
+        state: animate_state_pack!(icon.width(), icon.height()),
         transition: ICON_TRANS,
-        from: (Dimension::Fixed(0_f32.px()), Dimension::Fixed(2_f32.px())),
+        from: animate_state_pack!(Dimension::Fixed(0_f32.px()), Dimension::Fixed(2_f32.px())),
       };
       @(icon) {
         on_mounted: move |_| enter.run(),
