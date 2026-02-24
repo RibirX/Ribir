@@ -2,44 +2,35 @@ use std::{mem::size_of, ops::Range};
 
 use ribir_painter::{Color, Vertex, VertexBuffers};
 
-use super::{shaders::radial_gradient_shader, uniform::Uniform, vertex_buffer::VerticesBuffer};
-use crate::{
-  DrawPhaseLimits, GradientStopPrimitive, MaskLayer, RadialGradientPrimIndex,
-  RadialGradientPrimitive, WgpuTexture,
+use super::{
+  primitive_pool::PrimitivePoolMode, shaders::radial_gradient_shader, uniform::Uniform,
+  vertex_buffer::VerticesBuffer,
 };
+use crate::{DrawPhaseLimits, MaskLayer, RadialGradientPrimIndex, WgpuTexture};
 
 pub struct DrawRadialGradientTrianglesPass {
   vertices_buffer: VerticesBuffer<RadialGradientPrimIndex>,
   pipeline: Option<wgpu::RenderPipeline>,
   shader: wgpu::ShaderModule,
   format: Option<wgpu::TextureFormat>,
-  prims_uniform: Uniform<RadialGradientPrimitive>,
-  stops_uniform: Uniform<GradientStopPrimitive>,
   layout: wgpu::PipelineLayout,
+  current_range: (Range<wgpu::BufferAddress>, Range<wgpu::BufferAddress>),
 }
 
 impl DrawRadialGradientTrianglesPass {
   pub fn new(
     device: &wgpu::Device, mask_layout: &wgpu::BindGroupLayout,
-    texs_layout: &wgpu::BindGroupLayout, limits: &DrawPhaseLimits,
+    texs_layout: &wgpu::BindGroupLayout, slot0_layout: &wgpu::BindGroupLayout,
+    slot1_layout: &wgpu::BindGroupLayout, pool_mode: PrimitivePoolMode, limits: &DrawPhaseLimits,
   ) -> Self {
     let vertices_buffer = VerticesBuffer::new(512, 1024, device);
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
       label: Some("Radial gradient triangles shader"),
-      source: wgpu::ShaderSource::Wgsl(radial_gradient_shader(limits).into()),
+      source: wgpu::ShaderSource::Wgsl(radial_gradient_shader(limits, pool_mode).into()),
     });
-    let prims_storage =
-      Uniform::new(device, wgpu::ShaderStages::FRAGMENT, limits.max_radial_gradient_primitives);
-    let stops_storage =
-      Uniform::new(device, wgpu::ShaderStages::FRAGMENT, limits.max_gradient_stop_primitives);
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       label: Some("update triangles pipeline layout"),
-      bind_group_layouts: &[
-        mask_layout,
-        texs_layout,
-        prims_storage.layout(),
-        stops_storage.layout(),
-      ],
+      bind_group_layouts: &[mask_layout, texs_layout, slot0_layout, slot1_layout],
       immediate_size: 0,
     });
 
@@ -48,35 +39,29 @@ impl DrawRadialGradientTrianglesPass {
       pipeline: None,
       shader,
       format: None,
-      prims_uniform: prims_storage,
-      stops_uniform: stops_storage,
       layout,
+      current_range: (0..0, 0..0),
     }
   }
+
+  pub fn reset(&mut self) { self.vertices_buffer.reset(); }
 
   pub fn load_triangles_vertices(
     &mut self, buffers: &VertexBuffers<RadialGradientPrimIndex>, device: &wgpu::Device,
     queue: &wgpu::Queue,
-  ) {
-    self
+  ) -> Option<()> {
+    self.current_range = self
       .vertices_buffer
-      .write_buffer(buffers, device, queue);
-  }
-  pub fn load_radial_gradient_primitives(
-    &mut self, queue: &wgpu::Queue, primitives: &[RadialGradientPrimitive],
-  ) {
-    self.prims_uniform.write_buffer(queue, primitives);
-  }
-
-  pub fn load_gradient_stops(&mut self, queue: &wgpu::Queue, stops: &[GradientStopPrimitive]) {
-    self.stops_uniform.write_buffer(queue, stops);
+      .write_buffer(buffers, device, queue)?;
+    Some(())
   }
 
   #[allow(clippy::too_many_arguments)]
   pub fn draw_triangles(
     &mut self, texture: &WgpuTexture, indices: Range<u32>, clear: Option<Color>,
     device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, textures_bind: &wgpu::BindGroup,
-    mask_layer_storage: &Uniform<MaskLayer>,
+    mask_layer_storage: &Uniform<MaskLayer>, slot0_bind: &wgpu::BindGroup,
+    slot1_bind: &wgpu::BindGroup, mask_layer_offset: u32, prims_offset: u32, stops_offset: u32,
   ) {
     self.update(texture.format(), device);
     let pipeline = self.pipeline.as_ref().unwrap();
@@ -91,15 +76,28 @@ impl DrawRadialGradientTrianglesPass {
       multiview_mask: None,
     });
 
-    rpass.set_vertex_buffer(0, self.vertices_buffer.vertices().slice(..));
-    rpass.set_index_buffer(self.vertices_buffer.indices().slice(..), wgpu::IndexFormat::Uint32);
-    rpass.set_bind_group(0, mask_layer_storage.bind_group(), &[]);
-    rpass.set_bind_group(1, textures_bind, &[]);
-    rpass.set_bind_group(2, self.prims_uniform.bind_group(), &[]);
-    rpass.set_bind_group(3, self.stops_uniform.bind_group(), &[]);
-
     rpass.set_pipeline(pipeline);
-    rpass.draw_indexed(indices, 0, 0..1);
+    if !indices.is_empty() {
+      rpass.set_vertex_buffer(
+        0,
+        self
+          .vertices_buffer
+          .vertices()
+          .slice(self.current_range.0.clone()),
+      );
+      rpass.set_index_buffer(
+        self
+          .vertices_buffer
+          .indices()
+          .slice(self.current_range.1.clone()),
+        wgpu::IndexFormat::Uint32,
+      );
+      rpass.set_bind_group(0, mask_layer_storage.bind_group(), &[mask_layer_offset]);
+      rpass.set_bind_group(1, textures_bind, &[]);
+      rpass.set_bind_group(2, slot0_bind, &[prims_offset]);
+      rpass.set_bind_group(3, slot1_bind, &[stops_offset]);
+      rpass.draw_indexed(indices, 0, 0..1);
+    }
   }
 
   fn update(&mut self, format: wgpu::TextureFormat, device: &wgpu::Device) {

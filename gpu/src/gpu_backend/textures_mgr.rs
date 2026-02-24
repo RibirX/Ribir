@@ -381,7 +381,8 @@ where
         break;
       };
       let texture = id_to_texture_mut!(self, *tex_id);
-      gpu_impl.draw_alpha_triangles_with_scissor(rg, texture, *clip_rect);
+      let size_offset = gpu_impl.load_alpha_size(texture.size());
+      gpu_impl.draw_alpha_triangles_with_scissor(rg, texture, *clip_rect, size_offset);
       idx += 1;
     }
 
@@ -407,7 +408,8 @@ where
       };
 
       let texture = id_to_texture_mut!(self, *tex_id);
-      gpu_impl.draw_alpha_triangles(&indices, texture);
+      let size_offset = gpu_impl.load_alpha_size(texture.size());
+      gpu_impl.draw_alpha_triangles(&indices, texture, size_offset);
     }
 
     self.tess_task.clear();

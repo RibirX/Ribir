@@ -93,96 +93,101 @@ pub trait GPUBackendImpl {
   /// Draw triangles only alpha channel with 1.0. Caller guarantee the texture
   /// format is `ColorFormat::Alpha8`, caller will try to batch as much as
   /// possible, but also possibly call multi times in a frame.
-  fn draw_alpha_triangles(&mut self, indices: &Range<u32>, texture: &mut Self::Texture);
+  fn draw_alpha_triangles(
+    &mut self, indices: &Range<u32>, texture: &mut Self::Texture, size_offset: u32,
+  );
   /// Same behavior as `draw_alpha_triangles`, but the Vertex with a offset and
   /// gives a clip rectangle for the texture, the path should only painting in
   /// the rectangle.
   fn draw_alpha_triangles_with_scissor(
     &mut self, indices: &Range<u32>, texture: &mut Self::Texture, scissor: DeviceRect,
+    size_offset: u32,
   );
+
+  fn load_alpha_size(&mut self, size: DeviceSize) -> u32;
 
   /// load textures that will be use in this draw phase
   fn load_textures(&mut self, textures: &[&Self::Texture]);
   /// load the mask layers that the current draw phase will use, called at
   /// most once per draw phase.
-  fn load_mask_layers(&mut self, layers: &[MaskLayer]);
+  fn load_mask_layers(&mut self, layers: &[MaskLayer]) -> u32;
   /// Load the vertices and indices buffer that `draw_color_triangles` will
   /// use.
   fn load_color_vertices(&mut self, buffers: &VertexBuffers<ColorAttr>);
   /// Load the vertices and indices buffer that `draw_img_triangles` will use.
-  fn load_img_primitives(&mut self, primitives: &[ImgPrimitive]);
-  /// Load the vertices and indices buffer that `draw_img_triangles` will use.
-  fn load_img_vertices(&mut self, buffers: &VertexBuffers<ImagePrimIndex>);
+  fn load_img_data(
+    &mut self, primitives: &[ImgPrimitive], buffers: &VertexBuffers<ImagePrimIndex>,
+  ) -> u32;
 
-  /// Load the primitives that `draw_radial_gradient_triangles` will use.
-  fn load_radial_gradient_primitives(&mut self, primitives: &[RadialGradientPrimitive]);
-  /// Load the gradient color stops that `draw_radial_gradient_triangles` will
-  /// use.
-  fn load_radial_gradient_stops(&mut self, stops: &[GradientStopPrimitive]);
-  /// Load the vertices and indices buffer that `draw_radial_gradient_triangles`
-  /// will use.
-  fn load_radial_gradient_vertices(&mut self, buffers: &VertexBuffers<RadialGradientPrimIndex>);
+  /// Load the primitives and gradient color stops that
+  /// `draw_radial_gradient_triangles` will use.
+  fn load_radial_gradient_data(
+    &mut self, primitives: &[RadialGradientPrimitive], stops: &[GradientStopPrimitive],
+    buffers: &VertexBuffers<RadialGradientPrimIndex>,
+  ) -> (u32, u32);
 
-  /// Load the primitives that `draw_linear_gradient_triangles` will use.
-  fn load_linear_gradient_primitives(&mut self, primitives: &[LinearGradientPrimitive]);
-  /// Load the gradient color stops that `draw_linear_gradient_triangles` will
-  /// use.
-  fn load_linear_gradient_stops(&mut self, stops: &[GradientStopPrimitive]);
-  /// Load the vertices and indices buffer that `draw_linear_gradient_triangles`
-  /// will use.
-  fn load_linear_gradient_vertices(&mut self, buffers: &VertexBuffers<LinearGradientPrimIndex>);
+  /// Load the primitives and gradient color stops that
+  /// `draw_linear_gradient_triangles` will use.
+  fn load_linear_gradient_data(
+    &mut self, primitives: &[LinearGradientPrimitive], stops: &[GradientStopPrimitive],
+    buffers: &VertexBuffers<LinearGradientPrimIndex>,
+  ) -> (u32, u32);
 
   /// load the filter
-  fn load_filter_primitive(&mut self, primitives: &FilterPrimitive, kernel_matrix: &[f32]);
-
-  /// load the filter vertices
-  fn load_filter_vertices(&mut self, buffers: &VertexBuffers<()>);
+  fn load_filter_data(
+    &mut self, primitives: &FilterPrimitive, kernel_matrix: &[f32], buffers: &VertexBuffers<()>,
+  ) -> u32;
 
   /// Draw pure color triangles in the texture. And use the clear color clear
   /// the texture first if it's a Some-Value
   fn draw_color_triangles(
     &mut self, texture: &mut Self::Texture, indices: Range<u32>, clear: Option<Color>,
+    mask_offset: u32,
   );
   /// Draw triangles fill with image. And use the clear color clear the texture
   /// first if it's a Some-Value
   fn draw_img_triangles(
     &mut self, texture: &mut Self::Texture, indices: Range<u32>, clear: Option<Color>,
+    mask_offset: u32, prims_offset: u32,
   );
 
   fn draw_filter_triangles(
     &mut self, texture: &mut Self::Texture, origin: &Self::Texture, indices: Range<u32>,
-    clear: Option<Color>,
+    clear: Option<Color>, mask_offset: u32, prims_offset: u32,
   );
 
   /// Draw triangles fill with color radial gradient. And use the clear color
   /// clear the texture first if it's a Some-Value
   fn draw_radial_gradient_triangles(
     &mut self, texture: &mut Self::Texture, indices: Range<u32>, clear: Option<Color>,
+    mask_offset: u32, prims_offset: u32, stops_offset: u32,
   );
 
   /// Draw triangles fill with color linear gradient. And use the clear color
   /// clear the texture first if it's a Some-Value
   fn draw_linear_gradient_triangles(
     &mut self, texture: &mut Self::Texture, indices: Range<u32>, clear: Option<Color>,
+    mask_offset: u32, prims_offset: u32, stops_offset: u32,
   );
+
+  /// Flush any pending draw commands to the queue.
+  fn flush_draw_commands(&mut self);
 
   fn copy_texture_from_texture(
     &mut self, dest_tex: &mut Self::Texture, copy_to: DevicePoint, from_tex: &Self::Texture,
     from_rect: &DeviceRect,
   );
 
-  /// Load the vertices and indices buffer that `draw_texture_triangles` will
-  /// use.
-  fn load_texture_vertices(&mut self, buffers: &VertexBuffers<TexturePrimIndex>);
-
-  /// Load the primitives that `draw_texture_triangles` will use.
-  fn load_texture_primitives(&mut self, primitives: &[TexturePrimitive]);
+  /// Load the primitives and vertices that `draw_texture_triangles` will use.
+  fn load_texture_data(
+    &mut self, primitives: &[TexturePrimitive], buffers: &VertexBuffers<TexturePrimIndex>,
+  ) -> u32;
 
   /// Draw triangles fill with texture. And use the clear color clear the
   /// texture first if it's a Some-Value
   fn draw_texture_triangles(
     &mut self, texture: &mut Self::Texture, indices: Range<u32>, clear: Option<Color>,
-    from_texture: &Self::Texture,
+    from_texture: &Self::Texture, mask_offset: u32, prims_offset: u32,
   );
 
   /// A frame end, call once per frame
@@ -381,6 +386,7 @@ pub struct SdfMaskData {
 #[repr(C, packed)]
 #[derive(AsBytes, PartialEq, Clone, Copy, Debug)]
 pub struct FilterPrimitive {
+  pub color_matrix: [f32; 16],
   /// The origin of the image placed in texture.
   /// Used to locate the original image position in the texture.
   pub sample_offset: [f32; 2],
@@ -400,13 +406,12 @@ pub struct FilterPrimitive {
   ///   0
   pub composite: i32,
 
-  /// dummy for align
+  /// Explicit padding to align `base_color` to the 16-byte boundary required
+  /// by WGSL `vec4<f32>`. Do NOT remove — removing this will corrupt the GPU
+  /// struct layout and cause `base_color` to be read as zeros.
   pub dummy: [f32; 2],
   /// the final pix color will be color * color_matrix + base_color
   pub base_color: [f32; 4],
-
-  /// the final pix color will be color * color_matrix + base_color
-  pub color_matrix: [f32; 4 * 4],
 }
 
 #[repr(C, packed)]

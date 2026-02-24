@@ -2,35 +2,37 @@ use std::{mem::size_of, ops::Range};
 
 use ribir_painter::{Color, Vertex, VertexBuffers};
 
-use super::{shaders::img_triangles_shader, uniform::Uniform, vertex_buffer::VerticesBuffer};
-use crate::{DrawPhaseLimits, ImagePrimIndex, ImgPrimitive, MaskLayer, WgpuTexture};
+use super::{
+  primitive_pool::PrimitivePoolMode, shaders::img_triangles_shader, uniform::Uniform,
+  vertex_buffer::VerticesBuffer,
+};
+use crate::{DrawPhaseLimits, ImagePrimIndex, MaskLayer, WgpuTexture};
 
 pub struct DrawImgTrianglesPass {
   vertices_buffer: VerticesBuffer<ImagePrimIndex>,
   layout: wgpu::PipelineLayout,
   pipeline: Option<wgpu::RenderPipeline>,
   shader: wgpu::ShaderModule,
-  prims_uniform: Uniform<ImgPrimitive>,
   format: Option<wgpu::TextureFormat>,
+  current_range: (Range<wgpu::BufferAddress>, Range<wgpu::BufferAddress>),
 }
 
 impl DrawImgTrianglesPass {
   pub fn new(
     device: &wgpu::Device, mask_layout: &wgpu::BindGroupLayout,
-    texs_layout: &wgpu::BindGroupLayout, limits: &DrawPhaseLimits,
+    texs_layout: &wgpu::BindGroupLayout, slot0_layout: &wgpu::BindGroupLayout,
+    slot1_layout: &wgpu::BindGroupLayout, pool_mode: PrimitivePoolMode, limits: &DrawPhaseLimits,
   ) -> Self {
-    let prims_storage =
-      Uniform::new(device, wgpu::ShaderStages::FRAGMENT, limits.max_image_primitives);
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       label: Some("Image pipeline layout"),
-      bind_group_layouts: &[mask_layout, texs_layout, prims_storage.layout()],
+      bind_group_layouts: &[mask_layout, texs_layout, slot0_layout, slot1_layout],
       immediate_size: 0,
     });
 
     let vertices_buffer = VerticesBuffer::new(128, 512, device);
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
       label: Some("Image triangles shader"),
-      source: wgpu::ShaderSource::Wgsl(img_triangles_shader(limits).into()),
+      source: wgpu::ShaderSource::Wgsl(img_triangles_shader(limits, pool_mode).into()),
     });
 
     Self {
@@ -38,28 +40,28 @@ impl DrawImgTrianglesPass {
       layout,
       pipeline: None,
       shader,
-      prims_uniform: prims_storage,
       format: None,
+      current_range: (0..0, 0..0),
     }
   }
 
+  pub fn reset(&mut self) { self.vertices_buffer.reset(); }
+
   pub fn load_triangles_vertices(
     &mut self, buffers: &VertexBuffers<ImagePrimIndex>, device: &wgpu::Device, queue: &wgpu::Queue,
-  ) {
-    self
+  ) -> Option<()> {
+    self.current_range = self
       .vertices_buffer
-      .write_buffer(buffers, device, queue);
-  }
-
-  pub fn load_img_primitives(&mut self, queue: &wgpu::Queue, primitives: &[ImgPrimitive]) {
-    self.prims_uniform.write_buffer(queue, primitives);
+      .write_buffer(buffers, device, queue)?;
+    Some(())
   }
 
   #[allow(clippy::too_many_arguments)]
   pub fn draw_triangles(
     &mut self, texture: &WgpuTexture, indices: Range<u32>, clear: Option<Color>,
     device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, textures_bind: &wgpu::BindGroup,
-    mask_layer_storage: &Uniform<MaskLayer>,
+    mask_layer_storage: &Uniform<MaskLayer>, slot0_bind: &wgpu::BindGroup,
+    slot1_bind: &wgpu::BindGroup, mask_layer_offset: u32, prims_offset: u32,
   ) {
     self.update(texture.format(), device);
     let pipeline = self.pipeline.as_ref().unwrap();
@@ -73,14 +75,28 @@ impl DrawImgTrianglesPass {
       multiview_mask: None,
     });
 
-    rpass.set_vertex_buffer(0, self.vertices_buffer.vertices().slice(..));
-    rpass.set_index_buffer(self.vertices_buffer.indices().slice(..), wgpu::IndexFormat::Uint32);
-    rpass.set_bind_group(0, mask_layer_storage.bind_group(), &[]);
-    rpass.set_bind_group(1, textures_bind, &[]);
-    rpass.set_bind_group(2, self.prims_uniform.bind_group(), &[]);
-
     rpass.set_pipeline(pipeline);
-    rpass.draw_indexed(indices, 0, 0..1);
+    if !indices.is_empty() {
+      rpass.set_vertex_buffer(
+        0,
+        self
+          .vertices_buffer
+          .vertices()
+          .slice(self.current_range.0.clone()),
+      );
+      rpass.set_index_buffer(
+        self
+          .vertices_buffer
+          .indices()
+          .slice(self.current_range.1.clone()),
+        wgpu::IndexFormat::Uint32,
+      );
+      rpass.set_bind_group(0, mask_layer_storage.bind_group(), &[mask_layer_offset]);
+      rpass.set_bind_group(1, textures_bind, &[]);
+      rpass.set_bind_group(2, slot0_bind, &[prims_offset]);
+      rpass.set_bind_group(3, slot1_bind, &[0]);
+      rpass.draw_indexed(indices, 0, 0..1);
+    }
   }
 
   fn update(&mut self, format: wgpu::TextureFormat, device: &wgpu::Device) {

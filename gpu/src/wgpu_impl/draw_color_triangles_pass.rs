@@ -11,12 +11,14 @@ pub struct DrawColorTrianglesPass {
   pipeline: Option<wgpu::RenderPipeline>,
   shader: wgpu::ShaderModule,
   format: Option<wgpu::TextureFormat>,
+  current_range: (Range<wgpu::BufferAddress>, Range<wgpu::BufferAddress>),
 }
 
 impl DrawColorTrianglesPass {
   pub fn new(
     device: &wgpu::Device, mask_layout: &wgpu::BindGroupLayout,
-    texs_layout: &wgpu::BindGroupLayout, max_mask_layers: usize,
+    texs_layout: &wgpu::BindGroupLayout, slot0_layout: &wgpu::BindGroupLayout,
+    slot1_layout: &wgpu::BindGroupLayout, max_mask_layers: usize,
   ) -> Self {
     let vertices_buffer = VerticesBuffer::new(512, 1024, device);
 
@@ -26,26 +28,37 @@ impl DrawColorTrianglesPass {
     });
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       label: Some("Color triangles pipeline layout"),
-      bind_group_layouts: &[mask_layout, texs_layout],
+      bind_group_layouts: &[mask_layout, texs_layout, slot0_layout, slot1_layout],
       immediate_size: 0,
     });
 
-    Self { layout, vertices_buffer, pipeline: None, shader, format: None }
+    Self {
+      layout,
+      vertices_buffer,
+      pipeline: None,
+      shader,
+      format: None,
+      current_range: (0..0, 0..0),
+    }
   }
+
+  pub fn reset(&mut self) { self.vertices_buffer.reset(); }
 
   pub fn load_triangles_vertices(
     &mut self, buffers: &VertexBuffers<ColorAttr>, device: &wgpu::Device, queue: &wgpu::Queue,
-  ) {
-    self
+  ) -> Option<()> {
+    self.current_range = self
       .vertices_buffer
-      .write_buffer(buffers, device, queue);
+      .write_buffer(buffers, device, queue)?;
+    Some(())
   }
 
   #[allow(clippy::too_many_arguments)]
   pub fn draw_triangles(
     &mut self, texture: &WgpuTexture, indices: Range<u32>, clear: Option<Color>,
     device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, textures_bind: &wgpu::BindGroup,
-    mask_layer_storage: &Uniform<MaskLayer>,
+    mask_layer_storage: &Uniform<MaskLayer>, slot0_bind: &wgpu::BindGroup,
+    slot1_bind: &wgpu::BindGroup, mask_layer_offset: u32,
   ) {
     self.update(texture.format(), device);
     let pipeline = self.pipeline.as_ref().unwrap();
@@ -60,13 +73,28 @@ impl DrawColorTrianglesPass {
       multiview_mask: None,
     });
 
-    rpass.set_vertex_buffer(0, self.vertices_buffer.vertices().slice(..));
-    rpass.set_index_buffer(self.vertices_buffer.indices().slice(..), wgpu::IndexFormat::Uint32);
-    rpass.set_bind_group(0, mask_layer_storage.bind_group(), &[]);
-    rpass.set_bind_group(1, textures_bind, &[]);
-
     rpass.set_pipeline(pipeline);
-    rpass.draw_indexed(indices, 0, 0..1);
+    if !indices.is_empty() {
+      rpass.set_vertex_buffer(
+        0,
+        self
+          .vertices_buffer
+          .vertices()
+          .slice(self.current_range.0.clone()),
+      );
+      rpass.set_index_buffer(
+        self
+          .vertices_buffer
+          .indices()
+          .slice(self.current_range.1.clone()),
+        wgpu::IndexFormat::Uint32,
+      );
+      rpass.set_bind_group(0, mask_layer_storage.bind_group(), &[mask_layer_offset]);
+      rpass.set_bind_group(1, textures_bind, &[]);
+      rpass.set_bind_group(2, slot0_bind, &[0]);
+      rpass.set_bind_group(3, slot1_bind, &[0]);
+      rpass.draw_indexed(indices, 0, 0..1);
+    }
   }
 
   fn update(&mut self, format: wgpu::TextureFormat, device: &wgpu::Device) {

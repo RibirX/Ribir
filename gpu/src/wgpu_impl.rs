@@ -8,7 +8,9 @@ use ahash::HashSet;
 use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
 use ribir_painter::{Color, ColorFormat, PixelImage, VertexBuffers};
 use tokio::sync::oneshot;
+use tracing::debug;
 use wgpu::TextureFormat;
+use zerocopy::AsBytes;
 
 use self::{
   draw_alpha_triangles_pass::DrawAlphaTrianglesPass,
@@ -16,6 +18,7 @@ use self::{
   draw_img_triangles_pass::DrawImgTrianglesPass,
   draw_linear_gradient_pass::DrawLinearGradientTrianglesPass,
   draw_radial_gradient_pass::DrawRadialGradientTrianglesPass,
+  primitive_pool::{PrimitivePool, PrimitivePoolMode},
   texture_pass::{ClearTexturePass, CopyTexturePass},
   uniform::Uniform,
 };
@@ -26,6 +29,7 @@ use crate::{
   gpu_backend::Texture,
   wgpu_impl::{draw_filter_pass::DrawFilterPass, draw_texture_pass::DrawTexturePass},
 };
+mod primitive_pool;
 mod shaders;
 mod uniform;
 mod vertex_buffer;
@@ -61,6 +65,13 @@ pub struct WgpuImpl {
   texs_layout: wgpu::BindGroupLayout,
   textures_bind: Option<wgpu::BindGroup>,
   mask_layers_uniform: Uniform<MaskLayer>,
+  slot0_pool: PrimitivePool,
+  slot1_pool: PrimitivePool,
+  /// Mode for draw passes that use both slot0 (primitives) and slot1 (stops):
+  /// color, radial-gradient, linear-gradient.
+  dual_slot_mode: PrimitivePoolMode,
+  /// Mode for draw passes that use only slot0: img, filter, texture.
+  slot0_only_mode: PrimitivePoolMode,
   limits: DrawPhaseLimits,
   surface_format: Option<wgpu::TextureFormat>,
 }
@@ -75,7 +86,10 @@ macro_rules! command_encoder {
   };
 }
 macro_rules! color_pass {
-  ($backend:ident) => {
+  ($backend:ident) => {{
+    let slot0_layout = $backend.slot0_pool.layout();
+    let slot1_layout = $backend.slot1_pool.layout();
+
     $backend
       .color_triangles_pass
       .get_or_insert_with(|| {
@@ -83,14 +97,18 @@ macro_rules! color_pass {
           &$backend.device,
           $backend.mask_layers_uniform.layout(),
           &$backend.texs_layout,
+          slot0_layout,
+          slot1_layout,
           $backend.limits.max_mask_layers,
         )
       })
-  };
+  }};
 }
 
 macro_rules! img_pass {
-  ($backend:ident) => {
+  ($backend:ident) => {{
+    let slot0_layout = $backend.slot0_pool.layout();
+
     $backend
       .img_triangles_pass
       .get_or_insert_with(|| {
@@ -98,14 +116,20 @@ macro_rules! img_pass {
           &$backend.device,
           $backend.mask_layers_uniform.layout(),
           &$backend.texs_layout,
+          slot0_layout,
+          $backend.slot1_pool.layout(),
+          $backend.slot0_only_mode,
           &$backend.limits,
         )
       })
-  };
+  }};
 }
 
 macro_rules! radial_gradient_pass {
-  ($backend:ident) => {
+  ($backend:ident) => {{
+    let slot0_layout = $backend.slot0_pool.layout();
+    let slot1_layout = $backend.slot1_pool.layout();
+
     $backend
       .radial_gradient_pass
       .get_or_insert_with(|| {
@@ -113,14 +137,20 @@ macro_rules! radial_gradient_pass {
           &$backend.device,
           $backend.mask_layers_uniform.layout(),
           &$backend.texs_layout,
+          slot0_layout,
+          slot1_layout,
+          $backend.dual_slot_mode,
           &$backend.limits,
         )
       })
-  };
+  }};
 }
 
 macro_rules! linear_gradient_pass {
-  ($backend:ident) => {
+  ($backend:ident) => {{
+    let slot0_layout = $backend.slot0_pool.layout();
+    let slot1_layout = $backend.slot1_pool.layout();
+
     $backend
       .linear_gradient_pass
       .get_or_insert_with(|| {
@@ -128,36 +158,47 @@ macro_rules! linear_gradient_pass {
           &$backend.device,
           $backend.mask_layers_uniform.layout(),
           &$backend.texs_layout,
+          slot0_layout,
+          slot1_layout,
+          $backend.dual_slot_mode,
           &$backend.limits,
         )
       })
-  };
+  }};
 }
 
 macro_rules! filter_pass {
-  ($backend:ident) => {
+  ($backend:ident) => {{
+    let slot0_layout = $backend.slot0_pool.layout();
+
     $backend.filter_pass.get_or_insert_with(|| {
       DrawFilterPass::new(
         &$backend.device,
         $backend.mask_layers_uniform.layout(),
         &$backend.texs_layout,
+        slot0_layout,
+        $backend.slot0_only_mode,
         &$backend.limits,
       )
     })
-  };
+  }};
 }
 
 macro_rules! draw_texture_pass {
-  ($backend:ident) => {
+  ($backend:ident) => {{
+    let slot0_layout = $backend.slot0_pool.layout();
+
     $backend.draw_texture_pass.get_or_insert_with(|| {
       DrawTexturePass::new(
         &$backend.device,
         $backend.mask_layers_uniform.layout(),
         &$backend.texs_layout,
+        slot0_layout,
+        $backend.slot0_only_mode,
         &$backend.limits,
       )
     })
-  };
+  }};
 }
 
 pub(crate) use command_encoder;
@@ -191,6 +232,232 @@ impl WgpuImpl {
     let tex = self.device.create_texture(texture_descriptor);
     WgpuTexture::from_tex(tex)
   }
+
+  fn atomic_flush(&mut self) { self.flush_and_reset(); }
+
+  fn load_or_atomic_flush<T, F>(&mut self, mut load: F) -> T
+  where
+    F: FnMut(&mut Self) -> Option<T>,
+  {
+    if let Some(v) = load(self) {
+      return v;
+    }
+
+    self.atomic_flush();
+    let retried = load(self);
+    debug_assert!(retried.is_some(), "load_or_atomic_flush retry failed after flush");
+    retried.unwrap_or_else(|| panic!("load_or_atomic_flush retry failed after flush"))
+  }
+
+  /// Reset offsets for draw passes and primitive pools.
+  /// Note: does NOT reset `mask_layers_uniform`, which is managed
+  /// separately by `load_mask_layers` and `begin_frame`.
+  fn reset_draw_offsets(&mut self) {
+    self.reset_core_offsets();
+    self.reset_optional_pass_offsets();
+  }
+
+  fn flush_and_reset(&mut self) {
+    self.submit();
+    self.reset_draw_offsets();
+  }
+
+  fn reset_core_offsets(&mut self) {
+    self.alpha_triangles_pass.reset();
+    self.slot0_pool.reset();
+    self.slot1_pool.reset();
+  }
+
+  fn reset_optional_pass_offsets(&mut self) {
+    if let Some(p) = self.color_triangles_pass.as_mut() {
+      p.reset();
+    }
+    if let Some(p) = self.img_triangles_pass.as_mut() {
+      p.reset();
+    }
+    if let Some(p) = self.radial_gradient_pass.as_mut() {
+      p.reset();
+    }
+    if let Some(p) = self.linear_gradient_pass.as_mut() {
+      p.reset();
+    }
+    if let Some(p) = self.filter_pass.as_mut() {
+      p.reset();
+    }
+    if let Some(p) = self.draw_texture_pass.as_mut() {
+      p.reset();
+    }
+  }
+
+  fn try_load_alpha_vertices(&mut self, buffers: &VertexBuffers<()>) -> Option<()> {
+    self
+      .alpha_triangles_pass
+      .load_alpha_vertices(buffers, &self.device, &self.queue)
+  }
+
+  fn try_load_alpha_size(&mut self, size: DeviceSize) -> Option<u32> {
+    self
+      .alpha_triangles_pass
+      .load_size(&self.queue, size.to_u32().to_array())
+  }
+
+  fn try_load_color_vertices(&mut self, buffers: &VertexBuffers<ColorAttr>) -> Option<()> {
+    color_pass!(self).load_triangles_vertices(buffers, &self.device, &self.queue)
+  }
+
+  fn try_load_img_vertices(&mut self, buffers: &VertexBuffers<ImagePrimIndex>) -> Option<()> {
+    img_pass!(self).load_triangles_vertices(buffers, &self.device, &self.queue)
+  }
+
+  fn try_load_img_primitives(&mut self, primitives: &[ImgPrimitive]) -> Option<u32> {
+    self
+      .slot0_pool
+      .write_typed_slice(&self.queue, primitives)
+      .map(|slice| {
+        let _ = self.slot0_pool.index_base(slice);
+        self.slot0_pool.resolve_load_offset(slice)
+      })
+  }
+
+  fn try_load_slot0_img_primitives(&mut self, primitives: &[ImgPrimitive]) -> Option<u32> {
+    self.try_load_img_primitives(primitives)
+  }
+
+  fn try_load_filter_vertices(&mut self, buffers: &VertexBuffers<()>) -> Option<()> {
+    filter_pass!(self).load_triangles_vertices(buffers, &self.device, &self.queue)
+  }
+
+  fn try_load_radial_gradient_primitives(
+    &mut self, primitives: &[RadialGradientPrimitive],
+  ) -> Option<u32> {
+    self
+      .slot0_pool
+      .write_typed_slice(&self.queue, primitives)
+      .map(|slice| {
+        let _ = self.slot0_pool.index_base(slice);
+        self.slot0_pool.resolve_load_offset(slice)
+      })
+  }
+
+  fn try_load_slot0_radial_gradient_primitives(
+    &mut self, primitives: &[RadialGradientPrimitive],
+  ) -> Option<u32> {
+    self.try_load_radial_gradient_primitives(primitives)
+  }
+
+  fn try_load_radial_gradient_stops(&mut self, stops: &[GradientStopPrimitive]) -> Option<u32> {
+    self
+      .slot1_pool
+      .write_typed_slice(&self.queue, stops)
+      .map(|slice| {
+        let _ = self.slot1_pool.index_base(slice);
+        self.slot1_pool.resolve_load_offset(slice)
+      })
+  }
+
+  fn try_load_slot1_radial_gradient_stops(
+    &mut self, stops: &[GradientStopPrimitive],
+  ) -> Option<u32> {
+    self.try_load_radial_gradient_stops(stops)
+  }
+
+  fn try_load_radial_gradient_vertices(
+    &mut self, buffers: &VertexBuffers<RadialGradientPrimIndex>,
+  ) -> Option<()> {
+    radial_gradient_pass!(self).load_triangles_vertices(buffers, &self.device, &self.queue)
+  }
+
+  fn try_load_linear_gradient_primitives(
+    &mut self, primitives: &[LinearGradientPrimitive],
+  ) -> Option<u32> {
+    self
+      .slot0_pool
+      .write_typed_slice(&self.queue, primitives)
+      .map(|slice| {
+        let _ = self.slot0_pool.index_base(slice);
+        self.slot0_pool.resolve_load_offset(slice)
+      })
+  }
+
+  fn try_load_slot0_linear_gradient_primitives(
+    &mut self, primitives: &[LinearGradientPrimitive],
+  ) -> Option<u32> {
+    self.try_load_linear_gradient_primitives(primitives)
+  }
+
+  fn try_load_linear_gradient_stops(&mut self, stops: &[GradientStopPrimitive]) -> Option<u32> {
+    self
+      .slot1_pool
+      .write_typed_slice(&self.queue, stops)
+      .map(|slice| {
+        let _ = self.slot1_pool.index_base(slice);
+        self.slot1_pool.resolve_load_offset(slice)
+      })
+  }
+
+  fn try_load_slot1_linear_gradient_stops(
+    &mut self, stops: &[GradientStopPrimitive],
+  ) -> Option<u32> {
+    self.try_load_linear_gradient_stops(stops)
+  }
+
+  fn try_load_linear_gradient_vertices(
+    &mut self, buffers: &VertexBuffers<LinearGradientPrimIndex>,
+  ) -> Option<()> {
+    linear_gradient_pass!(self).load_triangles_vertices(buffers, &self.device, &self.queue)
+  }
+
+  fn try_load_filter_primitive(
+    &mut self, primitive: &FilterPrimitive, kernel_matrix: &[f32],
+  ) -> Option<u32> {
+    let total_bytes = (size_of::<FilterPrimitive>() + std::mem::size_of_val(kernel_matrix)) as u64;
+    if self.slot0_pool.needs_flush(total_bytes) {
+      return None;
+    }
+    self
+      .slot0_pool
+      .write_at(&self.queue, 0, primitive.as_bytes());
+    self.slot0_pool.write_at(
+      &self.queue,
+      size_of::<FilterPrimitive>() as u64,
+      kernel_matrix.as_bytes(),
+    );
+    Some(self.slot0_pool.advance(total_bytes))
+  }
+
+  fn try_load_slot0_filter_primitive(
+    &mut self, primitive: &FilterPrimitive, kernel_matrix: &[f32],
+  ) -> Option<u32> {
+    self.try_load_filter_primitive(primitive, kernel_matrix)
+  }
+
+  fn try_load_mask_layers(&mut self, layers: &[crate::MaskLayer]) -> Option<u32> {
+    self
+      .mask_layers_uniform
+      .write_buffer(&self.queue, layers)
+  }
+
+  fn try_load_group0_mask_layers(&mut self, layers: &[crate::MaskLayer]) -> Option<u32> {
+    self.try_load_mask_layers(layers)
+  }
+
+  fn try_load_texture_vertices(&mut self, buffers: &VertexBuffers<TexturePrimIndex>) -> Option<()> {
+    draw_texture_pass!(self).load_triangles_vertices(buffers, &self.device, &self.queue)
+  }
+
+  fn try_load_texture_primitives(&mut self, primitives: &[TexturePrimitive]) -> Option<u32> {
+    self
+      .slot0_pool
+      .write_typed_slice(&self.queue, primitives)
+      .map(|slice| {
+        let _ = self.slot0_pool.index_base(slice);
+        self.slot0_pool.resolve_load_offset(slice)
+      })
+  }
+
+  fn try_load_slot0_texture_primitives(&mut self, primitives: &[TexturePrimitive]) -> Option<u32> {
+    self.try_load_texture_primitives(primitives)
+  }
 }
 
 impl GPUBackendImpl for WgpuImpl {
@@ -199,6 +466,9 @@ impl GPUBackendImpl for WgpuImpl {
   fn limits(&self) -> &DrawPhaseLimits { &self.limits }
 
   fn begin_frame(&mut self) {
+    self.reset_draw_offsets();
+    self.mask_layers_uniform.reset();
+
     if self.command_encoder.is_none() {
       #[cfg(debug_assertions)]
       self.start_capture();
@@ -221,72 +491,112 @@ impl GPUBackendImpl for WgpuImpl {
   }
 
   fn load_alpha_vertices(&mut self, buffers: &VertexBuffers<()>) {
-    self
-      .alpha_triangles_pass
-      .load_alpha_vertices(buffers, &self.device, &self.queue);
+    self.load_or_atomic_flush(|backend| backend.try_load_alpha_vertices(buffers));
+  }
+
+  fn load_alpha_size(&mut self, size: DeviceSize) -> u32 {
+    self.load_or_atomic_flush(|backend| backend.try_load_alpha_size(size))
   }
 
   fn load_color_vertices(&mut self, buffers: &VertexBuffers<ColorAttr>) {
-    color_pass!(self).load_triangles_vertices(buffers, &self.device, &self.queue);
+    self.load_or_atomic_flush(|backend| backend.try_load_color_vertices(buffers));
   }
 
-  fn load_img_vertices(&mut self, buffers: &VertexBuffers<ImagePrimIndex>) {
-    img_pass!(self).load_triangles_vertices(buffers, &self.device, &self.queue);
+  fn load_img_data(
+    &mut self, primitives: &[ImgPrimitive], buffers: &VertexBuffers<ImagePrimIndex>,
+  ) -> u32 {
+    let load = |b: &mut Self| {
+      let offset = b.try_load_slot0_img_primitives(primitives)?;
+      b.try_load_img_vertices(buffers)?;
+      Some(offset)
+    };
+    if let Some(offset) = load(self) {
+      return offset;
+    }
+    self.atomic_flush();
+    load(self).unwrap()
   }
 
-  fn load_img_primitives(&mut self, primitives: &[ImgPrimitive]) {
-    img_pass!(self).load_img_primitives(&self.queue, primitives);
+  fn load_radial_gradient_data(
+    &mut self, primitives: &[RadialGradientPrimitive], stops: &[GradientStopPrimitive],
+    buffers: &VertexBuffers<RadialGradientPrimIndex>,
+  ) -> (u32, u32) {
+    let load = |b: &mut Self| {
+      let p_offset = b.try_load_slot0_radial_gradient_primitives(primitives)?;
+      let s_offset = b.try_load_slot1_radial_gradient_stops(stops)?;
+      b.try_load_radial_gradient_vertices(buffers)?;
+      Some((p_offset, s_offset))
+    };
+    if let Some(offsets) = load(self) {
+      return offsets;
+    }
+    self.atomic_flush();
+    load(self).unwrap()
   }
 
-  fn load_filter_vertices(&mut self, buffers: &VertexBuffers<()>) {
-    filter_pass!(self).load_triangles_vertices(buffers, &self.device, &self.queue);
+  fn load_linear_gradient_data(
+    &mut self, primitives: &[LinearGradientPrimitive], stops: &[GradientStopPrimitive],
+    buffers: &VertexBuffers<LinearGradientPrimIndex>,
+  ) -> (u32, u32) {
+    let load = |b: &mut Self| {
+      let p_offset = b.try_load_slot0_linear_gradient_primitives(primitives)?;
+      let s_offset = b.try_load_slot1_linear_gradient_stops(stops)?;
+      b.try_load_linear_gradient_vertices(buffers)?;
+      Some((p_offset, s_offset))
+    };
+    if let Some(offsets) = load(self) {
+      return offsets;
+    }
+    self.atomic_flush();
+    load(self).unwrap()
   }
 
-  fn load_radial_gradient_primitives(&mut self, primitives: &[RadialGradientPrimitive]) {
-    radial_gradient_pass!(self).load_radial_gradient_primitives(&self.queue, primitives);
+  fn load_filter_data(
+    &mut self, primitive: &FilterPrimitive, kernel_matrix: &[f32], buffers: &VertexBuffers<()>,
+  ) -> u32 {
+    let load = |b: &mut Self| {
+      let offset = b.try_load_slot0_filter_primitive(primitive, kernel_matrix)?;
+      b.try_load_filter_vertices(buffers)?;
+      Some(offset)
+    };
+    if let Some(offset) = load(self) {
+      return offset;
+    }
+    self.atomic_flush();
+    load(self).unwrap()
   }
 
-  fn load_radial_gradient_stops(&mut self, stops: &[GradientStopPrimitive]) {
-    radial_gradient_pass!(self).load_gradient_stops(&self.queue, stops);
+  fn load_mask_layers(&mut self, layers: &[crate::MaskLayer]) -> u32 {
+    let load = |b: &mut Self| b.try_load_group0_mask_layers(layers);
+    if let Some(offset) = load(self) {
+      return offset;
+    }
+
+    self.atomic_flush();
+    self.mask_layers_uniform.reset();
+    load(self).unwrap()
   }
 
-  fn load_radial_gradient_vertices(&mut self, buffers: &VertexBuffers<RadialGradientPrimIndex>) {
-    radial_gradient_pass!(self).load_triangles_vertices(buffers, &self.device, &self.queue);
-  }
-
-  fn load_linear_gradient_primitives(&mut self, primitives: &[LinearGradientPrimitive]) {
-    linear_gradient_pass!(self).load_linear_gradient_primitives(&self.queue, primitives);
-  }
-
-  fn load_linear_gradient_stops(&mut self, stops: &[GradientStopPrimitive]) {
-    linear_gradient_pass!(self).load_gradient_stops(&self.queue, stops);
-  }
-
-  fn load_linear_gradient_vertices(&mut self, buffers: &VertexBuffers<LinearGradientPrimIndex>) {
-    linear_gradient_pass!(self).load_triangles_vertices(buffers, &self.device, &self.queue);
-  }
-
-  fn load_filter_primitive(&mut self, primitive: &FilterPrimitive, kernel_matrix: &[f32]) {
-    filter_pass!(self).load_filter_primitive(&self.queue, primitive, kernel_matrix);
-  }
-
-  fn load_mask_layers(&mut self, layers: &[crate::MaskLayer]) {
-    self
-      .mask_layers_uniform
-      .write_buffer(&self.queue, layers);
-  }
-
-  fn draw_alpha_triangles(&mut self, indices: &Range<u32>, texture: &mut Self::Texture) {
+  fn draw_alpha_triangles(
+    &mut self, indices: &Range<u32>, texture: &mut Self::Texture, size_offset: u32,
+  ) {
     let encoder = command_encoder!(self);
-    self
-      .alpha_triangles_pass
-      .draw_alpha_triangles(indices, texture, None, &self.queue, encoder);
-    self.submit();
+    self.alpha_triangles_pass.draw_alpha_triangles(
+      indices,
+      texture,
+      None,
+      &self.queue,
+      encoder,
+      size_offset,
+    );
   }
 
   fn draw_radial_gradient_triangles(
     &mut self, texture: &mut Self::Texture, indices: Range<u32>, clear: Option<Color>,
+    mask_offset: u32, prims_offset: u32, stops_offset: u32,
   ) {
+    let slot0_bind = self.slot0_pool.bind_group();
+    let slot1_bind = self.slot1_pool.bind_group();
     let encoder = command_encoder!(self);
 
     radial_gradient_pass!(self).draw_triangles(
@@ -297,14 +607,20 @@ impl GPUBackendImpl for WgpuImpl {
       encoder,
       self.textures_bind.as_ref().unwrap(),
       &self.mask_layers_uniform,
+      slot0_bind,
+      slot1_bind,
+      mask_offset,
+      self.slot0_pool.bind_offset(prims_offset),
+      self.slot1_pool.bind_offset(stops_offset),
     );
-
-    self.submit()
   }
 
   fn draw_linear_gradient_triangles(
     &mut self, texture: &mut Self::Texture, indices: Range<u32>, clear: Option<Color>,
+    mask_offset: u32, prims_offset: u32, stops_offset: u32,
   ) {
+    let slot0_bind = self.slot0_pool.bind_group();
+    let slot1_bind = self.slot1_pool.bind_group();
     let encoder = command_encoder!(self);
 
     linear_gradient_pass!(self).draw_triangles(
@@ -315,13 +631,17 @@ impl GPUBackendImpl for WgpuImpl {
       encoder,
       self.textures_bind.as_ref().unwrap(),
       &self.mask_layers_uniform,
+      slot0_bind,
+      slot1_bind,
+      mask_offset,
+      self.slot0_pool.bind_offset(prims_offset),
+      self.slot1_pool.bind_offset(stops_offset),
     );
-
-    self.submit()
   }
 
   fn draw_alpha_triangles_with_scissor(
     &mut self, indices: &Range<u32>, texture: &mut Self::Texture, scissor: DeviceRect,
+    size_offset: u32,
   ) {
     let encoder = command_encoder!(self);
     self.alpha_triangles_pass.draw_alpha_triangles(
@@ -330,14 +650,18 @@ impl GPUBackendImpl for WgpuImpl {
       Some(scissor),
       &self.queue,
       encoder,
+      size_offset,
     );
-    self.submit();
   }
 
   fn draw_color_triangles(
     &mut self, texture: &mut Self::Texture, indices: Range<u32>, clear: Option<Color>,
+    mask_offset: u32,
   ) {
+    let slot0_bind = self.slot0_pool.bind_group();
+    let slot1_bind = self.slot1_pool.bind_group();
     let encoder = command_encoder!(self);
+
     color_pass!(self).draw_triangles(
       texture,
       indices,
@@ -346,14 +670,19 @@ impl GPUBackendImpl for WgpuImpl {
       encoder,
       self.textures_bind.as_ref().unwrap(),
       &self.mask_layers_uniform,
+      slot0_bind,
+      slot1_bind,
+      mask_offset,
     );
-    self.submit()
   }
 
   fn draw_img_triangles(
     &mut self, texture: &mut Self::Texture, indices: Range<u32>, clear: Option<Color>,
+    mask_offset: u32, prims_offset: u32,
   ) {
+    let slot0_bind = self.slot0_pool.bind_group();
     let encoder = command_encoder!(self);
+
     img_pass!(self).draw_triangles(
       texture,
       indices,
@@ -362,15 +691,20 @@ impl GPUBackendImpl for WgpuImpl {
       encoder,
       self.textures_bind.as_ref().unwrap(),
       &self.mask_layers_uniform,
+      slot0_bind,
+      self.slot1_pool.bind_group(),
+      mask_offset,
+      self.slot0_pool.bind_offset(prims_offset),
     );
-    self.submit()
   }
 
   fn draw_filter_triangles(
     &mut self, texture: &mut Self::Texture, origin: &Self::Texture, indices: Range<u32>,
-    clear: Option<Color>,
+    clear: Option<Color>, mask_offset: u32, prims_offset: u32,
   ) {
+    let slot0_bind = self.slot0_pool.bind_group();
     let encoder = command_encoder!(self);
+
     filter_pass!(self).draw_triangles(
       texture,
       origin,
@@ -380,9 +714,13 @@ impl GPUBackendImpl for WgpuImpl {
       encoder,
       self.textures_bind.as_ref().unwrap(),
       &self.mask_layers_uniform,
+      slot0_bind,
+      mask_offset,
+      self.slot0_pool.bind_offset(prims_offset),
     );
-    self.submit();
   }
+
+  fn flush_draw_commands(&mut self) { self.submit(); }
 
   fn copy_texture_from_texture(
     &mut self, dest_tex: &mut Self::Texture, dist_pos: DevicePoint, from_tex: &Self::Texture,
@@ -400,19 +738,28 @@ impl GPUBackendImpl for WgpuImpl {
     }
   }
 
-  fn load_texture_vertices(&mut self, buffers: &VertexBuffers<TexturePrimIndex>) {
-    draw_texture_pass!(self).load_triangles_vertices(buffers, &self.device, &self.queue);
-  }
-
-  fn load_texture_primitives(&mut self, primitives: &[TexturePrimitive]) {
-    draw_texture_pass!(self).load_texture_primitives(&self.queue, primitives);
+  fn load_texture_data(
+    &mut self, primitives: &[TexturePrimitive], buffers: &VertexBuffers<TexturePrimIndex>,
+  ) -> u32 {
+    let load = |b: &mut Self| {
+      let offset = b.try_load_slot0_texture_primitives(primitives)?;
+      b.try_load_texture_vertices(buffers)?;
+      Some(offset)
+    };
+    if let Some(offset) = load(self) {
+      return offset;
+    }
+    self.atomic_flush();
+    load(self).unwrap()
   }
 
   fn draw_texture_triangles(
     &mut self, texture: &mut Self::Texture, indices: Range<u32>, clear: Option<Color>,
-    from_texture: &Self::Texture,
+    from_texture: &Self::Texture, mask_offset: u32, prims_offset: u32,
   ) {
+    let slot0_bind = self.slot0_pool.bind_group();
     let encoder = command_encoder!(self);
+
     draw_texture_pass!(self).draw_triangles(
       texture,
       indices,
@@ -421,9 +768,11 @@ impl GPUBackendImpl for WgpuImpl {
       encoder,
       self.textures_bind.as_ref().unwrap(),
       &self.mask_layers_uniform,
+      slot0_bind,
+      mask_offset,
+      self.slot0_pool.bind_offset(prims_offset),
       from_texture,
     );
-    self.submit();
   }
 
   fn end_frame(&mut self) {
@@ -614,7 +963,14 @@ impl Texture for WgpuTexture {
 
     let (sender, receiver) = oneshot::channel();
     let slice = buffer.slice(..);
-    slice.map_async(wgpu::MapMode::Read, move |v| sender.send(v).unwrap());
+    slice.map_async(wgpu::MapMode::Read, move |v| {
+      let _ = sender.send(v);
+    });
+
+    backend
+      .device
+      .poll(wgpu::PollType::Wait { submission_index: None, timeout: None })
+      .unwrap();
 
     // Capture texture format for color conversion logic
     let texture_format = self.format();
@@ -750,13 +1106,13 @@ impl WgpuImpl {
 
     let alpha_triangles_pass = DrawAlphaTrianglesPass::new(&device);
 
-    let limits = device.limits();
-    let uniform_bytes = limits
+    let device_limits = device.limits();
+    let uniform_bytes = device_limits
       .max_uniform_buffer_binding_size
       .min(1024 * 1024) as usize;
     let texture_size_limit = DeviceSize::new(
-      limits.max_texture_dimension_2d as i32,
-      limits.max_texture_dimension_2d as i32,
+      device_limits.max_texture_dimension_2d as i32,
+      device_limits.max_texture_dimension_2d as i32,
     );
 
     let max_filter_matrix_len = (((uniform_bytes - size_of::<FilterPrimitive>()) & 0xFFFFFF00)
@@ -777,17 +1133,51 @@ impl WgpuImpl {
 
     let mask_layers_uniform =
       Uniform::new(&device, wgpu::ShaderStages::FRAGMENT, limits.max_mask_layers);
+    let can_prepare_storage_pool =
+      device_limits.max_storage_buffer_binding_size >= uniform_bytes as u32;
+    debug!("primitive pool mode: can_use_storage={can_prepare_storage_pool}");
+    let (slot0_pool, slot1_pool) = if can_prepare_storage_pool {
+      (
+        PrimitivePool::new_storage(
+          &device,
+          wgpu::ShaderStages::FRAGMENT,
+          uniform_bytes,
+          uniform_bytes * 16,
+        ),
+        PrimitivePool::new_storage(
+          &device,
+          wgpu::ShaderStages::FRAGMENT,
+          uniform_bytes,
+          uniform_bytes * 16,
+        ),
+      )
+    } else {
+      (
+        PrimitivePool::new_uniform(
+          &device,
+          wgpu::ShaderStages::FRAGMENT,
+          uniform_bytes,
+          uniform_bytes * 16,
+        ),
+        PrimitivePool::new_uniform(
+          &device,
+          wgpu::ShaderStages::FRAGMENT,
+          uniform_bytes,
+          uniform_bytes * 16,
+        ),
+      )
+    };
+    let dual_slot_mode = slot0_pool.mode();
+    let slot0_only_mode = slot0_pool.mode();
     let clear_tex_pass = ClearTexturePass::new(&device);
     let texs_layout = textures_layout(&device);
 
-    let surface_format = surface.as_ref().map(|surface| {
+    let surface_caps = surface
+      .as_ref()
+      .map(|surface| surface.get_capabilities(&adapter));
+    let surface_format = surface_caps.as_ref().map(|caps| {
       use wgpu::TextureFormat::*;
-      let formats = HashSet::from_iter(
-        surface
-          .get_capabilities(&adapter)
-          .formats
-          .into_iter(),
-      );
+      let formats = HashSet::from_iter(caps.formats.clone().into_iter());
       *formats
         .get(&Rgba8Unorm)
         .or_else(|| formats.get(&Bgra8Unorm))
@@ -812,17 +1202,30 @@ impl WgpuImpl {
       texs_layout,
       textures_bind: None,
       mask_layers_uniform,
+      slot0_pool,
+      slot1_pool,
+      dual_slot_mode,
+      slot0_only_mode,
       limits,
       surface_format,
     };
 
+    debug!(
+      "primitive pool mode: dual_slot={:?}, slot0_only={:?}",
+      gpu_impl.dual_slot_mode, gpu_impl.slot0_only_mode
+    );
+
     let surface = surface
+      .zip(surface_caps)
       .zip(surface_format)
-      .map(|(surface, format)| {
+      .map(|((surface, caps), format)| {
+        let mut usage = wgpu::TextureUsages::RENDER_ATTACHMENT
+          | wgpu::TextureUsages::COPY_SRC
+          | wgpu::TextureUsages::COPY_DST;
+        usage &= caps.usages;
+
         let config = wgpu::SurfaceConfiguration {
-          usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-            | wgpu::TextureUsages::COPY_SRC
-            | wgpu::TextureUsages::COPY_DST,
+          usage,
           format,
           width: 0,
           height: 0,
