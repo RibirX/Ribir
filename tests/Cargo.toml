@@ -21,7 +21,7 @@ ribir_geom = {path = "../geom"}
 ribir_painter = {path = "../painter"}
 ribir_core = {path = "../core", features=["test-utils"]}
 winit.workspace = true
-criterion = "0.7.0"
+criterion = "0.8.1"
 todos = {path = "../examples/todos"}
 counter = {path = "../examples/counter"}
 messages = {path = "../examples/messages"}
