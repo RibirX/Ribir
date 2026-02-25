@@ -133,6 +133,20 @@ pub trait StateWriter: StateWatcher {
   where
     Self: Sized;
 
+  /// Decrease the logical writer count used by unsubscribe lifecycle.
+  ///
+  /// This only affects `writer_count` accounting for notification teardown and
+  /// does not affect data ownership (`Rc`) or value validity.
+  /// Calls must be paired with `inc_writer_count`.
+  #[doc(hidden)]
+  fn dec_writer_count(&self);
+
+  /// Increase the logical writer count used by unsubscribe lifecycle.
+  ///
+  /// Counterpart of `dec_writer_count`.
+  #[doc(hidden)]
+  fn inc_writer_count(&self);
+
   /// Creates a writer that targets a specific data segment identified by `id`.
   ///
   /// Establishes a parent-child hierarchy where:
@@ -424,6 +438,12 @@ impl<V: ?Sized + 'static> StateWriter for Box<dyn StateWriter<Value = V>> {
   }
   #[inline]
   fn clone_writer(&self) -> Self { self.clone_boxed_writer() }
+
+  #[inline]
+  fn dec_writer_count(&self) { (**self).dec_writer_count(); }
+
+  #[inline]
+  fn inc_writer_count(&self) { (**self).inc_writer_count(); }
 
   #[inline]
   fn include_partial_writers(&mut self, include: bool) { (**self).include_partial_writers(include) }

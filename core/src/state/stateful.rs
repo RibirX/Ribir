@@ -1,4 +1,4 @@
-use std::{cell::Cell, convert::Infallible};
+use std::{cell::Cell, convert::Infallible, mem::ManuallyDrop, ptr};
 
 use ribir_algo::Rc;
 use smallvec::{SmallVec, smallvec};
@@ -75,11 +75,22 @@ impl<W: 'static> StateReader for Stateful<W> {
 
   fn try_into_value(self) -> Result<W, Self> {
     if self.data.strong_count() == 1 {
-      let data = self.data.clone();
-      drop(self);
-      // SAFETY: `self.data.strong_count() == 1` guarantees unique access.
-      let data = unsafe { Rc::try_unwrap(data).unwrap_unchecked() };
-      Ok(data.into_inner())
+      let this = ManuallyDrop::new(self);
+      // SAFETY: `this` is ManuallyDrop, moving fields out avoids running
+      // `Stateful::drop`, which would defer releasing `data`.
+      let data = unsafe { ptr::read(&this.data) };
+      // SAFETY: same as above.
+      let info = unsafe { ptr::read(&this.info) };
+
+      info.dec_writer();
+      let mut notifier = info.notifier.clone();
+      notifier.unsubscribe();
+      drop(info);
+
+      match Rc::try_unwrap(data) {
+        Ok(data) => Ok(data.into_inner()),
+        Err(_) => unreachable!("state data must stay unique in try_into_value"),
+      }
     } else {
       Err(self)
     }
@@ -133,6 +144,12 @@ impl<W: 'static> StateWriter for Stateful<W> {
   #[inline]
   fn clone_writer(&self) -> Self { self.clone() }
 
+  #[inline]
+  fn dec_writer_count(&self) { self.info.dec_writer(); }
+
+  #[inline]
+  fn inc_writer_count(&self) { self.info.inc_writer(); }
+
   fn include_partial_writers(&mut self, include: bool) { self.include_partial = include; }
 
   #[inline]
@@ -166,16 +183,23 @@ impl<W: 'static> StateReader for Reader<W> {
 }
 
 impl<W> Drop for Stateful<W> {
-  fn drop(&mut self) { self.info.dec_writer(); }
-}
-
-impl Drop for WriterInfo {
   fn drop(&mut self) {
-    if self.writer_count.get() == 0 {
-      let mut notifier = self.notifier.clone();
+    self.info.dec_writer();
+    if self.info.writer_count.get() == 0 {
+      let mut notifier = self.info.notifier.clone();
       // we use an async task to unsubscribe to wait the batched modifies to be
-      // notified.
-      AppCtx::spawn_local(async move { notifier.unsubscribe() });
+      // notified, while keeping state data/info alive until cleanup runs.
+      let keep_data = Rc::into_raw(self.data.clone()) as *const ();
+      let keep_info = Rc::into_raw(self.info.clone()) as *const ();
+      AppCtx::spawn_local(async move {
+        notifier.unsubscribe();
+        // SAFETY: These raw pointers are produced by `Rc::into_raw` above, and
+        // are reconstructed exactly once here to release the keep-alive refs.
+        unsafe {
+          drop_erased_rc::<StateCell<W>>(keep_data);
+          drop_erased_rc::<WriterInfo>(keep_info);
+        }
+      });
     }
   }
 }
@@ -234,7 +258,18 @@ impl WriterInfo {
 
   pub(crate) fn inc_writer(&self) { self.writer_count.set(self.writer_count.get() + 1); }
 
-  pub(crate) fn dec_writer(&self) { self.writer_count.set(self.writer_count.get() - 1); }
+  pub(crate) fn dec_writer(&self) {
+    let cnt = self.writer_count.get();
+    debug_assert!(cnt > 0, "writer_count underflow");
+    self.writer_count.set(cnt - 1);
+  }
+}
+
+#[inline]
+unsafe fn drop_erased_rc<T>(ptr: *const ()) {
+  // SAFETY: Caller guarantees `ptr` comes from `Rc::into_raw` for `T`, and this
+  // function is called exactly once for that keep-alive reference.
+  drop(unsafe { Rc::from_raw(ptr as *const T) });
 }
 
 impl Notifier {
@@ -333,6 +368,68 @@ mod tests {
     };
     AppCtx::run_until_stalled();
     assert_eq!(*drop_cnt.borrow(), 3);
+  }
+
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+  #[test]
+  fn keep_data_alive_until_async_unsubscribe() {
+    crate::reset_test_env!();
+    struct DropGuard {
+      drop_cnt: Rc<RefCell<i32>>,
+    }
+    impl Drop for DropGuard {
+      fn drop(&mut self) { *self.drop_cnt.borrow_mut() += 1; }
+    }
+
+    let drop_cnt = Rc::new(RefCell::new(0));
+    let state = Stateful::new(DropGuard { drop_cnt: drop_cnt.clone() });
+    let _sub = state.modifies().subscribe(|_| {});
+    let notifier = state.info.notifier.0.clone();
+    assert!(!notifier.is_closed());
+
+    drop(state);
+    assert_eq!(*drop_cnt.borrow(), 0);
+
+    AppCtx::run_until_stalled();
+    assert_eq!(*drop_cnt.borrow(), 1);
+    assert!(notifier.is_closed());
+  }
+
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+  #[test]
+  fn try_into_value_unsubscribe_immediately() {
+    crate::reset_test_env!();
+
+    let state = Stateful::new(1);
+    let _sub = state.modifies().subscribe(|_| {});
+    let notifier = state.info.notifier.0.clone();
+
+    let value = state.try_into_value().unwrap();
+    assert_eq!(value, 1);
+    assert!(notifier.is_closed());
+  }
+
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+  #[test]
+  fn transition_state_writer_count_is_neutral() {
+    crate::reset_test_env!();
+
+    let state = Stateful::new(0);
+    let source = state.clone_writer();
+    let w = fn_widget! {
+      let _animate = source.clone_writer().transition_with_init(
+        0,
+        EasingTransition { easing: easing::LINEAR, duration: Duration::ZERO },
+      );
+      @Void {}
+    };
+    let wnd = TestWindow::from_widget(w);
+    wnd.draw_frame();
+
+    assert_eq!(state.info.writer_count.get(), 2);
+    drop(wnd);
+    AppCtx::run_until_stalled();
+    assert_eq!(state.info.writer_count.get(), 2);
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]

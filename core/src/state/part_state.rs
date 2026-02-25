@@ -65,7 +65,7 @@ where
   }
 }
 
-impl<V: ?Sized, W, M> StateWatcher for PartWriter<W, M>
+impl<V: ?Sized + 'static, W, M> StateWatcher for PartWriter<W, M>
 where
   Self: 'static,
   W: StateWriter,
@@ -113,7 +113,7 @@ where
   }
 }
 
-impl<V: ?Sized, W, M> StateWriter for PartWriter<W, M>
+impl<V: ?Sized + 'static, W, M> StateWriter for PartWriter<W, M>
 where
   Self: 'static,
   W: StateWriter,
@@ -139,6 +139,12 @@ where
       include_partial: self.include_partial,
     }
   }
+
+  #[inline]
+  fn dec_writer_count(&self) { self.origin.dec_writer_count(); }
+
+  #[inline]
+  fn inc_writer_count(&self) { self.origin.inc_writer_count(); }
 
   fn include_partial_writers(&mut self, include: bool) { self.include_partial = include; }
 

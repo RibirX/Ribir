@@ -187,8 +187,13 @@ use ribir::material::md;
 fn label_fade(visible: PipeValue<bool>, w: Widget<'static>) -> Widget<'static> {
   fn_widget! {
     let mut label = @FatObj { @ { w } };
-    let effects = md::motion::spring::FAST.effects_transition(md::motion::duration::SHORT3);
-    label.opacity().transition_with_init(0., effects);
+    label.opacity().transition_with_init(
+      0.,
+      EasingTransition {
+        easing: md::easing::EMPHASIZED,
+        duration: md::easing::duration::SHORT3,
+      }
+    );
     label.with_opacity(visible.map(|v| if v { 1. } else { 0. }));
     label
   }
@@ -204,9 +209,14 @@ use ribir::material::md;
 
 fn selected_item(w: Widget<'static>) -> Widget<'static> {
   let mut item = FatObj::new(w);
-  let effects = md::motion::spring::FAST.effects_transition(md::motion::duration::SHORT3);
   let palette = Palette::of(BuildCtx::get());
-  item.foreground().transition_with_init(palette.on_surface_variant().into(), effects);
+  item.foreground().transition_with_init(
+    palette.on_surface_variant().into(),
+    EasingTransition {
+      easing: md::easing::EMPHASIZED,
+      duration: md::easing::duration::SHORT3,
+    }
+  );
   item.with_foreground(palette.secondary());
   item.into_widget()
 }
@@ -424,11 +434,11 @@ fn composition_example() -> Widget<'static> {
         };
 
         let opacity_size_anim = @Animate {
-            state: (
+            state: animate_state_pack!(
                 box_widget.opacity(),
-                box_widget.width()
+                box_widget.width(),
             ),
-            from: (0., 20_f32.into()),
+            from: animate_state_pack!(0., 20_f32.into()),
             transition: EasingTransition {
                 duration: Duration::from_millis(1000),
                 easing: easing::EASE_IN_OUT,
