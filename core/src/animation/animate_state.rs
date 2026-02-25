@@ -15,15 +15,23 @@ pub trait AnimateState {
   fn animate_state_modifies(&self) -> LocalBoxedObservable<'static, ModifyInfo, Infallible>;
   fn calc_lerp_value(&mut self, from: &Self::Value, to: &Self::Value, rate: f32) -> Self::Value;
 
+  #[doc(hidden)]
+  fn dec_writer_count(&self);
+
+  #[doc(hidden)]
+  fn inc_writer_count(&self);
+
   /// Creates an animation that smoothly transitions a writer's value on every
   /// change.
   ///
   /// Use this when the current state value is already the correct "from"
   /// value. The initial animation start value is `self.get()`.
-  fn transition(self, transition: impl Transition + 'static) -> Stateful<Animate<Self>>
+  fn transition(
+    self, transition: impl Transition + 'static,
+  ) -> Stateful<Animate<TransitionUncountedState<Self>>>
   where
-    Self: Sized,
-    Self::Value: PartialEq,
+    Self: Sized + 'static,
+    Self::Value: PartialEq + 'static,
   {
     let init = self.get();
     self.transition_with_init(init, transition)
@@ -39,23 +47,25 @@ pub trait AnimateState {
   /// property value, so the first sync can animate from `init_value`.
   fn transition_with_init(
     self, init_value: Self::Value, transition: impl Transition + 'static,
-  ) -> Stateful<Animate<Self>>
+  ) -> Stateful<Animate<TransitionUncountedState<Self>>>
   where
-    Self: Sized,
-    Self::Value: PartialEq,
+    Self: Sized + 'static,
+    Self::Value: PartialEq + 'static,
   {
     let init_trigger = Local::of(self.get());
+    let modifies = self.animate_state_modifies();
 
     let mut animate = Animate::declarer();
     animate
       .with_transition(transition)
       .with_from(init_value)
-      .with_state(self);
+      .with_state(TransitionUncountedState::new(self));
     let animate = animate.finish();
 
-    // FIXME: circular reference here
-    let modifies = animate.read().state.animate_state_modifies();
-    modifies
+    // Keep `animate` alive by capturing it in the source subscription closure.
+    // `animate.state` holds a count-neutral writer wrapper, so this does not
+    // keep writer_count > 0 in a cycle.
+    let _ = modifies
       .map({
         let animate = animate.clone_writer();
         move |_| animate.read().state.get()
@@ -72,6 +82,24 @@ pub trait AnimateState {
       });
     animate
   }
+}
+
+#[doc(hidden)]
+pub struct TransitionUncountedState<S: AnimateState + 'static> {
+  state: S,
+}
+
+impl<S: AnimateState + 'static> TransitionUncountedState<S> {
+  #[inline]
+  fn new(state: S) -> Self {
+    // Neutralize this wrapper's writer-count contribution.
+    state.dec_writer_count();
+    Self { state }
+  }
+}
+
+impl<S: AnimateState + 'static> Drop for TransitionUncountedState<S> {
+  fn drop(&mut self) { self.state.inc_writer_count(); }
 }
 
 /// A state with a lerp function as an animation state that use the `lerp_fn`
@@ -114,6 +142,35 @@ macro_rules! animate_state_pack {
 }
 pub use animate_state_pack;
 
+impl<S: AnimateState + 'static> AnimateState for TransitionUncountedState<S> {
+  type Value = S::Value;
+
+  #[inline]
+  fn get(&self) -> Self::Value { self.state.get() }
+
+  #[inline]
+  fn set(&self, v: Self::Value) { self.state.set(v) }
+
+  #[inline]
+  fn revert(&self, v: Self::Value) { self.state.revert(v) }
+
+  #[inline]
+  fn animate_state_modifies(&self) -> LocalBoxedObservable<'static, ModifyInfo, Infallible> {
+    self.state.animate_state_modifies()
+  }
+
+  #[inline]
+  fn dec_writer_count(&self) { self.state.dec_writer_count(); }
+
+  #[inline]
+  fn inc_writer_count(&self) { self.state.inc_writer_count(); }
+
+  #[inline]
+  fn calc_lerp_value(&mut self, from: &Self::Value, to: &Self::Value, rate: f32) -> Self::Value {
+    self.state.calc_lerp_value(from, to, rate)
+  }
+}
+
 impl<S> AnimateState for S
 where
   S: StateWriter,
@@ -140,6 +197,12 @@ where
       .filter(|s| s.contains(ModifyEffect::all()))
       .box_it()
   }
+
+  #[inline]
+  fn dec_writer_count(&self) { StateWriter::dec_writer_count(self); }
+
+  #[inline]
+  fn inc_writer_count(&self) { StateWriter::inc_writer_count(self); }
 
   fn calc_lerp_value(&mut self, from: &Self::Value, to: &Self::Value, rate: f32) -> Self::Value {
     from.lerp(to, rate)
@@ -168,6 +231,12 @@ where
   }
 
   #[inline]
+  fn dec_writer_count(&self) { self.state.dec_writer_count(); }
+
+  #[inline]
+  fn inc_writer_count(&self) { self.state.inc_writer_count(); }
+
+  #[inline]
   fn calc_lerp_value(&mut self, from: &S::Value, to: &S::Value, rate: f32) -> S::Value {
     (self.lerp_fn)(from, to, rate)
   }
@@ -186,7 +255,7 @@ impl<S, F> CustomLerpState<S, F>
 where
   S: StateWriter,
   S::Value: Clone,
-  F: FnMut(&S::Value, &S::Value, f32) -> S::Value,
+  F: FnMut(&S::Value, &S::Value, f32) -> S::Value + 'static,
 {
   #[inline]
   pub fn from_writer(state: S, lerp_fn: F) -> impl AnimateState<Value = S::Value> {
@@ -220,6 +289,12 @@ where
       .filter(|s| s.contains(ModifyEffect::all()))
       .box_it()
   }
+
+  #[inline]
+  fn dec_writer_count(&self) { self.0.dec_writer_count(); }
+
+  #[inline]
+  fn inc_writer_count(&self) { self.0.inc_writer_count(); }
 
   #[inline]
   fn calc_lerp_value(&mut self, _from: &Self::Value, _to: &Self::Value, _rate: f32) -> Self::Value {
@@ -263,6 +338,12 @@ impl AnimateState for AnimateStatePackEnd {
   }
 
   #[inline]
+  fn dec_writer_count(&self) {}
+
+  #[inline]
+  fn inc_writer_count(&self) {}
+
+  #[inline]
   fn calc_lerp_value(&mut self, _from: &Self::Value, _to: &Self::Value, _rate: f32) -> Self::Value {
     AnimateStatePackEnd
   }
@@ -298,6 +379,18 @@ where
   }
 
   #[inline]
+  fn dec_writer_count(&self) {
+    self.head.dec_writer_count();
+    self.tail.dec_writer_count();
+  }
+
+  #[inline]
+  fn inc_writer_count(&self) {
+    self.head.inc_writer_count();
+    self.tail.inc_writer_count();
+  }
+
+  #[inline]
   fn calc_lerp_value(&mut self, from: &Self::Value, to: &Self::Value, rate: f32) -> Self::Value {
     AnimateStatePack::new(
       self
@@ -320,5 +413,42 @@ mod tests {
     let mut group = animate_state_pack!(Stateful::new(1.), Stateful::new(2.));
     let half = group.calc_lerp_value(&animate_state_pack!(0., 0.), &group.get(), 0.5);
     assert_eq!(half, animate_state_pack!(0.5, 1.));
+  }
+
+  #[test]
+  fn transition_with_init_drop_no_cycle() {
+    reset_test_env!();
+
+    let state = Stateful::new(0);
+    let w = fn_widget! {
+      let _animate = state.clone_writer().transition_with_init(
+        0,
+        EasingTransition { easing: easing::LINEAR, duration: Duration::ZERO },
+      );
+      @Void {}
+    };
+    let wnd = crate::test_helper::TestWindow::from_widget(w);
+    wnd.draw_frame();
+    drop(wnd);
+    AppCtx::run_until_stalled();
+  }
+
+  #[test]
+  fn transition_with_init_part_writer_drop_no_cycle() {
+    reset_test_env!();
+
+    let state = Stateful::new((0, 0));
+    let w = fn_widget! {
+      let part = state.clone_writer().part_writer("0".into(), |v| PartMut::new(&mut v.0));
+      let _animate = part.transition_with_init(
+        0,
+        EasingTransition { easing: easing::LINEAR, duration: Duration::ZERO },
+      );
+      @Void {}
+    };
+    let wnd = crate::test_helper::TestWindow::from_widget(w);
+    wnd.draw_frame();
+    drop(wnd);
+    AppCtx::run_until_stalled();
   }
 }
