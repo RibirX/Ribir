@@ -26,19 +26,25 @@ use ribir_painter::PixelImage;
 use tokio::sync::{broadcast, mpsc, watch};
 use tokio_stream::wrappers::{BroadcastStream, IntervalStream};
 use tower_http::cors::{Any, CorsLayer};
+use winit::event::ElementState;
 
 use super::{
   FRAME_TX, FramePacket, clear_overlays as clear_global_overlays,
   helpers::*,
+  key_mapping::{
+    derive_physical_key, infer_receive_chars_from_key, keyboard_key_error,
+    keyboard_physical_key_error, parse_key_code, parse_virtual_key,
+  },
   overlays::{get_overlays, remove_overlay},
   set_overlay_hex,
   types::*,
 };
 use crate::{
   context::AppCtx,
+  events::{KeyLocation, ModifiersState, MouseButtons, PhysicalKey, RibirDeviceId, VirtualKey},
   prelude::WidgetId,
   widget_tree::WidgetTree,
-  window::{Window, WindowId},
+  window::{UiEvent, Window, WindowId},
 };
 
 static CAPTURE_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -367,6 +373,7 @@ pub fn start_debug_server() -> mpsc::Sender<DebugCommand> {
     .route("/capture/start", post(capture_start))
     .route("/capture/stop", post(capture_stop))
     .route("/capture/one_shot", post(capture_one_shot))
+    .route("/events/inject", post(inject_events_handler))
     // MCP protocol endpoints
     .route("/mcp/sse", get(mcp_sse_handler))
     .route("/mcp/message", post(mcp_message_handler))
@@ -990,7 +997,293 @@ async fn handle_command(cmd: DebugCommand) {
         wnd.shell_wnd().borrow().request_draw(true);
       }
     }
+
+    DebugCommand::InjectEvents { window_id, events, reply } => {
+      let Some(target_wnd) = resolve_target_window(window_id) else {
+        let _ = reply.send(Err("No active window found".into()));
+        return;
+      };
+
+      let mut accepted = 0usize;
+
+      for event in events {
+        let ui_events = match injected_to_ui_events(&target_wnd, event) {
+          Ok(events) => events,
+          Err(msg) => {
+            let _ = reply.send(Err(msg));
+            return;
+          }
+        };
+
+        for ui_event in ui_events {
+          if AppCtx::send_ui_event(ui_event) {
+            accepted += 1;
+          } else {
+            let _ = reply.send(Err("Failed to send UiEvent to event loop".into()));
+            return;
+          }
+        }
+      }
+
+      let _ = reply.send(Ok(InjectEventsResult { accepted }));
+    }
   }
+}
+
+fn resolve_injected_click_pos(
+  wnd: &Window, x: Option<f32>, y: Option<f32>, id: Option<String>,
+) -> Result<Option<ribir_geom::Point>, String> {
+  match (x, y) {
+    (Some(px), Some(py)) => return Ok(Some(ribir_geom::Point::new(px, py))),
+    (Some(_), None) | (None, Some(_)) => {
+      return Err("click/double_click requires both x and y when using coordinates".into());
+    }
+    (None, None) => {}
+  }
+
+  let Some(id_str) = id else {
+    return Ok(None);
+  };
+
+  let tree = wnd.tree();
+  let Some(widget_id) = resolve_widget_id(&id_str, tree) else {
+    return Err(format!(
+      "Widget not found for click target id '{}'. Supported formats: '3', '3:0', or \
+       '{{\"index1\":3,\"stamp\":0}}'.",
+      id_str
+    ));
+  };
+
+  let Some(layout) = tree.store.layout_info(widget_id) else {
+    return Err(format!("Widget '{}' has no layout info", id_str));
+  };
+  let Some(size) = layout.size else {
+    return Err(format!("Widget '{}' has no resolved size", id_str));
+  };
+
+  let global_pos = match widget_id.parent(tree) {
+    Some(parent) => tree.map_to_global(layout.pos, parent),
+    None => layout.pos,
+  };
+
+  Ok(Some(ribir_geom::Point::new(global_pos.x + size.width / 2., global_pos.y + size.height / 2.)))
+}
+
+fn mouse_button(button: InjectMouseButton) -> MouseButtons {
+  match button {
+    InjectMouseButton::Primary => MouseButtons::PRIMARY,
+    InjectMouseButton::Secondary => MouseButtons::SECONDARY,
+    InjectMouseButton::Auxiliary => MouseButtons::AUXILIARY,
+    InjectMouseButton::Fourth => MouseButtons::FOURTH,
+    InjectMouseButton::Fifth => MouseButtons::FIFTH,
+  }
+}
+
+fn key_location(location: InjectKeyLocation) -> KeyLocation {
+  match location {
+    InjectKeyLocation::Standard => KeyLocation::Standard,
+    InjectKeyLocation::Left => KeyLocation::Left,
+    InjectKeyLocation::Right => KeyLocation::Right,
+    InjectKeyLocation::Numpad => KeyLocation::Numpad,
+  }
+}
+
+fn resolve_chars_payload(chars: Option<String>, key: &str) -> Option<String> {
+  chars
+    .filter(|text| !text.is_empty())
+    .or_else(|| infer_receive_chars_from_key(key))
+}
+
+fn build_keyboard_event(
+  window_id: WindowId, key: VirtualKey, state: ElementState, physical_key: PhysicalKey,
+  is_repeat: bool, location: KeyLocation,
+) -> UiEvent {
+  UiEvent::KeyBoard { wnd_id: window_id, key, state, physical_key, is_repeat, location }
+}
+
+fn build_keyboard_input_events(
+  window_id: WindowId, key: String, chars: Option<String>,
+) -> Result<Vec<UiEvent>, String> {
+  let key_value = parse_virtual_key(&key).ok_or_else(|| keyboard_key_error(&key))?;
+  let physical_key = derive_physical_key(&key).ok_or_else(|| {
+    format!(
+      "Cannot derive physical_key from key '{}'. Use `raw_keyboard_input` with explicit \
+       `physical_key` (e.g. KeyA, Digit1, Enter).",
+      key
+    )
+  })?;
+
+  let mut events = Vec::with_capacity(3);
+  events.push(build_keyboard_event(
+    window_id,
+    key_value.clone(),
+    ElementState::Pressed,
+    physical_key,
+    false,
+    KeyLocation::Standard,
+  ));
+
+  if let Some(text) = resolve_chars_payload(chars, &key) {
+    events.push(UiEvent::ReceiveChars { wnd_id: window_id, chars: text.into() });
+  }
+
+  events.push(build_keyboard_event(
+    window_id,
+    key_value,
+    ElementState::Released,
+    physical_key,
+    false,
+    KeyLocation::Standard,
+  ));
+
+  Ok(events)
+}
+
+fn build_raw_keyboard_input_events(
+  window_id: WindowId, key: String, physical_key: Option<String>, state: InjectElementState,
+  is_repeat: bool, location: InjectKeyLocation, chars: Option<String>,
+) -> Result<Vec<UiEvent>, String> {
+  let key_value = parse_virtual_key(&key).ok_or_else(|| keyboard_key_error(&key))?;
+  let physical_key = match physical_key {
+    Some(value) => {
+      let code = parse_key_code(&value).ok_or_else(|| keyboard_physical_key_error(&value))?;
+      PhysicalKey::Code(code)
+    }
+    None => derive_physical_key(&key).ok_or_else(|| {
+      format!(
+        "Cannot derive physical_key from key '{}'. Provide `physical_key` with W3C code names \
+         (e.g. KeyA, Digit1, Enter).",
+        key
+      )
+    })?,
+  };
+
+  let event_state = ElementState::from(state.clone());
+  let mut events = vec![build_keyboard_event(
+    window_id,
+    key_value,
+    event_state,
+    physical_key,
+    is_repeat,
+    key_location(location),
+  )];
+
+  if matches!(state, InjectElementState::Pressed)
+    && let Some(text) = resolve_chars_payload(chars, &key)
+  {
+    events.push(UiEvent::ReceiveChars { wnd_id: window_id, chars: text.into() });
+  }
+
+  Ok(events)
+}
+
+fn injected_to_ui_events(wnd: &Window, event: InjectedUiEvent) -> Result<Vec<UiEvent>, String> {
+  let window_id = wnd.id();
+  let ui_events = match event {
+    InjectedUiEvent::CursorMoved { x, y } => {
+      vec![UiEvent::CursorMoved { wnd_id: window_id, pos: ribir_geom::Point::new(x, y) }]
+    }
+    InjectedUiEvent::CursorLeft => vec![UiEvent::CursorLeft { wnd_id: window_id }],
+    InjectedUiEvent::MouseWheel { delta_x, delta_y } => {
+      vec![UiEvent::MouseWheel { wnd_id: window_id, delta_x, delta_y }]
+    }
+    InjectedUiEvent::MouseInput { device_id, button, state } => vec![UiEvent::MouseInput {
+      wnd_id: window_id,
+      device_id: Box::new(RibirDeviceId::from(device_id)),
+      button: mouse_button(button),
+      state: ElementState::from(state),
+    }],
+    InjectedUiEvent::KeyboardInput { key, chars } => {
+      build_keyboard_input_events(window_id, key, chars)?
+    }
+    InjectedUiEvent::RawKeyboardInput { key, physical_key, state, is_repeat, location, chars } => {
+      build_raw_keyboard_input_events(
+        window_id,
+        key,
+        physical_key,
+        state,
+        is_repeat,
+        location,
+        chars,
+      )?
+    }
+    InjectedUiEvent::Click { device_id, button, id, x, y } => {
+      let mut out = Vec::with_capacity(3);
+      if let Some(pos) = resolve_injected_click_pos(wnd, x, y, id)? {
+        out.push(UiEvent::CursorMoved { wnd_id: window_id, pos });
+      }
+      let mapped_button = mouse_button(button);
+      out.push(UiEvent::MouseInput {
+        wnd_id: window_id,
+        device_id: Box::new(RibirDeviceId::from(device_id.clone())),
+        button: mapped_button,
+        state: ElementState::Pressed,
+      });
+      out.push(UiEvent::MouseInput {
+        wnd_id: window_id,
+        device_id: Box::new(RibirDeviceId::from(device_id)),
+        button: mapped_button,
+        state: ElementState::Released,
+      });
+      out
+    }
+    InjectedUiEvent::DoubleClick { device_id, button, id, x, y } => {
+      let mut out = Vec::with_capacity(5);
+      if let Some(pos) = resolve_injected_click_pos(wnd, x, y, id)? {
+        out.push(UiEvent::CursorMoved { wnd_id: window_id, pos });
+      }
+      let mapped_button = mouse_button(button);
+      out.push(UiEvent::MouseInput {
+        wnd_id: window_id,
+        device_id: Box::new(RibirDeviceId::from(device_id.clone())),
+        button: mapped_button,
+        state: ElementState::Pressed,
+      });
+      out.push(UiEvent::MouseInput {
+        wnd_id: window_id,
+        device_id: Box::new(RibirDeviceId::from(device_id.clone())),
+        button: mapped_button,
+        state: ElementState::Released,
+      });
+      out.push(UiEvent::MouseInput {
+        wnd_id: window_id,
+        device_id: Box::new(RibirDeviceId::from(device_id.clone())),
+        button: mapped_button,
+        state: ElementState::Pressed,
+      });
+      out.push(UiEvent::MouseInput {
+        wnd_id: window_id,
+        device_id: Box::new(RibirDeviceId::from(device_id)),
+        button: mapped_button,
+        state: ElementState::Released,
+      });
+      out
+    }
+    InjectedUiEvent::Chars { chars } => {
+      vec![UiEvent::ReceiveChars { wnd_id: window_id, chars: chars.into() }]
+    }
+    InjectedUiEvent::ModifiersChanged { shift, ctrl, alt, logo } => {
+      let mut state = ModifiersState::empty();
+      if shift {
+        state |= ModifiersState::SHIFT;
+      }
+      if ctrl {
+        state |= ModifiersState::CONTROL;
+      }
+      if alt {
+        state |= ModifiersState::ALT;
+      }
+      if logo {
+        state |= ModifiersState::SUPER;
+      }
+      vec![UiEvent::ModifiersChanged { wnd_id: window_id, state }]
+    }
+    InjectedUiEvent::RedrawRequest { force } => {
+      vec![UiEvent::RedrawRequest { wnd_id: window_id, force }]
+    }
+  };
+
+  Ok(ui_events)
 }
 
 /// GET /inspect/tree - Returns the full widget tree.
@@ -1091,6 +1384,18 @@ async fn capture_screenshot(State(state): State<Arc<DebugServerState>>) -> impl 
     Ok(img) => encode_png_response(&img),
     Err(ServiceError::Timeout) => (StatusCode::REQUEST_TIMEOUT, Vec::new()).into_response(),
     Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Vec::new()).into_response(),
+  }
+}
+
+/// POST /events/inject - Inject serialized events into the app event loop.
+async fn inject_events_handler(
+  State(state): State<Arc<DebugServerState>>, Json(payload): Json<InjectEventsRequest>,
+) -> Result<Json<InjectEventsResult>, StatusCode> {
+  use crate::debug_tool::service::*;
+
+  match inject_events_svc(&state, payload.window_id, payload.events).await {
+    Ok(result) => Ok(Json(result)),
+    Err(_) => Err(StatusCode::BAD_REQUEST),
   }
 }
 

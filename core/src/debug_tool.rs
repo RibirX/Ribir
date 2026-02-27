@@ -8,6 +8,7 @@
 //! Enabled via the `debug` feature flag.
 
 mod helpers;
+mod key_mapping;
 mod mcp;
 mod overlays;
 mod port_registry;

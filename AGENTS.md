@@ -92,7 +92,7 @@ cargo run --features debug
 Resources: ribir://status, ribir://windows, ribir://logs
 Tools: capture_screenshot, inspect_tree, inspect_widget, get_overlays, set_log_filter,
        add_overlay, remove_overlay, clear_overlays, start_recording, stop_recording,
-       capture_one_shot, start_app(project_path), attach_app(url), stop_app
+  capture_one_shot, inject_events, start_app(project_path), attach_app(url), stop_app
 ```
 - **Authoritative schema**: `core/src/debug_tool/mcp_schema.json`. Setup details in `dev-docs/debug-features.md`.
 

@@ -95,7 +95,10 @@
                 "properties": {
                     "window_id": {
                         "type": "string",
-                        "description": "Window ID to capture (optional, defaults to primary)"
+                        "description": "Window ID as decimal u64 string from ribir://windows (optional). Note: currently ignored by implementation; screenshot targets the default/primary active window.",
+                        "examples": [
+                            "140226801569568"
+                        ]
                     }
                 }
             }
@@ -108,11 +111,14 @@
                 "properties": {
                     "window_id": {
                         "type": "string",
-                        "description": "Window ID (optional)"
+                        "description": "Window ID as decimal u64 string from ribir://windows (optional). If omitted, uses the first active window.",
+                        "examples": [
+                            "140226801569568"
+                        ]
                     },
                     "options": {
                         "type": "string",
-                        "description": "Filter what to show. Options: 'all' (everything), 'id' (WidgetId), 'layout' (pos+size), 'global_pos' (screen coords), 'clamp' (constraints), 'props' (properties). Prefix with 'no_' to exclude (e.g. 'all,no_props')."
+                        "description": "Filter what to show. Options: 'all' (everything), 'id' (WidgetId), 'layout' (pos+size), 'global_pos' (screen coords), 'clamp' (constraints), 'props' (widget properties). For example, with 'props', a Text widget includes its text property value. Prefix with 'no_' to exclude (e.g. 'all,no_props')."
                     }
                 }
             }
@@ -125,11 +131,14 @@
                 "properties": {
                     "window_id": {
                         "type": "string",
-                        "description": "Window ID (optional)"
+                        "description": "Window ID as decimal u64 string from ribir://windows (optional). If omitted, uses the first active window.",
+                        "examples": [
+                            "140226801569568"
+                        ]
                     },
                     "options": {
                         "type": "string",
-                        "description": "Filter what to show. Options: 'all' (everything), 'id' (WidgetId), 'layout' (pos+size), 'global_pos' (screen coords), 'clamp' (constraints), 'props' (properties). Prefix with 'no_' to exclude (e.g. 'all,no_props')."
+                        "description": "Filter what to show. Options: 'all' (everything), 'id' (WidgetId), 'layout' (pos+size), 'global_pos' (screen coords), 'clamp' (constraints), 'props' (widget properties). For example, with 'props', a Text widget includes its text property value. Prefix with 'no_' to exclude (e.g. 'all,no_props')."
                     },
                     "id": {
                         "type": "string",
@@ -149,7 +158,10 @@
                 "properties": {
                     "window_id": {
                         "type": "string",
-                        "description": "Window ID (optional)"
+                        "description": "Window ID as decimal u64 string from ribir://windows (optional). If omitted, uses the first active window.",
+                        "examples": [
+                            "140226801569568"
+                        ]
                     }
                 }
             }
@@ -178,7 +190,10 @@
                 "properties": {
                     "window_id": {
                         "type": "string",
-                        "description": "Window ID (optional)"
+                        "description": "Window ID as decimal u64 string from ribir://windows (optional). If omitted, uses the first active window.",
+                        "examples": [
+                            "140226801569568"
+                        ]
                     },
                     "id": {
                         "type": "string",
@@ -202,7 +217,10 @@
                 "properties": {
                     "window_id": {
                         "type": "string",
-                        "description": "Window ID (optional)"
+                        "description": "Window ID as decimal u64 string from ribir://windows (optional). If omitted, uses the first active window.",
+                        "examples": [
+                            "140226801569568"
+                        ]
                     },
                     "id": {
                         "type": "string",
@@ -222,7 +240,7 @@
                 "properties": {
                     "window_id": {
                         "type": "string",
-                        "description": "Window ID (optional)"
+                        "description": "Window ID as decimal u64 string from ribir://windows (optional). If omitted, clears overlays for all windows."
                     }
                 }
             }
@@ -292,6 +310,417 @@
                 "required": [
                     "include"
                 ]
+            }
+        },
+        {
+            "name": "inject_events",
+            "description": "Inject serialized input events into the application's UI event loop for interaction simulation. Events are executed in array order. Categories: Functional events (`click`, `double_click`, `keyboard_input`, `chars`) and low-level events (`cursor_moved`, `mouse_input` press/release, `raw_keyboard_input` press/release). IMPORTANT: event `type` values are snake_case and button values use `primary|secondary|auxiliary|fourth|fifth` (not `left|right|middle`).",
+            "inputSchema": {
+                "type": "object",
+                "required": [
+                    "events"
+                ],
+                "examples": [
+                    {
+                        "events": [
+                            {
+                                "type": "cursor_moved",
+                                "x": 160,
+                                "y": 120
+                            },
+                            {
+                                "type": "mouse_input",
+                                "button": "primary",
+                                "state": "pressed"
+                            },
+                            {
+                                "type": "mouse_input",
+                                "button": "primary",
+                                "state": "released"
+                            }
+                        ]
+                    },
+                    {
+                        "events": [
+                            {
+                                "type": "click",
+                                "id": "3:0",
+                                "button": "primary"
+                            },
+                            {
+                                "type": "keyboard_input",
+                                "key": "a",
+                                "chars": "a"
+                            },
+                            {
+                                "type": "chars",
+                                "chars": "hello"
+                            }
+                        ]
+                    }
+                ],
+                "properties": {
+                    "window_id": {
+                        "type": "integer",
+                        "description": "Window ID as u64 from ribir://windows (optional). If omitted, uses the first active window. If no active window exists, the call fails.",
+                        "examples": [
+                            140226801569568
+                        ]
+                    },
+                    "events": {
+                        "type": "array",
+                        "description": "Ordered event list. Each event uses a tagged object with `type`.",
+                        "items": {
+                            "type": "object",
+                            "oneOf": [
+                                {
+                                    "required": [
+                                        "type",
+                                        "x",
+                                        "y"
+                                    ],
+                                    "properties": {
+                                        "type": {
+                                            "const": "cursor_moved"
+                                        },
+                                        "x": {
+                                            "type": "number",
+                                            "description": "Cursor x in window coordinates."
+                                        },
+                                        "y": {
+                                            "type": "number",
+                                            "description": "Cursor y in window coordinates."
+                                        }
+                                    }
+                                },
+                                {
+                                    "required": [
+                                        "type"
+                                    ],
+                                    "properties": {
+                                        "type": {
+                                            "const": "cursor_left"
+                                        }
+                                    }
+                                },
+                                {
+                                    "required": [
+                                        "type",
+                                        "delta_x",
+                                        "delta_y"
+                                    ],
+                                    "properties": {
+                                        "type": {
+                                            "const": "mouse_wheel"
+                                        },
+                                        "delta_x": {
+                                            "type": "number"
+                                        },
+                                        "delta_y": {
+                                            "type": "number"
+                                        }
+                                    }
+                                },
+                                {
+                                    "required": [
+                                        "type",
+                                        "button",
+                                        "state"
+                                    ],
+                                    "properties": {
+                                        "type": {
+                                            "const": "mouse_input"
+                                        },
+                                        "button": {
+                                            "type": "string",
+                                            "description": "Mouse button name. Use `primary|secondary|auxiliary|fourth|fifth`.",
+                                            "enum": [
+                                                "primary",
+                                                "secondary",
+                                                "auxiliary",
+                                                "fourth",
+                                                "fifth"
+                                            ]
+                                        },
+                                        "state": {
+                                            "type": "string",
+                                            "enum": [
+                                                "pressed",
+                                                "released"
+                                            ]
+                                        },
+                                        "device_id": {
+                                            "type": "object",
+                                            "description": "Optional device identifier. Omit for default dummy device.",
+                                            "oneOf": [
+                                                {
+                                                    "required": [
+                                                        "type"
+                                                    ],
+                                                    "properties": {
+                                                        "type": {
+                                                            "const": "dummy"
+                                                        }
+                                                    }
+                                                },
+                                                {
+                                                    "required": [
+                                                        "type",
+                                                        "value"
+                                                    ],
+                                                    "properties": {
+                                                        "type": {
+                                                            "const": "custom"
+                                                        },
+                                                        "value": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },
+                                {
+                                    "required": [
+                                        "type",
+                                        "key"
+                                    ],
+                                    "properties": {
+                                        "type": {
+                                            "const": "keyboard_input"
+                                        },
+                                        "key": {
+                                            "type": "string",
+                                            "description": "Logical key value using W3C KeyboardEvent.key names. This is a functional-level single key stroke (server injects press + release)."
+                                        },
+                                        "chars": {
+                                            "type": "string",
+                                            "description": "Optional text payload. Server emits UiEvent::ReceiveChars between press/release. If omitted, server auto-infers text for printable single-character keys (and Space/Tab)."
+                                        }
+                                    }
+                                },
+                                {
+                                    "required": [
+                                        "type",
+                                        "key",
+                                        "state"
+                                    ],
+                                    "properties": {
+                                        "type": {
+                                            "const": "raw_keyboard_input"
+                                        },
+                                        "key": {
+                                            "type": "string",
+                                            "description": "Logical key value using W3C KeyboardEvent.key names."
+                                        },
+                                        "state": {
+                                            "type": "string",
+                                            "enum": [
+                                                "pressed",
+                                                "released"
+                                            ]
+                                        },
+                                        "physical_key": {
+                                            "type": "string",
+                                            "description": "Optional physical key code using W3C KeyboardEvent.code names (e.g. 'KeyA', 'Digit1', 'Enter', 'ArrowLeft'). If omitted, server derives it for supported keys."
+                                        },
+                                        "is_repeat": {
+                                            "type": "boolean",
+                                            "description": "Whether this is an auto-repeat key event."
+                                        },
+                                        "location": {
+                                            "type": "string",
+                                            "enum": [
+                                                "standard",
+                                                "left",
+                                                "right",
+                                                "numpad"
+                                            ],
+                                            "description": "Physical key location."
+                                        },
+                                        "chars": {
+                                            "type": "string",
+                                            "description": "Optional text payload. When `state` is `pressed`, server emits UiEvent::ReceiveChars using this value."
+                                        }
+                                    }
+                                },
+                                {
+                                    "required": [
+                                        "type"
+                                    ],
+                                    "properties": {
+                                        "type": {
+                                            "const": "click"
+                                        },
+                                        "id": {
+                                            "type": "string",
+                                            "description": "Optional widget target ID. Supported formats: '3', '3:0', or '{\"index1\":3,\"stamp\":0}'. If both `id` and `x`/`y` are present, `x`/`y` takes precedence."
+                                        },
+                                        "x": {
+                                            "type": "number"
+                                        },
+                                        "y": {
+                                            "type": "number"
+                                        },
+                                        "button": {
+                                            "type": "string",
+                                            "description": "Mouse button name. Use `primary|secondary|auxiliary|fourth|fifth`.",
+                                            "enum": [
+                                                "primary",
+                                                "secondary",
+                                                "auxiliary",
+                                                "fourth",
+                                                "fifth"
+                                            ]
+                                        },
+                                        "device_id": {
+                                            "type": "object",
+                                            "description": "Optional device identifier. Omit for default dummy device.",
+                                            "oneOf": [
+                                                {
+                                                    "required": [
+                                                        "type"
+                                                    ],
+                                                    "properties": {
+                                                        "type": {
+                                                            "const": "dummy"
+                                                        }
+                                                    }
+                                                },
+                                                {
+                                                    "required": [
+                                                        "type",
+                                                        "value"
+                                                    ],
+                                                    "properties": {
+                                                        "type": {
+                                                            "const": "custom"
+                                                        },
+                                                        "value": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },
+                                {
+                                    "required": [
+                                        "type"
+                                    ],
+                                    "properties": {
+                                        "type": {
+                                            "const": "double_click"
+                                        },
+                                        "id": {
+                                            "type": "string",
+                                            "description": "Optional widget target ID. Supported formats: '3', '3:0', or '{\"index1\":3,\"stamp\":0}'. If both `id` and `x`/`y` are present, `x`/`y` takes precedence."
+                                        },
+                                        "x": {
+                                            "type": "number"
+                                        },
+                                        "y": {
+                                            "type": "number"
+                                        },
+                                        "button": {
+                                            "type": "string",
+                                            "description": "Mouse button name. Use `primary|secondary|auxiliary|fourth|fifth`.",
+                                            "enum": [
+                                                "primary",
+                                                "secondary",
+                                                "auxiliary",
+                                                "fourth",
+                                                "fifth"
+                                            ]
+                                        },
+                                        "device_id": {
+                                            "type": "object",
+                                            "description": "Optional device identifier. Omit for default dummy device.",
+                                            "oneOf": [
+                                                {
+                                                    "required": [
+                                                        "type"
+                                                    ],
+                                                    "properties": {
+                                                        "type": {
+                                                            "const": "dummy"
+                                                        }
+                                                    }
+                                                },
+                                                {
+                                                    "required": [
+                                                        "type",
+                                                        "value"
+                                                    ],
+                                                    "properties": {
+                                                        "type": {
+                                                            "const": "custom"
+                                                        },
+                                                        "value": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },
+                                {
+                                    "required": [
+                                        "type",
+                                        "chars"
+                                    ],
+                                    "properties": {
+                                        "type": {
+                                            "const": "chars"
+                                        },
+                                        "chars": {
+                                            "type": "string",
+                                            "description": "Quick text input event. Maps to UiEvent::ReceiveChars."
+                                        }
+                                    }
+                                },
+                                {
+                                    "required": [
+                                        "type"
+                                    ],
+                                    "properties": {
+                                        "type": {
+                                            "const": "modifiers_changed"
+                                        },
+                                        "shift": {
+                                            "type": "boolean"
+                                        },
+                                        "ctrl": {
+                                            "type": "boolean"
+                                        },
+                                        "alt": {
+                                            "type": "boolean"
+                                        },
+                                        "logo": {
+                                            "type": "boolean"
+                                        }
+                                    }
+                                },
+                                {
+                                    "required": [
+                                        "type"
+                                    ],
+                                    "properties": {
+                                        "type": {
+                                            "const": "redraw_request"
+                                        },
+                                        "force": {
+                                            "type": "boolean"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
             }
         }
     ],

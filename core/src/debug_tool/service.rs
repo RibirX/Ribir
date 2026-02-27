@@ -13,7 +13,7 @@ use super::{
   helpers,
   overlays::get_overlays,
   server::DebugServerState,
-  types::{DebugCommand, InspectOptions, WindowInfo},
+  types::{DebugCommand, InjectEventsResult, InjectedUiEvent, InspectOptions, WindowInfo},
 };
 use crate::window::WindowId;
 
@@ -177,6 +177,28 @@ pub async fn clear_overlays_svc(
     .await
     .map_err(|_| ServiceError::Internal("Failed to send command".into()))?;
   Ok(())
+}
+
+/// Inject serialized input events into the shared UI event loop path.
+pub async fn inject_events_svc(
+  state: &DebugServerState, window_id: Option<WindowId>, events: Vec<InjectedUiEvent>,
+) -> ServiceResult<InjectEventsResult> {
+  if events.is_empty() {
+    return Err(ServiceError::Internal("events must not be empty".into()));
+  }
+
+  let (reply_tx, reply_rx) = oneshot::channel();
+  state
+    .command_tx
+    .send(DebugCommand::InjectEvents { window_id, events, reply: reply_tx })
+    .await
+    .map_err(|_| ServiceError::Internal("Failed to send command".into()))?;
+
+  match reply_rx.await {
+    Ok(Ok(result)) => Ok(result),
+    Ok(Err(msg)) => Err(ServiceError::Internal(msg)),
+    Err(_) => Err(ServiceError::Internal("Failed to receive response".into())),
+  }
 }
 
 /// Parse options string into InspectOptions.
