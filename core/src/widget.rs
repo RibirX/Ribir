@@ -130,7 +130,10 @@ pub trait Render: 'static {
   /// Default implementation returns the type name.
   #[cfg(feature = "debug")]
   fn debug_name(&self) -> std::borrow::Cow<'static, str> {
-    std::borrow::Cow::Borrowed(std::any::type_name::<Self>())
+    use crate::debug_tool::resolve_debug_name;
+    std::borrow::Cow::Borrowed(
+      resolve_debug_name::<Self>().unwrap_or_else(|| std::any::type_name::<Self>()),
+    )
   }
 
   /// Returns debug properties as a JSON value for debugging tools.
@@ -226,7 +229,7 @@ impl GenWidget {
 
 impl<W: ComposeChild<'static, Child = Option<C>>, C> Compose for W {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
-    ComposeChild::compose_child(this, None)
+    ComposeChild::compose_child(this, None).attach_debug_name::<W>()
   }
 }
 
@@ -275,6 +278,19 @@ impl<'w> Widget<'w> {
   pub fn attach_data(self, data: Box<dyn Query>) -> Self {
     self.on_build(|id| id.attach_data(data, BuildCtx::get_mut().tree_mut()))
   }
+
+  #[cfg(feature = "debug")]
+  pub fn attach_debug_name<T: ?Sized>(self) -> Self {
+    if let Some(name) = crate::debug_tool::resolve_debug_name::<T>() {
+      self.attach_data(Box::new(Queryable(crate::debug_tool::OriginWidgetName(name))))
+    } else {
+      self
+    }
+  }
+
+  #[cfg(not(feature = "debug"))]
+  #[inline]
+  pub fn attach_debug_name<T: ?Sized>(self) -> Self { self }
 
   /// Attach a state to a widget and try to unwrap it before attaching.
   ///

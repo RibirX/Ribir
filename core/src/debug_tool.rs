@@ -18,6 +18,7 @@ mod types;
 
 use std::sync::{Arc, OnceLock};
 
+pub(crate) use helpers::{OriginWidgetName, resolve_debug_name};
 pub(crate) use overlays::paint_debug_overlays;
 pub use overlays::{clear_overlays, set_overlay_hex};
 use ribir_painter::PixelImage;

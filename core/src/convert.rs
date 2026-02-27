@@ -132,14 +132,14 @@ impl<K: ?Sized> NotWidgetSelf for PipeOptionWidget<K> {}
 
 // Base composition conversion for static components
 impl<C: Compose + 'static> RFrom<C, OtherWidget<dyn Compose>> for Widget<'static> {
-  fn r_from(widget: C) -> Self { Compose::compose(Stateful::new(widget)) }
+  fn r_from(widget: C) -> Self { Compose::compose(Stateful::new(widget)).attach_debug_name::<C>() }
 }
 
 // State-aware composition conversion
 impl<W: StateWriter<Value: Compose + Sized>>
   RFrom<W, OtherWidget<dyn StateWriter<Value = &dyn Compose>>> for Widget<'static>
 {
-  fn r_from(widget: W) -> Self { Compose::compose(widget) }
+  fn r_from(widget: W) -> Self { Compose::compose(widget).attach_debug_name::<W::Value>() }
 }
 
 // Base render conversion
@@ -253,7 +253,11 @@ impl<'w, T, K> RFrom<FatObj<T>, OtherWidget<FatObj<K>>> for Widget<'w>
 where
   T: IntoWidget<'w, K>,
 {
-  fn r_from(value: FatObj<T>) -> Self { value.map(|w| w.into_widget()).compose() }
+  fn r_from(value: FatObj<T>) -> Self {
+    value
+      .map(|w| w.into_widget().attach_debug_name::<T>())
+      .compose()
+  }
 }
 
 // Pipe-to-widget conversion for reactive streams

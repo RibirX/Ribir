@@ -107,7 +107,7 @@ where
   #[inline]
   fn r_from(from: Pair<P, C>) -> Self {
     let Pair { parent, child } = from;
-    ComposeChild::compose_child(parent, child.r_into())
+    ComposeChild::compose_child(parent, child.r_into()).attach_debug_name::<P>()
   }
 }
 

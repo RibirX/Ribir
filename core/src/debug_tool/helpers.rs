@@ -1,11 +1,208 @@
 //! Helper functions for the debug MCP server.
 
+use std::{
+  collections::HashMap,
+  sync::{LazyLock, RwLock},
+};
+
 use ribir_geom::{Point, Rect};
 use ribir_painter::Color;
 use serde_json::{Value, json};
 
 use super::types::*;
 use crate::{prelude::WidgetId, widget_tree::WidgetTree};
+
+pub(crate) struct OriginWidgetName(pub &'static str);
+
+const DEBUG_NAME_BLACKLIST: &[&str] =
+  &["Widget", "SingleKind", "MultiKind", "Pair", "SinglePair", "MultiPair", "PairOf", "XChild"];
+
+const DEBUG_BUILTIN_WIDGET_BLACKLIST: &[&str] = &[
+  "TrackWidgetId",
+  "Class",
+  "Padding",
+  "FittedBox",
+  "ConstrainedBox",
+  "FixedSize",
+  "RadiusWidget",
+  "BorderWidget",
+  "BackdropFilter",
+  "FilterWidget",
+  "BoxShadowWidget",
+  "Background",
+  "Foreground",
+  "ScrollableWidget",
+  "LayoutBox",
+  "MixBuiltin",
+  "Cursor",
+  "Margin",
+  "TransformWidget",
+  "Opacity",
+  "Visibility",
+  "Anchor",
+  "PaintingStyleWidget",
+  "TextAlignWidget",
+  "TextStyleWidget",
+  "KeepAlive",
+  "Tooltips",
+  "Disabled",
+  "ClipBoundary",
+  "Provider",
+  "Reuse",
+];
+const DEBUG_STRIP_GENERIC_TARGETS: &[&str] = &["Stateful", "FatObj"];
+
+fn is_blacklisted_name(name: &str) -> bool {
+  DEBUG_NAME_BLACKLIST
+    .iter()
+    .any(|item| item.eq_ignore_ascii_case(name))
+}
+
+fn is_strip_generic_target(name: &str) -> bool {
+  DEBUG_STRIP_GENERIC_TARGETS
+    .iter()
+    .any(|item| item.eq_ignore_ascii_case(name))
+}
+
+fn is_builtin_widget_name(name: &str) -> bool {
+  DEBUG_BUILTIN_WIDGET_BLACKLIST
+    .iter()
+    .any(|item| item.eq_ignore_ascii_case(name))
+}
+
+fn is_builtin_widget_type_path(path: &str) -> bool {
+  path
+    .to_ascii_lowercase()
+    .contains("::builtin_widgets::")
+}
+
+fn is_forbidden_generic_target(name: &str) -> bool { name.eq_ignore_ascii_case("Widget") }
+
+fn short_type_name(name: &str) -> &str { name.rsplit("::").next().unwrap_or(name).trim() }
+
+fn first_non_lifetime_generic_arg(inner: &str) -> Option<&str> {
+  let mut depth = 0usize;
+  let mut start = 0usize;
+
+  for (idx, ch) in inner.char_indices() {
+    match ch {
+      '<' => depth += 1,
+      '>' if depth > 0 => depth -= 1,
+      ',' if depth == 0 => {
+        let arg = inner[start..idx].trim();
+        if !arg.is_empty() && !arg.starts_with('\'') {
+          return Some(arg);
+        }
+        start = idx + 1;
+      }
+      _ => {}
+    }
+  }
+
+  let last = inner[start..].trim();
+  if last.is_empty() || last.starts_with('\'') { None } else { Some(last) }
+}
+
+fn split_outer_generic(ty: &str) -> (&str, Option<&str>) {
+  let ty = ty.trim();
+  let mut depth = 0usize;
+  let mut generic_start = None;
+  let mut generic_end = None;
+
+  for (idx, ch) in ty.char_indices() {
+    match ch {
+      '<' if depth == 0 => {
+        generic_start = Some(idx);
+        depth = 1;
+      }
+      '<' => depth += 1,
+      '>' if depth > 0 => {
+        depth -= 1;
+        if depth == 0 {
+          generic_end = Some(idx);
+          break;
+        }
+      }
+      _ => {}
+    }
+  }
+
+  match (generic_start, generic_end) {
+    (Some(start), Some(end)) => {
+      let outer = ty[..start].trim();
+      let inner = ty[start + 1..end].trim();
+      if inner.is_empty() {
+        return (outer, None);
+      }
+
+      (outer, first_non_lifetime_generic_arg(inner))
+    }
+    _ => (ty, None),
+  }
+}
+
+fn simplify_widget_name_recursive(ty: &str) -> Option<&str> {
+  let (outer, first_arg) = split_outer_generic(ty);
+  let outer_short = short_type_name(outer);
+
+  if is_forbidden_generic_target(outer_short) || is_builtin_widget_type_path(outer) {
+    return None;
+  }
+
+  if is_strip_generic_target(outer_short)
+    || is_blacklisted_name(outer_short)
+    || is_builtin_widget_name(outer_short)
+  {
+    return first_arg.and_then(simplify_widget_name_recursive);
+  }
+
+  let short = outer_short
+    .strip_suffix("Widget")
+    .unwrap_or(outer_short)
+    .trim();
+
+  if short.is_empty() || is_blacklisted_name(short) || is_builtin_widget_name(short) {
+    first_arg.and_then(simplify_widget_name_recursive)
+  } else {
+    Some(short)
+  }
+}
+
+fn simplify_widget_name(raw: &str) -> Option<&str> {
+  let normalized = raw
+    .trim()
+    .trim_matches('{')
+    .trim_matches('}')
+    .trim();
+  if normalized.is_empty() || normalized.contains("closure") {
+    return None;
+  }
+
+  simplify_widget_name_recursive(normalized)
+}
+
+static DEBUG_WIDGET_NAME_CACHE: LazyLock<RwLock<HashMap<&'static str, Option<&'static str>>>> =
+  LazyLock::new(|| RwLock::new(HashMap::new()));
+
+pub(crate) fn resolve_debug_name<T: ?Sized>() -> Option<&'static str> {
+  let full_name = std::any::type_name::<T>();
+
+  if let Some(cached_name) = DEBUG_WIDGET_NAME_CACHE
+    .read()
+    .ok()
+    .and_then(|cache| cache.get(full_name).copied())
+  {
+    return cached_name;
+  }
+
+  let display_name = simplify_widget_name(full_name);
+
+  if let Ok(mut cache) = DEBUG_WIDGET_NAME_CACHE.write() {
+    cache.insert(full_name, display_name);
+  }
+
+  display_name
+}
 
 /// Build the layout tree recursively from WidgetTree.
 ///
@@ -40,9 +237,13 @@ pub(crate) fn build_layout_info_json(
   id: WidgetId, tree: &WidgetTree, options: InspectOptions,
 ) -> Option<Value> {
   let render = id.get(tree)?;
+  let name = id
+    .query_ref::<OriginWidgetName>(tree)
+    .map(|n| n.0.to_string())
+    .unwrap_or_else(|| render.as_render().debug_name().to_string());
 
   let mut obj = serde_json::Map::new();
-  obj.insert("name".to_string(), Value::String(render.as_render().debug_name().into_owned()));
+  obj.insert("name".to_string(), Value::String(name));
 
   if options.id {
     obj.insert("id".to_string(), serde_json::to_value(id).unwrap_or(Value::Null));
