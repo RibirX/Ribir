@@ -265,7 +265,10 @@ async fn handle_tool_call(
   };
   let parse_window_id = |v: &Value| -> Option<crate::window::WindowId> {
     match v {
-      Value::String(s) => s.parse::<u64>().ok().map(crate::window::WindowId::from),
+      Value::String(s) => s
+        .parse::<u64>()
+        .ok()
+        .map(crate::window::WindowId::from),
       Value::Number(n) => n.as_u64().map(crate::window::WindowId::from),
       _ => None,
     }

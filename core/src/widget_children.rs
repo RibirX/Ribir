@@ -377,7 +377,10 @@ impl<P: XParent> Parent for FatObj<P> {
     Self: 'w,
   {
     self
-      .map(|p| p.x_with_children(children))
+      .map(|p| {
+        p.x_with_children(children)
+          .attach_debug_name::<P>()
+      })
       .compose()
   }
 }
@@ -440,6 +443,7 @@ where
         ComposeChild::compose_child(parent, child)
       })
       .into_widget()
+      .attach_debug_name::<W>()
   }
 }
 
