@@ -263,12 +263,17 @@ async fn handle_tool_call(
       .and_then(|a| a.get(key))
       .and_then(|v| v.as_str())
   };
+  let parse_window_id = |v: &Value| -> Option<crate::window::WindowId> {
+    match v {
+      Value::String(s) => s.parse::<u64>().ok().map(crate::window::WindowId::from),
+      Value::Number(n) => n.as_u64().map(crate::window::WindowId::from),
+      _ => None,
+    }
+  };
   let get_window_id = || -> Option<crate::window::WindowId> {
-    get_str("window_id").and_then(|s| {
-      s.parse::<u64>()
-        .ok()
-        .map(crate::window::WindowId::from)
-    })
+    args
+      .and_then(|a| a.get("window_id"))
+      .and_then(parse_window_id)
   };
 
   match params.name.as_str() {
@@ -542,6 +547,37 @@ async fn handle_tool_call(
         Err(code) => {
           JsonRpcResponse::error(id, -32000, format!("Failed to capture one shot: status {}", code))
         }
+      }
+    }
+
+    "inject_events" => {
+      let args = params.arguments.unwrap_or(Value::Null);
+      let args_obj = match args.as_object() {
+        Some(obj) => obj,
+        None => return JsonRpcResponse::error(id, -32602, "Invalid params: expected object"),
+      };
+
+      let window_id = args_obj
+        .get("window_id")
+        .and_then(parse_window_id);
+
+      let Some(events_value) = args_obj.get("events").cloned() else {
+        return JsonRpcResponse::error(id, -32602, "Missing required argument: events");
+      };
+      let events: Vec<crate::debug_tool::types::InjectedUiEvent> =
+        match serde_json::from_value(events_value) {
+          Ok(v) => v,
+          Err(e) => return JsonRpcResponse::error(id, -32602, format!("Invalid params: {}", e)),
+        };
+
+      match inject_events_svc(&state, window_id, events).await {
+        Ok(result) => {
+          let text = serde_json::to_string_pretty(&result).unwrap_or_default();
+          let result =
+            CallToolResult { content: vec![ToolContent::Text { text }], is_error: false };
+          JsonRpcResponse::result(id, serde_json::to_value(result).unwrap())
+        }
+        Err(e) => JsonRpcResponse::error(id, -32000, format!("Failed to inject events: {}", e)),
       }
     }
 

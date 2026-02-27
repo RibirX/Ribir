@@ -46,6 +46,8 @@ pub struct AppCtx {
   typography_store: RefCell<TypographyStore>,
   clipboard: RefCell<Box<dyn Clipboard>>,
   event_sender: RefCell<Option<UnboundedSender<FrameworkEvent>>>,
+  #[cfg(feature = "debug")]
+  ui_event_sender: RefCell<Option<UnboundedSender<UiEvent>>>,
   shell: RefCell<Option<BoxShell>>,
   change_dataset: ChangeDataset,
   #[cfg(not(target_arch = "wasm32"))]
@@ -132,10 +134,34 @@ impl AppCtx {
     #[cfg(not(target_arch = "wasm32"))]
     std::thread::spawn(move || {
       let event_loop = AppCtx::init(shell);
+
+      #[cfg(feature = "debug")]
+      let (ui_sender, ui_receiver) = unbounded_channel();
+
+      #[cfg(feature = "debug")]
+      {
+        *AppCtx::shared().ui_event_sender.borrow_mut() = Some(ui_sender.clone());
+      }
+
       // Drive the app main future inside a LocalSet for the whole lifetime of
       // the AppCtx thread. This ensures `spawn_local` remains valid as long as
       // the main loop is running.
       let main_fut = async {
+        #[cfg(feature = "debug")]
+        let mut upstream_ui_events = ui_events;
+
+        #[cfg(feature = "debug")]
+        let merged_sender = ui_sender.clone();
+
+        #[cfg(feature = "debug")]
+        AppCtx::spawn_local(async move {
+          while let Some(event) = upstream_ui_events.recv().await {
+            if merged_sender.send(event).is_err() {
+              break;
+            }
+          }
+        });
+
         init.await;
 
         #[cfg(feature = "debug")]
@@ -143,7 +169,15 @@ impl AppCtx {
           crate::debug_tool::start_debug_server();
         }
 
-        event_loop.run(ui_events).await
+        #[cfg(feature = "debug")]
+        {
+          event_loop.run(ui_receiver).await;
+        }
+
+        #[cfg(not(feature = "debug"))]
+        {
+          event_loop.run(ui_events).await;
+        }
       };
       let local_set = &*AppCtx::shared().local_set.borrow();
       RUNTIME.block_on(local_set.run_until(main_fut));
@@ -151,9 +185,42 @@ impl AppCtx {
     #[cfg(target_arch = "wasm32")]
     {
       let event_loop = AppCtx::init(shell);
+
+      #[cfg(feature = "debug")]
+      let (ui_sender, ui_receiver) = unbounded_channel();
+
+      #[cfg(feature = "debug")]
+      {
+        *AppCtx::shared().ui_event_sender.borrow_mut() = Some(ui_sender.clone());
+      }
+
       AppCtx::spawn_local(async move {
+        #[cfg(feature = "debug")]
+        let mut upstream_ui_events = ui_events;
+
+        #[cfg(feature = "debug")]
+        let merged_sender = ui_sender.clone();
+
+        #[cfg(feature = "debug")]
+        AppCtx::spawn_local(async move {
+          while let Some(event) = upstream_ui_events.recv().await {
+            if merged_sender.send(event).is_err() {
+              break;
+            }
+          }
+        });
+
         init.await;
-        event_loop.run(ui_events).await
+
+        #[cfg(feature = "debug")]
+        {
+          event_loop.run(ui_receiver).await;
+        }
+
+        #[cfg(not(feature = "debug"))]
+        {
+          event_loop.run(ui_events).await;
+        }
       });
     }
   }
@@ -167,6 +234,14 @@ impl AppCtx {
   pub fn exit() {
     AppCtx::spawn_local(async move {
       AppCtx::shared().event_sender.borrow_mut().take();
+
+      #[cfg(feature = "debug")]
+      {
+        AppCtx::shared()
+          .ui_event_sender
+          .borrow_mut()
+          .take();
+      }
     });
   }
 
@@ -303,6 +378,16 @@ impl AppCtx {
       false
     }
   }
+
+  #[cfg(feature = "debug")]
+  pub(crate) fn send_ui_event(event: UiEvent) -> bool {
+    if let Some(event_sender) = AppCtx::shared().ui_event_sender.borrow().as_ref() {
+      event_sender.send(event).is_ok()
+    } else {
+      warn!("UI event sender not found, must call AppCtx::run().");
+      false
+    }
+  }
 }
 
 impl AppCtx {
@@ -409,6 +494,8 @@ impl Default for AppCtx {
       windows: RefCell::new(ahash::HashMap::default()),
       change_dataset: ChangeDataset::default(),
       event_sender: RefCell::new(None),
+      #[cfg(feature = "debug")]
+      ui_event_sender: RefCell::new(None),
       shell: RefCell::new(None),
       #[cfg(not(target_arch = "wasm32"))]
       local_set: RefCell::new(LocalSet::new()), // Will be reset in first test
@@ -502,6 +589,8 @@ pub mod test_utils {
   pub struct TestRuntimeGuard {
     _sender: UnboundedSender<UiEvent>,
     old_sender: Option<UnboundedSender<FrameworkEvent>>,
+    #[cfg(feature = "debug")]
+    old_ui_sender: Option<UnboundedSender<UiEvent>>,
     _runtime_guard: EnterGuard<'static>,
     _local_enter_guard: tokio::task::LocalEnterGuard,
   }
@@ -516,8 +605,25 @@ pub mod test_utils {
       }
       AppCtx::run_until_stalled();
       AppCtx::shared().event_sender.borrow_mut().take();
+
+      #[cfg(feature = "debug")]
+      {
+        AppCtx::shared()
+          .ui_event_sender
+          .borrow_mut()
+          .take();
+      }
+
       AppCtx::run_until_stalled();
       std::mem::swap(&mut *AppCtx::shared().event_sender.borrow_mut(), &mut self.old_sender);
+
+      #[cfg(feature = "debug")]
+      {
+        std::mem::swap(
+          &mut *AppCtx::shared().ui_event_sender.borrow_mut(),
+          &mut self.old_ui_sender,
+        );
+      }
     }
   }
 
@@ -575,6 +681,11 @@ pub mod test_utils {
       let (sender, receiver) = unbounded_channel();
       let (ui_sender, ui_receiver) = unbounded_channel();
       let old_sender = Option::replace(&mut *AppCtx::shared().event_sender.borrow_mut(), sender);
+
+      #[cfg(feature = "debug")]
+      let old_ui_sender =
+        Option::replace(&mut *AppCtx::shared().ui_event_sender.borrow_mut(), ui_sender.clone());
+
       *AppCtx::shared().shell.borrow_mut() = Some(Box::new(TestShell {}));
 
       // Enter the LocalSet context so that tokio::task::spawn_local (used by rxRust)
@@ -595,7 +706,14 @@ pub mod test_utils {
         event_loop.run(ui_receiver).await;
       });
       let _runtime_guard = AppCtx::enter();
-      TestRuntimeGuard { _sender: ui_sender, old_sender, _runtime_guard, _local_enter_guard }
+      TestRuntimeGuard {
+        _sender: ui_sender,
+        old_sender,
+        #[cfg(feature = "debug")]
+        old_ui_sender,
+        _runtime_guard,
+        _local_enter_guard,
+      }
     }
 
     pub fn insert_window(wnd: Rc<Window>) {
