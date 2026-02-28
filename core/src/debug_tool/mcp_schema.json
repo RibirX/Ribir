@@ -1,747 +1,534 @@
 {
-    "adapter_version": "0.4.0",
-    "fallback_init_result": {
-        "protocolVersion": "2024-11-05",
-        "capabilities": {
-            "tools": {
-                "listChanged": false
-            },
-            "resources": {
-                "listChanged": false,
-                "subscribe": false,
-                "subscribeSupported": false
-            }
-        },
-        "serverInfo": {
-            "name": "Ribir Debug Server",
-            "version": "0.4.0",
-            "description": "Debug and inspect running Ribir applications. Capture screenshots, explore widget tree, add visual overlays, view logs, and record frames. The HTTP server binds to 127.0.0.1:2333 and increments until a free port is found (fallback to a dynamic port). Use RIBIR_DEBUG_URL or the port registry for discovery."
-        }
+  "adapter_version": "0.4.0",
+  "fallback_init_result": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {
+      "tools": {
+        "listChanged": false
+      },
+      "resources": {
+        "listChanged": false,
+        "subscribe": false,
+        "subscribeSupported": false
+      }
     },
-    "tools": [
-        {
-            "name": "start_app",
-            "description": "Start or attach a Ribir debug session for a runnable crate path. This tool first tries to attach an existing session for project_path, then launches `cargo run --features debug` if no session is found. Use an absolute crate path (not workspace root).",
-            "inputSchema": {
-                "type": "object",
-                "required": [
-                    "project_path"
-                ],
-                "properties": {
-                    "project_path": {
-                        "type": "string",
-                        "description": "Absolute path to a runnable Rust crate directory containing Cargo.toml. Do not pass workspace root unless it is directly runnable."
-                    },
-                    "features": {
-                        "type": "string",
-                        "description": "Comma-separated extra features to merge with `debug`."
-                    },
-                    "cargo_args": {
-                        "description": "Additional cargo arguments to pass to the run command.",
-                        "oneOf": [
-                            {
-                                "type": "string",
-                                "description": "Space-separated cargo arguments."
-                            },
-                            {
-                                "type": "array",
-                                "items": {
-                                    "type": "string"
-                                },
-                                "description": "Array form of cargo arguments."
-                            }
-                        ]
-                    },
-                    "adopt": {
-                        "type": "boolean",
-                        "description": "Whether this MCP server should manage and stop the process via stop_app. Default true."
-                    }
-                }
-            }
-        },
-        {
-            "name": "attach_app",
-            "description": "Attach to an already running Ribir debug server by explicit URL (for example from RIBIR_DEBUG_URL).",
-            "inputSchema": {
-                "type": "object",
-                "required": [
-                    "url"
-                ],
-                "properties": {
-                    "url": {
-                        "type": "string",
-                        "description": "Debug server base URL, e.g. http://127.0.0.1:2333"
-                    },
-                    "adopt": {
-                        "type": "boolean",
-                        "description": "Attempt to adopt process ownership for cleanup via stop_app when PID can be resolved from registry."
-                    }
-                }
-            }
-        },
-        {
-            "name": "stop_app",
-            "description": "Stop only the process currently managed by this MCP server (launched or adopted). No-op when nothing is managed.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {}
-            }
-        },
-        {
-            "name": "capture_screenshot",
-            "description": "Capture a screenshot of the specified window. Returns the image as base64-encoded PNG data in the response.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "window_id": {
-                        "type": "string",
-                        "description": "Window ID as decimal u64 string from ribir://windows (optional). Note: currently ignored by implementation; screenshot targets the default/primary active window.",
-                        "examples": [
-                            "140226801569568"
-                        ]
-                    }
-                }
-            }
-        },
-        {
-            "name": "inspect_tree",
-            "description": "Get the full widget tree structure",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "window_id": {
-                        "type": "string",
-                        "description": "Window ID as decimal u64 string from ribir://windows (optional). If omitted, uses the first active window.",
-                        "examples": [
-                            "140226801569568"
-                        ]
-                    },
-                    "options": {
-                        "type": "string",
-                        "description": "Filter what to show. Options: 'all' (everything), 'id' (WidgetId), 'layout' (pos+size), 'global_pos' (screen coords), 'clamp' (constraints), 'props' (widget properties). For example, with 'props', a Text widget includes its text property value. Prefix with 'no_' to exclude (e.g. 'all,no_props')."
-                    }
-                }
-            }
-        },
-        {
-            "name": "inspect_widget",
-            "description": "Get details for a specific widget by ID",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "window_id": {
-                        "type": "string",
-                        "description": "Window ID as decimal u64 string from ribir://windows (optional). If omitted, uses the first active window.",
-                        "examples": [
-                            "140226801569568"
-                        ]
-                    },
-                    "options": {
-                        "type": "string",
-                        "description": "Filter what to show. Options: 'all' (everything), 'id' (WidgetId), 'layout' (pos+size), 'global_pos' (screen coords), 'clamp' (constraints), 'props' (widget properties). For example, with 'props', a Text widget includes its text property value. Prefix with 'no_' to exclude (e.g. 'all,no_props')."
-                    },
-                    "id": {
-                        "type": "string",
-                        "description": "Widget ID to inspect. Supported formats: '3', '3:0', or '{\"index1\":3,\"stamp\":0}'."
-                    }
-                },
-                "required": [
-                    "id"
-                ]
-            }
-        },
-        {
-            "name": "get_overlays",
-            "description": "List all active overlays",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "window_id": {
-                        "type": "string",
-                        "description": "Window ID as decimal u64 string from ribir://windows (optional). If omitted, uses the first active window.",
-                        "examples": [
-                            "140226801569568"
-                        ]
-                    }
-                }
-            }
-        },
-        {
-            "name": "set_log_filter",
-            "description": "Set the log filter (e.g., 'info,ribir_core=debug')",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "filter": {
-                        "type": "string",
-                        "description": "Filter string"
-                    }
-                },
-                "required": [
-                    "filter"
-                ]
-            }
-        },
-        {
-            "name": "add_overlay",
-            "description": "Add a visual highlight overlay to a widget for debugging purposes",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "window_id": {
-                        "type": "string",
-                        "description": "Window ID as decimal u64 string from ribir://windows (optional). If omitted, uses the first active window.",
-                        "examples": [
-                            "140226801569568"
-                        ]
-                    },
-                    "id": {
-                        "type": "string",
-                        "description": "Widget ID (e.g., '3', '3:0', or '{\"index1\":3,\"stamp\":0}')"
-                    },
-                    "color": {
-                        "type": "string",
-                        "description": "Color hex code (optional, #RRGGBB or #RRGGBBAA, default: #FF000080)"
-                    }
-                },
-                "required": [
-                    "id"
-                ]
-            }
-        },
-        {
-            "name": "remove_overlay",
-            "description": "Remove a specific visual debug overlay from a widget",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "window_id": {
-                        "type": "string",
-                        "description": "Window ID as decimal u64 string from ribir://windows (optional). If omitted, uses the first active window.",
-                        "examples": [
-                            "140226801569568"
-                        ]
-                    },
-                    "id": {
-                        "type": "string",
-                        "description": "Widget ID of the overlay to remove. Supported formats: '3', '3:0', or '{\"index1\":3,\"stamp\":0}'."
-                    }
-                },
-                "required": [
-                    "id"
-                ]
-            }
-        },
-        {
-            "name": "clear_overlays",
-            "description": "Clear all visual debug overlays from the window",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "window_id": {
-                        "type": "string",
-                        "description": "Window ID as decimal u64 string from ribir://windows (optional). If omitted, clears overlays for all windows."
-                    }
-                }
-            }
-        },
-        {
-            "name": "start_recording",
-            "description": "Start a capture session for frame recording. Output is written under $RIBIR_CAPTURE_DIR (default ./captures/{capture_id}/frames).",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "include": {
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "enum": [
-                                "logs",
-                                "images"
-                            ]
-                        },
-                        "description": "Optional capture channels. Allowed values: 'logs', 'images'. Defaults to ['images'] when omitted."
-                    }
-                }
-            }
-        },
-        {
-            "name": "stop_recording",
-            "description": "Stop the active recording session and return absolute capture and manifest paths.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {}
-            }
-        },
-        {
-            "name": "capture_one_shot",
-            "description": "One-click capture: start -> request redraw (if images enabled) -> wait -> stop. Returns the capture session directory path. Default output directory is $RIBIR_CAPTURE_DIR or ./captures/{capture_id}/, containing frames/*.png, logs.jsonl and manifest.json",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "include": {
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "enum": [
-                                "logs",
-                                "images"
-                            ]
-                        },
-                        "description": "Capture channels to include. Allowed values: 'logs', 'images'."
-                    },
-                    "pre_ms": {
-                        "type": "integer",
-                        "description": "Ms of logs to include prior to start (default 2000)"
-                    },
-                    "post_ms": {
-                        "type": "integer",
-                        "description": "Ms of logs to include after stop (default 1000)"
-                    },
-                    "settle_ms": {
-                        "type": "integer",
-                        "description": "Extra time (ms) to wait after we observe a frame update (default 150)"
-                    },
-                    "output_dir": {
-                        "type": "string",
-                        "description": "Optional output directory"
-                    }
-                },
-                "required": [
-                    "include"
-                ]
-            }
-        },
-        {
-            "name": "inject_events",
-            "description": "Inject serialized input events into the application's UI event loop for interaction simulation. Events are executed in array order. Categories: Functional events (`click`, `double_click`, `keyboard_input`, `chars`) and low-level events (`cursor_moved`, `mouse_input` press/release, `raw_keyboard_input` press/release). IMPORTANT: event `type` values are snake_case and button values use `primary|secondary|auxiliary|fourth|fifth` (not `left|right|middle`).",
-            "inputSchema": {
-                "type": "object",
-                "required": [
-                    "events"
-                ],
-                "examples": [
-                    {
-                        "events": [
-                            {
-                                "type": "cursor_moved",
-                                "x": 160,
-                                "y": 120
-                            },
-                            {
-                                "type": "mouse_input",
-                                "button": "primary",
-                                "state": "pressed"
-                            },
-                            {
-                                "type": "mouse_input",
-                                "button": "primary",
-                                "state": "released"
-                            }
-                        ]
-                    },
-                    {
-                        "events": [
-                            {
-                                "type": "click",
-                                "id": "3:0",
-                                "button": "primary"
-                            },
-                            {
-                                "type": "keyboard_input",
-                                "key": "a",
-                                "chars": "a"
-                            },
-                            {
-                                "type": "chars",
-                                "chars": "hello"
-                            }
-                        ]
-                    }
-                ],
-                "properties": {
-                    "window_id": {
-                        "type": "integer",
-                        "description": "Window ID as u64 from ribir://windows (optional). If omitted, uses the first active window. If no active window exists, the call fails.",
-                        "examples": [
-                            140226801569568
-                        ]
-                    },
-                    "events": {
-                        "type": "array",
-                        "description": "Ordered event list. Each event uses a tagged object with `type`.",
-                        "items": {
-                            "type": "object",
-                            "oneOf": [
-                                {
-                                    "required": [
-                                        "type",
-                                        "x",
-                                        "y"
-                                    ],
-                                    "properties": {
-                                        "type": {
-                                            "const": "cursor_moved"
-                                        },
-                                        "x": {
-                                            "type": "number",
-                                            "description": "Cursor x in window coordinates."
-                                        },
-                                        "y": {
-                                            "type": "number",
-                                            "description": "Cursor y in window coordinates."
-                                        }
-                                    }
-                                },
-                                {
-                                    "required": [
-                                        "type"
-                                    ],
-                                    "properties": {
-                                        "type": {
-                                            "const": "cursor_left"
-                                        }
-                                    }
-                                },
-                                {
-                                    "required": [
-                                        "type",
-                                        "delta_x",
-                                        "delta_y"
-                                    ],
-                                    "properties": {
-                                        "type": {
-                                            "const": "mouse_wheel"
-                                        },
-                                        "delta_x": {
-                                            "type": "number"
-                                        },
-                                        "delta_y": {
-                                            "type": "number"
-                                        }
-                                    }
-                                },
-                                {
-                                    "required": [
-                                        "type",
-                                        "button",
-                                        "state"
-                                    ],
-                                    "properties": {
-                                        "type": {
-                                            "const": "mouse_input"
-                                        },
-                                        "button": {
-                                            "type": "string",
-                                            "description": "Mouse button name. Use `primary|secondary|auxiliary|fourth|fifth`.",
-                                            "enum": [
-                                                "primary",
-                                                "secondary",
-                                                "auxiliary",
-                                                "fourth",
-                                                "fifth"
-                                            ]
-                                        },
-                                        "state": {
-                                            "type": "string",
-                                            "enum": [
-                                                "pressed",
-                                                "released"
-                                            ]
-                                        },
-                                        "device_id": {
-                                            "type": "object",
-                                            "description": "Optional device identifier. Omit for default dummy device.",
-                                            "oneOf": [
-                                                {
-                                                    "required": [
-                                                        "type"
-                                                    ],
-                                                    "properties": {
-                                                        "type": {
-                                                            "const": "dummy"
-                                                        }
-                                                    }
-                                                },
-                                                {
-                                                    "required": [
-                                                        "type",
-                                                        "value"
-                                                    ],
-                                                    "properties": {
-                                                        "type": {
-                                                            "const": "custom"
-                                                        },
-                                                        "value": {
-                                                            "type": "integer"
-                                                        }
-                                                    }
-                                                }
-                                            ]
-                                        }
-                                    }
-                                },
-                                {
-                                    "required": [
-                                        "type",
-                                        "key"
-                                    ],
-                                    "properties": {
-                                        "type": {
-                                            "const": "keyboard_input"
-                                        },
-                                        "key": {
-                                            "type": "string",
-                                            "description": "Logical key value using W3C KeyboardEvent.key names. This is a functional-level single key stroke (server injects press + release)."
-                                        },
-                                        "chars": {
-                                            "type": "string",
-                                            "description": "Optional text payload. Server emits UiEvent::ReceiveChars between press/release. If omitted, server auto-infers text for printable single-character keys (and Space/Tab)."
-                                        }
-                                    }
-                                },
-                                {
-                                    "required": [
-                                        "type",
-                                        "key",
-                                        "state"
-                                    ],
-                                    "properties": {
-                                        "type": {
-                                            "const": "raw_keyboard_input"
-                                        },
-                                        "key": {
-                                            "type": "string",
-                                            "description": "Logical key value using W3C KeyboardEvent.key names."
-                                        },
-                                        "state": {
-                                            "type": "string",
-                                            "enum": [
-                                                "pressed",
-                                                "released"
-                                            ]
-                                        },
-                                        "physical_key": {
-                                            "type": "string",
-                                            "description": "Optional physical key code using W3C KeyboardEvent.code names (e.g. 'KeyA', 'Digit1', 'Enter', 'ArrowLeft'). If omitted, server derives it for supported keys."
-                                        },
-                                        "is_repeat": {
-                                            "type": "boolean",
-                                            "description": "Whether this is an auto-repeat key event."
-                                        },
-                                        "location": {
-                                            "type": "string",
-                                            "enum": [
-                                                "standard",
-                                                "left",
-                                                "right",
-                                                "numpad"
-                                            ],
-                                            "description": "Physical key location."
-                                        },
-                                        "chars": {
-                                            "type": "string",
-                                            "description": "Optional text payload. When `state` is `pressed`, server emits UiEvent::ReceiveChars using this value."
-                                        }
-                                    }
-                                },
-                                {
-                                    "required": [
-                                        "type"
-                                    ],
-                                    "properties": {
-                                        "type": {
-                                            "const": "click"
-                                        },
-                                        "id": {
-                                            "type": "string",
-                                            "description": "Optional widget target ID. Supported formats: '3', '3:0', or '{\"index1\":3,\"stamp\":0}'. If both `id` and `x`/`y` are present, `x`/`y` takes precedence."
-                                        },
-                                        "x": {
-                                            "type": "number"
-                                        },
-                                        "y": {
-                                            "type": "number"
-                                        },
-                                        "button": {
-                                            "type": "string",
-                                            "description": "Mouse button name. Use `primary|secondary|auxiliary|fourth|fifth`.",
-                                            "enum": [
-                                                "primary",
-                                                "secondary",
-                                                "auxiliary",
-                                                "fourth",
-                                                "fifth"
-                                            ]
-                                        },
-                                        "device_id": {
-                                            "type": "object",
-                                            "description": "Optional device identifier. Omit for default dummy device.",
-                                            "oneOf": [
-                                                {
-                                                    "required": [
-                                                        "type"
-                                                    ],
-                                                    "properties": {
-                                                        "type": {
-                                                            "const": "dummy"
-                                                        }
-                                                    }
-                                                },
-                                                {
-                                                    "required": [
-                                                        "type",
-                                                        "value"
-                                                    ],
-                                                    "properties": {
-                                                        "type": {
-                                                            "const": "custom"
-                                                        },
-                                                        "value": {
-                                                            "type": "integer"
-                                                        }
-                                                    }
-                                                }
-                                            ]
-                                        }
-                                    }
-                                },
-                                {
-                                    "required": [
-                                        "type"
-                                    ],
-                                    "properties": {
-                                        "type": {
-                                            "const": "double_click"
-                                        },
-                                        "id": {
-                                            "type": "string",
-                                            "description": "Optional widget target ID. Supported formats: '3', '3:0', or '{\"index1\":3,\"stamp\":0}'. If both `id` and `x`/`y` are present, `x`/`y` takes precedence."
-                                        },
-                                        "x": {
-                                            "type": "number"
-                                        },
-                                        "y": {
-                                            "type": "number"
-                                        },
-                                        "button": {
-                                            "type": "string",
-                                            "description": "Mouse button name. Use `primary|secondary|auxiliary|fourth|fifth`.",
-                                            "enum": [
-                                                "primary",
-                                                "secondary",
-                                                "auxiliary",
-                                                "fourth",
-                                                "fifth"
-                                            ]
-                                        },
-                                        "device_id": {
-                                            "type": "object",
-                                            "description": "Optional device identifier. Omit for default dummy device.",
-                                            "oneOf": [
-                                                {
-                                                    "required": [
-                                                        "type"
-                                                    ],
-                                                    "properties": {
-                                                        "type": {
-                                                            "const": "dummy"
-                                                        }
-                                                    }
-                                                },
-                                                {
-                                                    "required": [
-                                                        "type",
-                                                        "value"
-                                                    ],
-                                                    "properties": {
-                                                        "type": {
-                                                            "const": "custom"
-                                                        },
-                                                        "value": {
-                                                            "type": "integer"
-                                                        }
-                                                    }
-                                                }
-                                            ]
-                                        }
-                                    }
-                                },
-                                {
-                                    "required": [
-                                        "type",
-                                        "chars"
-                                    ],
-                                    "properties": {
-                                        "type": {
-                                            "const": "chars"
-                                        },
-                                        "chars": {
-                                            "type": "string",
-                                            "description": "Quick text input event. Maps to UiEvent::ReceiveChars."
-                                        }
-                                    }
-                                },
-                                {
-                                    "required": [
-                                        "type"
-                                    ],
-                                    "properties": {
-                                        "type": {
-                                            "const": "modifiers_changed"
-                                        },
-                                        "shift": {
-                                            "type": "boolean"
-                                        },
-                                        "ctrl": {
-                                            "type": "boolean"
-                                        },
-                                        "alt": {
-                                            "type": "boolean"
-                                        },
-                                        "logo": {
-                                            "type": "boolean"
-                                        }
-                                    }
-                                },
-                                {
-                                    "required": [
-                                        "type"
-                                    ],
-                                    "properties": {
-                                        "type": {
-                                            "const": "redraw_request"
-                                        },
-                                        "force": {
-                                            "type": "boolean"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
+    "serverInfo": {
+      "name": "Ribir Debug Server",
+      "version": "0.4.0",
+      "description": "Debug and inspect running Ribir applications. Capture screenshots, explore widget tree, add visual overlays, view logs, and record frames. The HTTP server binds to 127.0.0.1:2333 and increments until a free port is found (fallback to a dynamic port). Use RIBIR_DEBUG_URL or the port registry for discovery."
+    }
+  },
+  "tools": [
+    {
+      "name": "start_app",
+      "description": "Start or attach a Ribir debug session for a runnable crate path. This tool first tries to attach an existing session for project_path, then launches `cargo run --features debug` if no session is found. Use an absolute crate path (not workspace root).",
+      "inputSchema": {
+        "type": "object",
+        "required": ["project_path"],
+        "properties": {
+          "project_path": {
+            "type": "string",
+            "description": "Absolute path to a runnable Rust crate directory containing Cargo.toml. Do not pass workspace root unless it is directly runnable."
+          },
+          "features": {
+            "type": "string",
+            "description": "Comma-separated extra features to merge with `debug`."
+          },
+          "cargo_args": {
+            "description": "Additional cargo arguments to pass to the run command.",
+            "oneOf": [
+              {
+                "type": "string",
+                "description": "Space-separated cargo arguments."
+              },
+              {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Array form of cargo arguments."
+              }
+            ]
+          },
+          "adopt": {
+            "type": "boolean",
+            "description": "Whether this MCP server should manage and stop the process via stop_app. Default true."
+          }
         }
-    ],
-    "resources": [
-        {
-            "uri": "ribir://logs",
-            "name": "Application Logs",
-            "description": "Recent application logs (last 100 lines). Access via resources/read method with the given URI",
-            "mimeType": "text/plain"
-        },
-        {
-            "uri": "ribir://windows",
-            "name": "Window List",
-            "description": "List of active windows. Access via resources/read method with the given URI",
-            "mimeType": "application/json"
-        },
-        {
-            "uri": "ribir://status",
-            "name": "Server Status",
-            "description": "Debug server status (recording, filter, stats). Access via resources/read method with the given URI",
-            "mimeType": "application/json"
+      }
+    },
+    {
+      "name": "attach_app",
+      "description": "Attach to an already running Ribir debug server by explicit URL (for example from RIBIR_DEBUG_URL).",
+      "inputSchema": {
+        "type": "object",
+        "required": ["url"],
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Debug server base URL, e.g. http://127.0.0.1:2333"
+          },
+          "adopt": {
+            "type": "boolean",
+            "description": "Attempt to adopt process ownership for cleanup via stop_app when PID can be resolved from registry."
+          }
         }
-    ]
+      }
+    },
+    {
+      "name": "stop_app",
+      "description": "Stop only the process currently managed by this MCP server (launched or adopted). No-op when nothing is managed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "capture_screenshot",
+      "description": "Capture a screenshot of the specified window. Returns the image as base64-encoded PNG data in the response.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "window_id": {
+            "type": "string",
+            "description": "Window ID as decimal u64 string from ribir://windows (optional). Note: currently ignored by implementation; screenshot targets the default/primary active window.",
+            "examples": ["140226801569568"]
+          }
+        }
+      }
+    },
+    {
+      "name": "inspect_tree",
+      "description": "Get the full widget tree structure",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "window_id": {
+            "type": "string",
+            "description": "Window ID as decimal u64 string from ribir://windows (optional). If omitted, uses the first active window.",
+            "examples": ["140226801569568"]
+          },
+          "options": {
+            "type": "string",
+            "description": "Filter what to show. Options: 'all' (everything), 'id' (WidgetId), 'layout' (pos+size), 'global_pos' (screen coords), 'clamp' (constraints), 'props' (widget properties). For example, with 'props', a Text widget includes its text property value. Prefix with 'no_' to exclude (e.g. 'all,no_props')."
+          }
+        }
+      }
+    },
+    {
+      "name": "inspect_widget",
+      "description": "Get details for a specific widget by ID",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "window_id": {
+            "type": "string",
+            "description": "Window ID as decimal u64 string from ribir://windows (optional). If omitted, uses the first active window.",
+            "examples": ["140226801569568"]
+          },
+          "options": {
+            "type": "string",
+            "description": "Filter what to show. Options: 'all' (everything), 'id' (WidgetId), 'layout' (pos+size), 'global_pos' (screen coords), 'clamp' (constraints), 'props' (widget properties). For example, with 'props', a Text widget includes its text property value. Prefix with 'no_' to exclude (e.g. 'all,no_props')."
+          },
+          "id": {
+            "type": "string",
+            "description": "Widget ID to inspect. Supported formats: '3', '3:0', or '{\"index1\":3,\"stamp\":0}'."
+          }
+        },
+        "required": ["id"]
+      }
+    },
+    {
+      "name": "get_overlays",
+      "description": "List all active overlays",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "window_id": {
+            "type": "string",
+            "description": "Window ID as decimal u64 string from ribir://windows (optional). If omitted, uses the first active window.",
+            "examples": ["140226801569568"]
+          }
+        }
+      }
+    },
+    {
+      "name": "set_log_filter",
+      "description": "Set the log filter (e.g., 'info,ribir_core=debug')",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "string",
+            "description": "Filter string"
+          }
+        },
+        "required": ["filter"]
+      }
+    },
+    {
+      "name": "add_overlay",
+      "description": "Add a visual highlight overlay to a widget for debugging purposes",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "window_id": {
+            "type": "string",
+            "description": "Window ID as decimal u64 string from ribir://windows (optional). If omitted, uses the first active window.",
+            "examples": ["140226801569568"]
+          },
+          "id": {
+            "type": "string",
+            "description": "Widget ID (e.g., '3', '3:0', or '{\"index1\":3,\"stamp\":0}')"
+          },
+          "color": {
+            "type": "string",
+            "description": "Color hex code (optional, #RRGGBB or #RRGGBBAA, default: #FF000080)"
+          }
+        },
+        "required": ["id"]
+      }
+    },
+    {
+      "name": "remove_overlay",
+      "description": "Remove a specific visual debug overlay from a widget",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "window_id": {
+            "type": "string",
+            "description": "Window ID as decimal u64 string from ribir://windows (optional). If omitted, uses the first active window.",
+            "examples": ["140226801569568"]
+          },
+          "id": {
+            "type": "string",
+            "description": "Widget ID of the overlay to remove. Supported formats: '3', '3:0', or '{\"index1\":3,\"stamp\":0}'."
+          }
+        },
+        "required": ["id"]
+      }
+    },
+    {
+      "name": "clear_overlays",
+      "description": "Clear all visual debug overlays from the window",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "window_id": {
+            "type": "string",
+            "description": "Window ID as decimal u64 string from ribir://windows (optional). If omitted, clears overlays for all windows."
+          }
+        }
+      }
+    },
+    {
+      "name": "start_recording",
+      "description": "Start a capture session for frame recording. Output is written under $RIBIR_CAPTURE_DIR (default ./captures/{capture_id}/frames).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["logs", "images"]
+            },
+            "description": "Optional capture channels. Allowed values: 'logs', 'images'. Defaults to ['images'] when omitted."
+          }
+        }
+      }
+    },
+    {
+      "name": "stop_recording",
+      "description": "Stop the active recording session and return absolute capture and manifest paths.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "capture_one_shot",
+      "description": "One-click capture: start -> request redraw (if images enabled) -> wait -> stop. Returns the capture session directory path. Default output directory is $RIBIR_CAPTURE_DIR or ./captures/{capture_id}/, containing frames/*.png, logs.jsonl and manifest.json",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["logs", "images"]
+            },
+            "description": "Capture channels to include. Allowed values: 'logs', 'images'."
+          },
+          "pre_ms": {
+            "type": "integer",
+            "description": "Ms of logs to include prior to start (default 2000)"
+          },
+          "post_ms": {
+            "type": "integer",
+            "description": "Ms of logs to include after stop (default 1000)"
+          },
+          "settle_ms": {
+            "type": "integer",
+            "description": "Extra time (ms) to wait after we observe a frame update (default 150)"
+          },
+          "output_dir": {
+            "type": "string",
+            "description": "Optional output directory"
+          }
+        },
+        "required": ["include"]
+      }
+    },
+    {
+      "name": "inject_events",
+      "description": "Inject serialized input events into the application's UI event loop for interaction simulation. Events are executed in array order. Categories: Functional events (`click`, `double_click`, `keyboard_input`, `chars`) and low-level events (`cursor_moved`, `mouse_input` press/release, `raw_keyboard_input` press/release). IMPORTANT: event `type` values are snake_case and button values use `primary|secondary|auxiliary|fourth|fifth` (not `left|right|middle`).",
+      "inputSchema": {
+        "type": "object",
+        "required": ["events"],
+        "examples": [
+          {
+            "events": [
+              {
+                "type": "cursor_moved",
+                "x": 160,
+                "y": 120
+              },
+              {
+                "type": "mouse_input",
+                "button": "primary",
+                "state": "pressed"
+              },
+              {
+                "type": "mouse_input",
+                "button": "primary",
+                "state": "released"
+              }
+            ]
+          },
+          {
+            "events": [
+              {
+                "type": "click",
+                "id": "3:0",
+                "button": "primary"
+              },
+              {
+                "type": "keyboard_input",
+                "key": "a",
+                "chars": "a"
+              },
+              {
+                "type": "chars",
+                "chars": "hello"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "window_id": {
+            "type": "integer",
+            "description": "Window ID as u64 from ribir://windows (optional). If omitted, uses the first active window. If no active window exists, the call fails.",
+            "examples": [
+              140226801569568
+            ]
+          },
+          "events": {
+            "type": "array",
+            "description": "Ordered event list. Each event uses a tagged object with `type`.",
+            "items": {
+              "type": "object",
+              "oneOf": [
+                {
+                  "required": ["type", "x", "y"],
+                  "properties": {
+                    "type": {"const": "cursor_moved"},
+                    "x": {
+                      "type": "number",
+                      "description": "Cursor x in window coordinates."
+                    },
+                    "y": {
+                      "type": "number",
+                      "description": "Cursor y in window coordinates."
+                    }
+                  }
+                },
+                {
+                  "required": ["type"],
+                  "properties": {
+                    "type": {"const": "cursor_left"}
+                  }
+                },
+                {
+                  "required": ["type", "delta_x", "delta_y"],
+                  "properties": {
+                    "type": {"const": "mouse_wheel"},
+                    "delta_x": {"type": "number"},
+                    "delta_y": {"type": "number"}
+                  }
+                },
+                {
+                  "required": ["type", "button", "state"],
+                  "properties": {
+                    "type": {"const": "mouse_input"},
+                    "button": {
+                      "type": "string",
+                      "description": "Mouse button name. Use `primary|secondary|auxiliary|fourth|fifth`.",
+                      "enum": [
+                        "primary",
+                        "secondary",
+                        "auxiliary",
+                        "fourth",
+                        "fifth"
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": ["pressed", "released"]
+                    }
+                  }
+                },
+                {
+                  "required": ["type", "key"],
+                  "properties": {
+                    "type": {"const": "keyboard_input"},
+                    "key": {
+                      "type": "string",
+                      "description": "Logical key value using W3C KeyboardEvent.key names. This is a functional-level single key stroke (server injects press + release)."
+                    },
+                    "chars": {
+                      "type": "string",
+                      "description": "Optional text payload. Server emits UiEvent::ReceiveChars between press/release. If omitted, server auto-infers text for printable single-character keys (and Space/Tab)."
+                    }
+                  }
+                },
+                {
+                  "required": ["type", "key", "state"],
+                  "properties": {
+                    "type": {"const": "raw_keyboard_input"},
+                    "key": {
+                      "type": "string",
+                      "description": "Logical key value using W3C KeyboardEvent.key names."
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": ["pressed", "released"]
+                    },
+                    "physical_key": {
+                      "type": "string",
+                      "description": "Optional physical key code using W3C KeyboardEvent.code names (e.g. 'KeyA', 'Digit1', 'Enter', 'ArrowLeft'). If omitted, server derives it for supported keys."
+                    },
+                    "is_repeat": {
+                      "type": "boolean",
+                      "description": "Whether this is an auto-repeat key event."
+                    },
+                    "location": {
+                      "type": "string",
+                      "enum": ["standard", "left", "right", "numpad"],
+                      "description": "Physical key location."
+                    },
+                    "chars": {
+                      "type": "string",
+                      "description": "Optional text payload. When `state` is `pressed`, server emits UiEvent::ReceiveChars using this value."
+                    }
+                  }
+                },
+                {
+                  "required": ["type"],
+                  "properties": {
+                    "type": {"const": "click"},
+                    "id": {
+                      "type": "string",
+                      "description": "Optional widget target ID. Supported formats: '3', '3:0', or '{\"index1\":3,\"stamp\":0}'. If both `id` and `x`/`y` are present, `x`/`y` takes precedence."
+                    },
+                    "x": {"type": "number"},
+                    "y": {"type": "number"},
+                    "button": {
+                      "type": "string",
+                      "description": "Mouse button name. Use `primary|secondary|auxiliary|fourth|fifth`.",
+                      "enum": [
+                        "primary",
+                        "secondary",
+                        "auxiliary",
+                        "fourth",
+                        "fifth"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "required": ["type"],
+                  "properties": {
+                    "type": {"const": "double_click"},
+                    "id": {
+                      "type": "string",
+                      "description": "Optional widget target ID. Supported formats: '3', '3:0', or '{\"index1\":3,\"stamp\":0}'. If both `id` and `x`/`y` are present, `x`/`y` takes precedence."
+                    },
+                    "x": {"type": "number"},
+                    "y": {"type": "number"},
+                    "button": {
+                      "type": "string",
+                      "description": "Mouse button name. Use `primary|secondary|auxiliary|fourth|fifth`.",
+                      "enum": [
+                        "primary",
+                        "secondary",
+                        "auxiliary",
+                        "fourth",
+                        "fifth"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "required": ["type", "chars"],
+                  "properties": {
+                    "type": {"const": "chars"},
+                    "chars": {
+                      "type": "string",
+                      "description": "Quick text input event. Maps to UiEvent::ReceiveChars."
+                    }
+                  }
+                },
+                {
+                  "required": ["type"],
+                  "properties": {
+                    "type": {"const": "modifiers_changed"},
+                    "shift": {"type": "boolean"},
+                    "ctrl": {"type": "boolean"},
+                    "alt": {"type": "boolean"},
+                    "logo": {"type": "boolean"}
+                  }
+                },
+                {
+                  "required": ["type"],
+                  "properties": {
+                    "type": {"const": "redraw_request"},
+                    "force": {"type": "boolean"}
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "resources": [
+    {
+      "uri": "ribir://logs",
+      "name": "Application Logs",
+      "description": "Recent application logs (last 100 lines). Access via resources/read method with the given URI",
+      "mimeType": "text/plain"
+    },
+    {
+      "uri": "ribir://windows",
+      "name": "Window List",
+      "description": "List of active windows. Access via resources/read method with the given URI",
+      "mimeType": "application/json"
+    },
+    {
+      "uri": "ribir://status",
+      "name": "Server Status",
+      "description": "Debug server status (recording, filter, stats). Access via resources/read method with the given URI",
+      "mimeType": "application/json"
+    }
+  ]
 }

@@ -1218,9 +1218,9 @@ fn injected_to_ui_events(wnd: &Window, event: InjectedUiEvent) -> Result<Vec<UiE
     InjectedUiEvent::MouseWheel { delta_x, delta_y } => {
       vec![UiEvent::MouseWheel { wnd_id: window_id, delta_x, delta_y }]
     }
-    InjectedUiEvent::MouseInput { device_id, button, state } => vec![UiEvent::MouseInput {
+    InjectedUiEvent::MouseInput { button, state } => vec![UiEvent::MouseInput {
       wnd_id: window_id,
-      device_id: Box::new(RibirDeviceId::from(device_id)),
+      device_id: Box::new(RibirDeviceId::Dummy),
       button: mouse_button(button),
       state: ElementState::from(state),
     }],
@@ -1238,7 +1238,7 @@ fn injected_to_ui_events(wnd: &Window, event: InjectedUiEvent) -> Result<Vec<UiE
         chars,
       )?
     }
-    InjectedUiEvent::Click { device_id, button, id, x, y } => {
+    InjectedUiEvent::Click { button, id, x, y } => {
       let mut out = Vec::with_capacity(3);
       if let Some(pos) = resolve_injected_click_pos(wnd, x, y, id)? {
         out.push(UiEvent::CursorMoved { wnd_id: window_id, pos });
@@ -1246,19 +1246,19 @@ fn injected_to_ui_events(wnd: &Window, event: InjectedUiEvent) -> Result<Vec<UiE
       let mapped_button = mouse_button(button);
       out.push(UiEvent::MouseInput {
         wnd_id: window_id,
-        device_id: Box::new(RibirDeviceId::from(device_id.clone())),
+        device_id: Box::new(RibirDeviceId::Dummy),
         button: mapped_button,
         state: ElementState::Pressed,
       });
       out.push(UiEvent::MouseInput {
         wnd_id: window_id,
-        device_id: Box::new(RibirDeviceId::from(device_id)),
+        device_id: Box::new(RibirDeviceId::Dummy),
         button: mapped_button,
         state: ElementState::Released,
       });
       out
     }
-    InjectedUiEvent::DoubleClick { device_id, button, id, x, y } => {
+    InjectedUiEvent::DoubleClick { button, id, x, y } => {
       let mut out = Vec::with_capacity(5);
       if let Some(pos) = resolve_injected_click_pos(wnd, x, y, id)? {
         out.push(UiEvent::CursorMoved { wnd_id: window_id, pos });
@@ -1266,25 +1266,25 @@ fn injected_to_ui_events(wnd: &Window, event: InjectedUiEvent) -> Result<Vec<UiE
       let mapped_button = mouse_button(button);
       out.push(UiEvent::MouseInput {
         wnd_id: window_id,
-        device_id: Box::new(RibirDeviceId::from(device_id.clone())),
+        device_id: Box::new(RibirDeviceId::Dummy),
         button: mapped_button,
         state: ElementState::Pressed,
       });
       out.push(UiEvent::MouseInput {
         wnd_id: window_id,
-        device_id: Box::new(RibirDeviceId::from(device_id.clone())),
+        device_id: Box::new(RibirDeviceId::Dummy),
         button: mapped_button,
         state: ElementState::Released,
       });
       out.push(UiEvent::MouseInput {
         wnd_id: window_id,
-        device_id: Box::new(RibirDeviceId::from(device_id.clone())),
+        device_id: Box::new(RibirDeviceId::Dummy),
         button: mapped_button,
         state: ElementState::Pressed,
       });
       out.push(UiEvent::MouseInput {
         wnd_id: window_id,
-        device_id: Box::new(RibirDeviceId::from(device_id)),
+        device_id: Box::new(RibirDeviceId::Dummy),
         button: mapped_button,
         state: ElementState::Released,
       });
