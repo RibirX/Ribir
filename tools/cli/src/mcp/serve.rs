@@ -135,7 +135,6 @@ enum ToolError {
   StartProjectPathNotAbs { path: PathBuf },
   StartCargoTomlMissing { path: PathBuf },
   StartProjectValidation { kind: StartProjectValidationKind, message: String },
-  StartSessionNotReady { port: u16, path: PathBuf },
   StartSpawnFailed { source: String },
   StartStderrUnavailable,
   StartExitedEarly { status: String, stderr_preview: String },
@@ -184,9 +183,6 @@ impl ToolError {
         error_code: "PROJECT_PATH_NOT_RUNNABLE",
         next_action: "provide_project_path_or_attach_url",
       },
-      Self::StartSessionNotReady { .. } => {
-        ErrorSpec { rpc_code: -32000, error_code: "SESSION_NOT_READY", next_action: "retry" }
-      }
       Self::StartSpawnFailed { .. } => ErrorSpec {
         rpc_code: -32000,
         error_code: "LAUNCH_FAILED",
@@ -224,11 +220,6 @@ impl ToolError {
         format!("No Cargo.toml found in '{}'.", path.display())
       }
       Self::StartProjectValidation { message, .. } => message.clone(),
-      Self::StartSessionNotReady { port, path } => format!(
-        "Found existing session on port {} for '{}', but debug server is not ready yet.",
-        port,
-        path.display()
-      ),
       Self::StartSpawnFailed { source } => format!("Failed to spawn: {source}"),
       Self::StartStderrUnavailable => "Failed to capture child stderr.".to_string(),
       Self::StartExitedEarly { status, stderr_preview } => {
@@ -888,10 +879,10 @@ async fn try_attach_existing_session(
 
   ctx.step(StepCode::StartAttachFound);
   if !wait_for_debug_server_ready(entry.port).await {
-    return Err(StepError {
-      step: StepCode::StartAttachNotReady,
-      err: ToolError::StartSessionNotReady { port: entry.port, path: cwd.to_path_buf() },
-    });
+    ctx.step(StepCode::StartAttachNotReady);
+    // If the port is registered but unresponsive, fallback to launching a new
+    // session. The new session will overwrite the stale registry entry.
+    return Ok(None);
   }
 
   ctx.step(StepCode::StartAttachReady);
