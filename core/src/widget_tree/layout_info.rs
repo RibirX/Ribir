@@ -247,6 +247,22 @@ impl AnchorUnit {
   fn after() -> Self { Self::new(AlignType::After) }
 }
 
+impl Lerp for AnchorUnit {
+  fn lerp(&self, to: &Self, factor: f32) -> Self {
+    if self.align == to.align {
+      AnchorUnit {
+        align: self.align.clone(),
+        pixel_offset: self.pixel_offset.lerp(&to.pixel_offset, factor),
+        percent_offset: self
+          .percent_offset
+          .lerp(&to.percent_offset, factor),
+      }
+    } else {
+      to.clone()
+    }
+  }
+}
+
 #[derive(Default, PartialEq, Clone, Debug)]
 pub struct AnchorX(AnchorUnit);
 
@@ -267,6 +283,10 @@ impl AnchorX {
   pub fn calculate(&self, reference: f32, this: f32) -> f32 { self.0.calculate(reference, this) }
 }
 
+impl Lerp for AnchorX {
+  fn lerp(&self, to: &Self, factor: f32) -> Self { AnchorX(self.0.lerp(&to.0, factor)) }
+}
+
 #[derive(Default, PartialEq, Clone, Debug)]
 pub struct AnchorY(AnchorUnit);
 
@@ -285,6 +305,10 @@ impl AnchorY {
   pub fn under() -> Self { Self(AnchorUnit::after()) }
   pub fn offset(self, offset: impl Into<Measure>) -> Self { Self(self.0.offset(offset)) }
   pub fn calculate(&self, reference: f32, this: f32) -> f32 { self.0.calculate(reference, this) }
+}
+
+impl Lerp for AnchorY {
+  fn lerp(&self, to: &Self, factor: f32) -> Self { AnchorY(self.0.lerp(&to.0, factor)) }
 }
 
 #[derive(Default, PartialEq, Clone)]
@@ -344,6 +368,12 @@ impl Anchor {
       .map(|y| y.calculate(reference.height, this.height))
       .unwrap_or(0.);
     Point::new(x, y)
+  }
+}
+
+impl Lerp for Anchor {
+  fn lerp(&self, to: &Self, factor: f32) -> Self {
+    Anchor { x: self.x.lerp(&to.x, factor), y: self.y.lerp(&to.y, factor) }
   }
 }
 
@@ -699,5 +729,72 @@ mod tests {
 
     wnd.draw_frame();
     assert_eq!(*cnt.read(), 2);
+  }
+
+  #[test]
+  fn anchor_unit_lerp_same_align() {
+    // Same align type: lerp pixel and percent offsets independently
+    let from = AnchorUnit { align: AlignType::Start, pixel_offset: 10., percent_offset: 0.2 };
+    let to = AnchorUnit { align: AlignType::Start, pixel_offset: 50., percent_offset: 0.8 };
+    let mid = from.lerp(&to, 0.5);
+    assert_eq!(mid.align, AlignType::Start);
+    assert!((mid.pixel_offset - 30.).abs() < f32::EPSILON);
+    assert!((mid.percent_offset - 0.5).abs() < f32::EPSILON);
+  }
+
+  #[test]
+  fn anchor_unit_lerp_different_align_snaps() {
+    // Different align type: snap to target
+    let from = AnchorUnit { align: AlignType::Start, pixel_offset: 10., percent_offset: 0. };
+    let to = AnchorUnit { align: AlignType::End, pixel_offset: 20., percent_offset: 0. };
+    let result = from.lerp(&to, 0.5);
+    assert_eq!(result, to);
+  }
+
+  #[test]
+  fn anchor_x_lerp() {
+    let from = AnchorX::left().offset(10.);
+    let to = AnchorX::left().offset(50.);
+    let mid = from.lerp(&to, 0.5);
+    // calculate with reference=0, this=0 to extract pixel offset
+    assert!((mid.calculate(0., 0.) - 30.).abs() < f32::EPSILON);
+  }
+
+  #[test]
+  fn anchor_y_lerp() {
+    let from = AnchorY::top().offset(0.);
+    let to = AnchorY::top().offset(100.);
+    let mid = from.lerp(&to, 0.25);
+    assert!((mid.calculate(0., 0.) - 25.).abs() < f32::EPSILON);
+  }
+
+  #[test]
+  fn anchor_lerp_both_axes() {
+    let from = Anchor::left_top(10., 20.);
+    let to = Anchor::left_top(50., 80.);
+    let mid = from.lerp(&to, 0.5);
+    let pos = mid.calculate(Size::zero(), Size::zero());
+    assert!((pos.x - 30.).abs() < f32::EPSILON);
+    assert!((pos.y - 50.).abs() < f32::EPSILON);
+  }
+
+  #[test]
+  fn anchor_lerp_none_to_some() {
+    // None lerps from default (Start + 0px)
+    let from = Anchor { x: None, y: None };
+    let to = Anchor::left_top(40., 60.);
+    let mid = from.lerp(&to, 0.5);
+    let pos = mid.calculate(Size::zero(), Size::zero());
+    assert!((pos.x - 20.).abs() < f32::EPSILON);
+    assert!((pos.y - 30.).abs() < f32::EPSILON);
+  }
+
+  #[test]
+  fn anchor_lerp_cross_align_snaps() {
+    let from = Anchor::left(10.);
+    let to = Anchor::right(20.);
+    let mid = from.lerp(&to, 0.3);
+    // x should snap to `right(20.)` since align types differ
+    assert_eq!(mid.x, to.x);
   }
 }
