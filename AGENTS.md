@@ -79,30 +79,49 @@ impl Compose for MyComponent {
 4. **Test**: `cargo +nightly ci test`
 5. **Visual Tests**: If you change rendering, check `test_cases/`. Update expected images with `RIBIR_IMG_TEST=overwrite cargo +nightly ci test`.
 
-## 6. Debug Logs & MCP (Important)
-- **Start app with debug enabled**:
-```bash
-cargo run --features debug
-```
-- **Startup URLs**: On launch it prints `RIBIR_DEBUG_URL=...` and `RIBIR_DEBUG_UI=...`. Use these for manual access and include them in bug reports.
-- **Logs**: In-memory ring buffer only, capped to 50,000 entries and ~60s of history. `/logs` returns NDJSON and includes `x-ribir-log-dropped` for any dropped count.
-- **Captures**: Saved to `captures/<capture_id>/logs.jsonl` by default. Override with `RIBIR_CAPTURE_DIR=/path`.
-- **MCP usage (agent-facing)**: From an MCP client, read resources and run tools below.
-```text
-Resources: ribir://status, ribir://windows, ribir://logs
-Tools: capture_screenshot, inspect_tree, inspect_widget, get_overlays, set_log_filter,
-       add_overlay, remove_overlay, clear_overlays, start_recording, stop_recording,
-  capture_one_shot, inject_events, start_app(project_path), attach_app(url), stop_app
-```
-- **Authoritative schema**: `core/src/debug_tool/mcp_schema.json`. Setup details in `dev-docs/debug-features.md`.
+## 6. Debug & MCP
 
-### 6.1 Custom Debug Names (`debug_name`)
-- When `debug` feature is enabled, widgets can set an explicit debug name via builtin API (`debug_name: "..."` in declare syntax / `with_debug_name("...")` on `FatObj`).
-- Explicit debug names are preferred for testability and stable tree inspection labels (e.g., `"counter_button"`).
-- Empty debug names are ignored.
-- In non-debug builds this is a no-op.
-- If no explicit name is set, debug tools fall back to type-based name resolution with internal filtering.
-- After setting `debug_name`, the value is visible in MCP inspection results (`inspect_tree` / `inspect_widget`) and in layout tree outputs.
+Use the **Ribir Debug Server** MCP to inspect and debug running applications.
+
+### Starting Applications
+
+Use the `start_app` tool to launch or attach to a Ribir debug session. 
+If the app is already running manually, you can use `attach_app` with the `RIBIR_DEBUG_URL`.
+
+For specific parameter details and exact behavior, please refer directly to the MCP tool descriptions as they are the most accurate source.
+
+### Key Tools
+
+Commonly used MCP tools:
+- `start_app` / `attach_app` / `stop_app` - Application lifecycle
+- `capture_screenshot` - Visual state inspection
+- `inspect_tree` / `inspect_widget` - Widget tree inspection
+- `add_overlay` / `remove_overlay` - Visual debugging
+- `inject_events` - Simulate user interactions
+- `set_log_filter` - Dynamic log level adjustment
+
+### Resources
+
+- `ribir://logs` - Application logs (NDJSON, ~60s history, 50k entry cap)
+- `ribir://windows` - Active windows
+- `ribir://status` - Server status
+
+See `dev-docs/debug-features.md` for detailed API documentation.
+
+### Custom Debug Names (`debug_name`)
+
+Assign stable names to widgets for easier inspection:
+
+```rust
+button! {
+  debug_name: "counter_button",
+  @{ "+1" }
+}
+```
+
+- Works via builtin `with_debug_name` on `FatObj`
+- Only active in debug builds
+- Falls back to type-based names if not set
 
 ## 7. Interaction & Data Flow
 For interactive widgets, follow the **Single Source of Truth** rule: UI is a projection of data.

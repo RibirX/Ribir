@@ -14,6 +14,9 @@ cargo install --path tools/cli
 ```
 2. Run your app with the `debug` feature enabled:
 
+**For AI assistants (MCP):** Use the `start_app` tool with the absolute path to your runnable crate. This automatically launches the app with `--features debug` if not already running.
+
+**For manual debugging:**
 ```bash
 cargo run --features debug
 ```
@@ -79,24 +82,28 @@ If users manually launch GUI apps before attach, recommend non-blocking startup 
 
 ### Key MCP Tools
 
-When connected, the AI can use tools such as:
-- `start_app`: Attach-first launch by absolute runnable crate `project_path`.
-- `attach_app`: Direct attach to explicit debug URL.
-- `stop_app`: Stop only process managed by the MCP bridge.
-- `capture_screenshot`: Get a visual of the current app state.
-- `inspect_tree`: Read the full widget tree and layout information.
-- `inspect_widget`: Get detailed properties of a specific widget.
-- `add_overlay`/`remove_overlay`: Visually highlight widgets in the app.
-- `set_log_filter`: Dynamically change log levels (e.g., `ribir_core=debug`).
-- `inject_events`: Inject serialized UI events (cursor/mouse/wheel/keyboard/chars/modifiers) through the same event loop path.
-  - Functional events: `click`, `double_click`, `keyboard_input`, `chars`.
-  - Low-level events: `cursor_moved`, `mouse_input` (`pressed`/`released`), `raw_keyboard_input` (`pressed`/`released`).
-  - Also supports advanced events: `click` and `double_click` (server expands to canonical mouse down/up sequence).
-  - `click`/`double_click` can target by coordinates (`x`,`y`) or widget `id` (uses widget center). If both are provided, coordinates win.
-  - `keyboard_input` is the default keyboard API (single key stroke: server does press + release, optional `chars`).
-  - `raw_keyboard_input` is low-level keyboard API (`physical_key` / `location` / `is_repeat`).
-  - `chars` is the quick text input event.
-  - For `mouse_input`, you can pass serializable `device_id`: `{ "type": "dummy" }` or `{ "type": "custom", "value": 1 }`.
+> **Note:** Tool schemas are discovered automatically via MCP. Use `tools/list` for full schema details.
+
+| Category | Tools |
+|----------|-------|
+| **Lifecycle** | `start_app`, `attach_app`, `stop_app` |
+| **Visual** | `capture_screenshot` |
+| **Inspection** | `inspect_tree`, `inspect_widget` |
+| **Overlays** | `add_overlay`, `remove_overlay`, `clear_overlays`, `get_overlays` |
+| **Logging** | `set_log_filter` |
+| **Events** | `inject_events` |
+| **Recording** | `start_recording`, `stop_recording`, `capture_one_shot` |
+
+#### Widget IDs
+
+Widget identifiers support multiple formats:
+- `"3"` - Numeric shorthand (matched by `index1`)
+- `"3:0"` - Colon shorthand (`index1:stamp`)
+- `'{"index1":3,"stamp":0}'` - Full JSON format
+
+Use `debug_name` prefix to target by name: `"name:counter_button"`
+
+#### Event Injection Examples
 
 Example `inject_events` arguments:
 
@@ -169,6 +176,16 @@ You can also target a widget by its `debug_name` using the `name:` prefix:
 }
 ```
 
+### MCP Resources
+
+| URI | Description |
+|-----|-------------|
+| `ribir://logs` | Application logs (NDJSON, ~60s history, 50k cap) |
+| `ribir://windows` | Active windows |
+| `ribir://status` | Server status |
+
+Read `ribir://windows` to get window IDs for `window_id` parameters.
+
 ## 🌐 HTTP Debug Server
 
 The debug server provides a REST API and a built-in web UI for manual inspection.
@@ -208,6 +225,7 @@ For MCP SSE, use:
 | `/capture/start` | `POST` | Start a capture session |
 | `/capture/stop` | `POST` | Stop the active capture session |
 | `/capture/one_shot` | `POST` | One-click capture (start → wait → stop) |
+| `/mcp/sse` | `GET` | MCP Server-Sent Events endpoint for AI assistants |
 
 `/inspect/tree` and `/inspect/{id}` accept `options` tokens:
 `all,id,layout,global_pos,clamp,props,no_global_pos,no_clamp,no_props`.
