@@ -4,7 +4,7 @@ use serde::{Deserialize, de::Error as DeError};
 use serde_json::Value;
 use winit::event::ElementState;
 
-use crate::{events::RibirDeviceId, window::WindowId};
+use crate::window::WindowId;
 
 /// Controls which fields are collected and returned by the layout endpoints.
 ///
@@ -59,8 +59,6 @@ pub enum InjectedUiEvent {
     delta_y: f32,
   },
   MouseInput {
-    #[serde(default)]
-    device_id: InjectDeviceId,
     button: InjectMouseButton,
     state: InjectElementState,
   },
@@ -85,8 +83,6 @@ pub enum InjectedUiEvent {
   },
   Click {
     #[serde(default)]
-    device_id: InjectDeviceId,
-    #[serde(default)]
     button: InjectMouseButton,
     #[serde(default)]
     id: Option<String>,
@@ -96,8 +92,6 @@ pub enum InjectedUiEvent {
     y: Option<f32>,
   },
   DoubleClick {
-    #[serde(default)]
-    device_id: InjectDeviceId,
     #[serde(default)]
     button: InjectMouseButton,
     #[serde(default)]
@@ -149,23 +143,6 @@ pub enum InjectKeyLocation {
   Left,
   Right,
   Numpad,
-}
-
-#[derive(Debug, Clone, Deserialize, Default)]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
-pub enum InjectDeviceId {
-  #[default]
-  Dummy,
-  Custom(u64),
-}
-
-impl From<InjectDeviceId> for RibirDeviceId {
-  fn from(value: InjectDeviceId) -> Self {
-    match value {
-      InjectDeviceId::Dummy => RibirDeviceId::Dummy,
-      InjectDeviceId::Custom(id) => RibirDeviceId::Custom(id),
-    }
-  }
 }
 
 impl From<InjectElementState> for ElementState {
