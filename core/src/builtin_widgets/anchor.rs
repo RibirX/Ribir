@@ -8,9 +8,10 @@ use crate::{prelude::*, wrap_render::WrapRender};
 
 /// A widget that positions its child.
 ///
-/// Use `x` and `y` to specify additional offsets for the child's position.
-/// The value can be a fixed pixel value, a percentage of the parent's maximum
-/// constraint (max size), or a calculated value.
+/// Use `x` and `y` to specify additional offsets for the child's position,
+/// or use `pos` to set both at once. The value can be a fixed pixel value,
+/// a percentage of the parent's maximum constraint (max size), or a calculated
+/// value.
 ///
 /// # Example, with fixed pixel value
 ///
@@ -26,7 +27,7 @@ use crate::{prelude::*, wrap_render::WrapRender};
 /// };
 /// ```
 ///
-/// # Example, align relactive to parent
+/// # Example, align relative to parent
 ///
 /// ``` rust
 /// use ribir::prelude::*;
@@ -36,6 +37,19 @@ use crate::{prelude::*, wrap_render::WrapRender};
 ///     text: "Hello World!",
 ///     x: AnchorX::center(),
 ///     y: AnchorY::center().offset(-10.), // move 10 pixel up above center
+///   }
+/// };
+/// ```
+///
+/// # Example, set both x and y with `pos`
+///
+/// ``` rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Text {
+///     text: "Hello World!",
+///     pos: Anchor::new(10., 20.),
 ///   }
 /// };
 /// ```

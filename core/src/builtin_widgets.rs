@@ -873,7 +873,6 @@ impl<T> FatObj<T> {
   }
 
   /// Initializes the x position of the widget.
-  /// Initializes the x position of the widget.
   pub fn with_x<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Option<AnchorX>>, K>) -> &mut Self {
     init_sub_widget!(self, anchor, x, v)
   }
@@ -881,6 +880,20 @@ impl<T> FatObj<T> {
   /// Initializes the y position of the widget.
   pub fn with_y<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Option<AnchorY>>, K>) -> &mut Self {
     init_sub_widget!(self, anchor, y, v)
+  }
+
+  /// Initializes both x and y positions of the widget.
+  ///
+  /// This is a convenience method that sets both positions at once.
+  pub fn with_pos<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Anchor>, K>) -> &mut Self {
+    let mix = self
+      .mix_builtin
+      .get_or_insert_with(MixBuiltin::default);
+    let anchor = self
+      .anchor
+      .get_or_insert_with(|| Stateful::new(<_>::default()));
+    mix.init_sub_widget(v, anchor, |w, v| *w = v);
+    self
   }
 
   /// Initializes the visibility of the widget.
@@ -1391,6 +1404,11 @@ impl<T> FatObj<T> {
   pub fn y(&mut self) -> impl StateWriter<Value = Option<AnchorY>> {
     let anchor = sub_widget!(self, anchor);
     part_writer!(&mut anchor.y)
+  }
+
+  /// Returns a state writer for modifying both x and y positions together.
+  pub fn pos(&mut self) -> impl StateWriter<Value = Anchor> {
+    sub_widget!(self, anchor).clone_writer()
   }
 
   pub fn mix_builtin_widget(&mut self) -> &MixBuiltin {
