@@ -159,42 +159,32 @@ cargo run --features debug
 # MCP clients can either call start_app(project_path) or attach_app(url)
 ```
 
-##### Available Tools
+##### MCP Tools and Resources
 
-When connected, the AI assistant can use these tools:
+MCP tools and resources are discovered dynamically. For full documentation, see [`dev-docs/debug-features.md`](../../dev-docs/debug-features.md).
 
-| Tool | Description |
-|------|-------------|
-| `start_app` | Start or attach by runnable crate path (`project_path`) |
-| `attach_app` | Attach directly to a known debug URL (e.g. `RIBIR_DEBUG_URL`) |
-| `stop_app` | Stop only the process managed by this MCP bridge |
-| `capture_screenshot` | Capture a screenshot of the application window |
-| `inspect_tree` | Get the widget tree structure and layout information |
-| `inspect_widget` | Get detailed information about a specific widget |
-| `get_overlays` | List all active debug overlays |
-| `add_overlay` | Highlight a widget with a colored overlay |
-| `remove_overlay` | Remove a specific overlay |
-| `clear_overlays` | Clear all overlays |
-| `set_log_filter` | Set the log filter (e.g., `info,ribir_core=debug`) |
-| `start_recording` | Start recording to disk (`include`: `logs`, `images`; default `images`) |
-| `stop_recording` | Stop recording and save to disk |
-| `capture_one_shot` | Capture a single sequence of frames (pre/post trigger) |
+Brief overview:
 
-##### Available Resources
+| Category | Tools |
+|----------|-------|
+| **Lifecycle** | `start_app`, `attach_app`, `stop_app` |
+| **Inspection** | `capture_screenshot`, `inspect_tree`, `inspect_widget` |
+| **Overlays** | `add_overlay`, `remove_overlay`, `clear_overlays`, `get_overlays` |
+| **Logging** | `set_log_filter` |
+| **Events** | `inject_events` |
+| **Recording** | `start_recording`, `stop_recording`, `capture_one_shot` |
 
-| Resource | URI | Description |
-|----------|-----|-------------|
-| Application Logs | `ribir://logs` | Recent application logs (last 100 lines) |
-| Window List | `ribir://windows` | List of active windows |
-| Server Status | `ribir://status` | Debug server status (recording, filter, stats) |
+**Resources:** `ribir://logs`, `ribir://windows`, `ribir://status`
 
 ##### Quick Start
+
+See [`dev-docs/debug-features.md`](../../dev-docs/debug-features.md) for detailed debugging workflows.
 
 ```bash
 # 1. Run your Ribir app with debug feature enabled
 cargo run --features debug
 
-# 2. Configure your AI client to use the MCP server.
+# 2. Configure your AI client (see Configuration Examples below)
 # 3. In MCP:
 #    - call start_app(project_path) for attach-first launch flow, or
 #    - call attach_app(url) if you already have RIBIR_DEBUG_URL.
