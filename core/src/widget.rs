@@ -282,7 +282,7 @@ impl<'w> Widget<'w> {
   #[cfg(feature = "debug")]
   pub fn attach_debug_name<T: ?Sized>(self) -> Self {
     if let Some(name) = crate::debug_tool::resolve_debug_name::<T>() {
-      self.attach_data(Box::new(Queryable(crate::debug_tool::OriginWidgetName(name))))
+      self.attach_debug_name_value(name)
     } else {
       self
     }
@@ -291,6 +291,15 @@ impl<'w> Widget<'w> {
   #[cfg(not(feature = "debug"))]
   #[inline]
   pub fn attach_debug_name<T: ?Sized>(self) -> Self { self }
+
+  #[cfg(feature = "debug")]
+  pub fn attach_debug_name_value(self, name: &'static str) -> Self {
+    if name.trim().is_empty() {
+      self
+    } else {
+      self.attach_data(Box::new(Queryable(crate::debug_tool::OriginWidgetName(name))))
+    }
+  }
 
   /// Attach a state to a widget and try to unwrap it before attaching.
   ///

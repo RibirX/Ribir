@@ -869,6 +869,37 @@ fn resolve_widget_id(id_str: &str, tree: &WidgetTree) -> Option<WidgetId> {
     return find_widget_id_by_parts(tree, idx, None);
   }
 
+  let name = id_str
+    .strip_prefix("name:")
+    .or_else(|| id_str.strip_prefix("debug:"))
+    .unwrap_or(id_str)
+    .trim();
+  if name.is_empty() {
+    return None;
+  }
+
+  resolve_widget_id_by_debug_name(tree, name)
+}
+
+fn resolve_widget_id_by_debug_name(tree: &WidgetTree, name: &str) -> Option<WidgetId> {
+  let root = tree.root();
+  let mut stack = vec![root];
+  while let Some(node) = stack.pop() {
+    if let Some(label) = node
+      .query_ref::<OriginWidgetName>(tree)
+      .map(|n| n.0)
+    {
+      if label == name {
+        return Some(node);
+      }
+    } else if let Some(render) = node.get(tree) {
+      let dbg_name = render.as_render().debug_name();
+      if dbg_name.as_ref() == name {
+        return Some(node);
+      }
+    }
+    stack.extend(node.children(tree));
+  }
   None
 }
 
@@ -1048,8 +1079,8 @@ fn resolve_injected_click_pos(
   let tree = wnd.tree();
   let Some(widget_id) = resolve_widget_id(&id_str, tree) else {
     return Err(format!(
-      "Widget not found for click target id '{}'. Supported formats: '3', '3:0', or \
-       '{{\"index1\":3,\"stamp\":0}}'.",
+      "Widget not found for click target id '{}'. Supported formats: '3', '3:0', \
+       '{{\"index1\":3,\"stamp\":0}}', or 'name:<debug_name>'.",
       id_str
     ));
   };

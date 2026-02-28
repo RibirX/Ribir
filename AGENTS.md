@@ -96,6 +96,14 @@ Tools: capture_screenshot, inspect_tree, inspect_widget, get_overlays, set_log_f
 ```
 - **Authoritative schema**: `core/src/debug_tool/mcp_schema.json`. Setup details in `dev-docs/debug-features.md`.
 
+### 6.1 Custom Debug Names (`debug_name`)
+- When `debug` feature is enabled, widgets can set an explicit debug name via builtin API (`debug_name: "..."` in declare syntax / `with_debug_name("...")` on `FatObj`).
+- Explicit debug names are preferred for testability and stable tree inspection labels (e.g., `"counter_button"`).
+- Empty debug names are ignored.
+- In non-debug builds this is a no-op.
+- If no explicit name is set, debug tools fall back to type-based name resolution with internal filtering.
+- After setting `debug_name`, the value is visible in MCP inspection results (`inspect_tree` / `inspect_widget`) and in layout tree outputs.
+
 ## 7. Interaction & Data Flow
 For interactive widgets, follow the **Single Source of Truth** rule: UI is a projection of data.
 
