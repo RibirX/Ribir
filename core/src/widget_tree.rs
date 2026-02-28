@@ -365,8 +365,6 @@ impl DirtyMarker {
       map.insert(id, scope).is_none()
     }
   }
-
-  pub(crate) fn is_dirty(&self, id: WidgetId) -> bool { self.0.borrow().contains_key(&id) }
 }
 
 #[declare(simple)]

@@ -1,3 +1,5 @@
+use tracing::warn;
+
 use crate::{
   prelude::*,
   ticker::FrameMsg,
@@ -13,8 +15,8 @@ pub struct Animate<S: AnimateState + 'static> {
   pub from: S::Value,
   #[declare(skip)]
   running_info: Option<AnimateInfo<S::Value>>,
-  #[declare(skip, default = BuildCtx::get().window().id())]
-  window_id: WindowId,
+  #[declare(custom, default = Self::default_window_id())]
+  pub window_id: Option<WindowId>,
 }
 
 impl<S: AnimateState> AnimateDeclarer<S> {
@@ -26,11 +28,21 @@ impl<S: AnimateState> AnimateDeclarer<S> {
   pub fn default_transition() -> Box<dyn Transition> {
     Box::new(EasingTransition { easing: easing::LINEAR, duration: Duration::from_millis(300) })
   }
+
+  pub fn default_window_id() -> Option<WindowId> {
+    BuildCtx::try_get().map(|ctx| ctx.window().id())
+  }
+
+  pub fn with_window_id(&mut self, window_id: WindowId) -> &mut Self {
+    self.window_id = Some(Some(window_id));
+    self
+  }
 }
 
 pub(crate) struct AnimateInfo<V> {
   from: V,
   to: V,
+  window_id: WindowId,
   start_at: Instant,
   last_progress: AnimateProgress,
   // Determines if lerp value in current frame.
@@ -46,12 +58,15 @@ where
     let mut animate_ref = self.write();
     let this = &mut *animate_ref;
 
-    let Some(wnd) = AppCtx::get_window(this.window_id) else { return };
+    let Some(window_id) = this.window_id else {
+      warn!("Animate.run skipped: window_id is not configured.");
+      return;
+    };
+    let Some(wnd) = AppCtx::get_window(window_id) else { return };
 
     if !wnd.flags().contains(WindowFlags::ANIMATIONS) {
       return;
     }
-
     let new_to = this.state.get();
 
     if let Some(AnimateInfo { from, to, last_progress, start_at, .. }) = &mut this.running_info {
@@ -116,6 +131,7 @@ where
         start_at: Instant::now(),
         last_progress: AnimateProgress::Dismissed,
         _tick_msg_guard: Some(Box::new((tick_handle, state_handle))),
+        window_id,
         already_lerp: false,
       });
 
@@ -127,10 +143,8 @@ where
 
   fn stop(&self) {
     let mut this = self.silent();
-    if this.is_running()
-      && let Some(wnd) = AppCtx::get_window(this.window_id)
-    {
-      wnd.dec_running_animate();
+    if this.is_running() {
+      this.dec_running_animate_if_needed();
       this.running_info.take();
     }
   }
@@ -142,6 +156,18 @@ impl<S> Animate<S>
 where
   S: AnimateState + 'static,
 {
+  pub fn set_window_id(&mut self, window_id: WindowId) -> &mut Self {
+    self.window_id = Some(window_id);
+    self
+  }
+
+  pub fn clear_window_id(&mut self) -> &mut Self {
+    self.window_id = None;
+    self
+  }
+
+  pub fn window_id(&self) -> Option<WindowId> { self.window_id }
+
   pub fn is_running(&self) -> bool { self.running_info.is_some() }
 
   /// Advance the animation to the given time, you must start the animation
@@ -177,22 +203,39 @@ where
   }
 }
 
-impl<P> Drop for Animate<P>
+impl<S> Animate<S>
 where
-  P: AnimateState,
+  S: AnimateState,
 {
-  fn drop(&mut self) {
-    if self.running_info.is_some()
-      && let Some(wnd) = AppCtx::get_window(self.window_id)
+  fn running_window_id(&self) -> Option<WindowId> {
+    self
+      .running_info
+      .as_ref()
+      .map(|info| info.window_id)
+  }
+
+  fn dec_running_animate_if_needed(&self) {
+    if let Some(window_id) = self.running_window_id()
+      && let Some(wnd) = AppCtx::get_window(window_id)
     {
       wnd.dec_running_animate();
     }
   }
 }
 
+impl<P> Drop for Animate<P>
+where
+  P: AnimateState,
+{
+  fn drop(&mut self) {
+    if self.running_info.is_some() {
+      self.dec_running_animate_if_needed();
+    }
+  }
+}
+
 #[cfg(test)]
 mod tests {
-
   use super::*;
   use crate::{reset_test_env, test_helper::TestWindow};
 

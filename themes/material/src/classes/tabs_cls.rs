@@ -265,22 +265,24 @@ fn indicator(pos: &TabPos) -> Widget<'static> {
     }
 
 
-    let smooth = @SmoothPos {
+    let smooth = @SmoothLayout {
+      axes: SmoothAxes::POS,
       transition: EasingTransition {
         easing: md::easing::EMPHASIZED_DECELERATE,
         duration: md::easing::duration::MEDIUM1,
       },
-
-      x, y
     };
 
     @(smooth) {
-      @NoAffectedParentSize { @IgnorePointer {
-        @ @UnconstrainedBox {
-          dir: UnconstrainedDir::Both,
-          @ { indicator }
+      @NoAffectedParentSize {
+        x, y,
+        @IgnorePointer {
+          @UnconstrainedBox {
+            dir: UnconstrainedDir::Both,
+            @ { indicator }
+          }
         }
-      } }
+      }
     }
     .into_widget()
   }
