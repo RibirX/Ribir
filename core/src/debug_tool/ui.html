@@ -622,7 +622,35 @@
                     <div style="height:6px"></div>
                     <small class="muted">Call <code>POST /overlay</code> to write global
                         overlay (drawn into frames during rendering), <code>DELETE /overlay/{id}</code>
-                        to remove, <code>DELETE /overlays</code> to clear all.</small>
+                        to remove, <code>DELETE /overlays</code> to clear all. Use <code>name:&lt;debug_name&gt;</code> to target by debug name.</small>
+                </div>
+            </section>
+
+            <section>
+                <div class="hd">
+                    <span>Events</span>
+                    <div class="row">
+                        <button class="primary" id="btnClickSend">Click</button>
+                        <button id="btnDblClickSend">Double Click</button>
+                    </div>
+                </div>
+                <div class="bd">
+                    <div class="row" style="align-items: end;">
+                        <div class="field" style="flex: 2; min-width: 220px;">
+                            <label for="eventTarget" class="inline">Target (WidgetId or debug_name)</label>
+                            <input id="eventTarget" class="grow" type="text" placeholder="e.g.: 42 or name:counter_button" />
+                        </div>
+                        <div class="field" style="flex: 1; min-width: 120px;">
+                            <label for="eventX">X</label>
+                            <input id="eventX" type="number" placeholder="optional" />
+                        </div>
+                        <div class="field" style="flex: 1; min-width: 120px;">
+                            <label for="eventY">Y</label>
+                            <input id="eventY" type="number" placeholder="optional" />
+                        </div>
+                    </div>
+                    <div style="height:6px"></div>
+                    <small class="muted">Sends <code>POST /events/inject</code> with <code>click</code>/<code>double_click</code>. If X/Y are omitted, the server resolves by id or <code>name:...</code> (debug_name).</small>
                 </div>
             </section>
             <section>
@@ -1567,6 +1595,37 @@
             autoOverlayId = null;
         }
 
+        async function sendClickEvent(isDouble) {
+            const target = (($('eventTarget')?.value) || '').trim();
+            const xRaw = ($('eventX')?.value || '').trim();
+            const yRaw = ($('eventY')?.value || '').trim();
+            const x = xRaw === '' ? null : Number(xRaw);
+            const y = yRaw === '' ? null : Number(yRaw);
+
+            const evt = { type: isDouble ? 'double_click' : 'click' };
+            if (x !== null && y !== null) {
+                evt.x = x;
+                evt.y = y;
+            } else if (target) {
+                evt.id = target;
+            }
+
+            const body = {
+                window_id: getSelectedWindowId(),
+                events: [evt],
+            };
+
+            const res = await fetch('/events/inject', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            if (!res.ok) {
+                const msg = await res.text();
+                alert('inject event failed: ' + msg);
+            }
+        }
+
         function showTokens(prefix) {
             const wantId = !!$(prefix + 'ShowId')?.checked;
             const wantLayout = !!$(prefix + 'ShowLayout')?.checked;
@@ -1799,6 +1858,8 @@
         $('btnOverlaySet').onclick = overlaySet;
         $('btnOverlayRefresh').onclick = refreshOverlays;
         $('btnOverlayClear').onclick = overlayClear;
+        $('btnClickSend').onclick = () => sendClickEvent(false);
+        $('btnDblClickSend').onclick = () => sendClickEvent(true);
         $('btnTreeClearOverlay').onclick = clearSelectedOverlay;
         $('layoutTreeView')?.addEventListener('keydown', handleTreeKeydown);
         $('treeRawToggle').onchange = () => {

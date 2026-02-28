@@ -159,6 +159,16 @@ Direct advanced click / double click:
 }
 ```
 
+You can also target a widget by its `debug_name` using the `name:` prefix:
+
+```json
+{
+  "events": [
+    { "type": "click", "id": "name:counter_button" }
+  ]
+}
+```
+
 ## 🌐 HTTP Debug Server
 
 The debug server provides a REST API and a built-in web UI for manual inspection.
@@ -201,6 +211,26 @@ For MCP SSE, use:
 
 `/inspect/tree` and `/inspect/{id}` accept `options` tokens:
 `all,id,layout,global_pos,clamp,props,no_global_pos,no_clamp,no_props`.
+
+### Custom debug names (`debug_name`)
+
+You can assign a stable, human-readable debug name to a widget:
+
+```rust
+button! {
+  debug_name: "counter_button",
+  @{ "+1" }
+}
+```
+
+This works through the built-in `with_debug_name` capability on `FatObj` and
+is effective only when the `debug` feature is enabled.
+
+Behavior summary:
+- Empty names are ignored.
+- Explicit `debug_name` takes priority over auto-resolved type names.
+- If no explicit name is provided, Ribir falls back to type-based name
+  resolution with internal filtering (for wrappers/builtin intermediate types).
 
 For widget identifier inputs (`id`) in inspect/overlay APIs, use one of:
 - `{"index1": <n>, "stamp": <s>}` (full `WidgetId`)

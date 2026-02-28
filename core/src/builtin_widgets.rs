@@ -138,6 +138,8 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FatObj<T> {
   host: T,
+  #[cfg(feature = "debug")]
+  debug_name: Option<&'static str>,
   track_id: Option<Stateful<TrackWidgetId>>,
   class: Option<Stateful<Class>>,
   padding: Option<Stateful<Padding>>,
@@ -193,6 +195,8 @@ impl<T> FatObj<T> {
   pub fn map<V>(self, f: impl FnOnce(T) -> V) -> FatObj<V> {
     FatObj {
       host: f(self.host),
+      #[cfg(feature = "debug")]
+      debug_name: self.debug_name,
       track_id: self.track_id,
       class: self.class,
       mix_builtin: self.mix_builtin,
@@ -941,6 +945,37 @@ impl<T> FatObj<T> {
     self.reuse = Some(Reuse { reuse_id: reuse_id.into() });
     self
   }
+
+  /// Sets an explicit debug name for this widget.
+  ///
+  /// This is only effective when the `debug` feature is enabled.
+  /// The name is used by debug inspect tools (HTTP `/inspect/*` and MCP
+  /// `inspect_tree` / `inspect_widget`) as the node display name.
+  ///
+  /// # Notes
+  /// - Use a stable, human-readable identifier (for example:
+  ///   `"counter_button"`).
+  /// - An empty name is ignored.
+  /// - This explicit name has higher priority than auto-resolved type names.
+  ///
+  /// # Example
+  ///
+  /// ```rust
+  /// use ribir::prelude::*;
+  /// let _ = fn_widget! {
+  ///   @FilledButton {
+  ///     debug_name: "counter_button",
+  ///     @{ "+1" }
+  ///   }
+  /// };
+  /// ```
+  pub fn with_debug_name(&mut self, _name: &'static str) -> &mut Self {
+    #[cfg(feature = "debug")]
+    {
+      self.debug_name = Some(_name);
+    }
+    self
+  }
 }
 
 impl<T> FatObj<T> {
@@ -1508,6 +1543,13 @@ impl<'a> FatObj<Widget<'a>> {
     if let Some(h) = self.keep_alive_unsubscribe_handle {
       host = host.attach_anonymous_data(h);
     }
+
+    #[cfg(feature = "debug")]
+    if let Some(name) = self.debug_name {
+      println!("attach debug name: {name}");
+      host = host.attach_debug_name_value(name);
+    }
+
     host
   }
 }
