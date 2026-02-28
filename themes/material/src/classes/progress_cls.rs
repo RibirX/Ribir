@@ -1,5 +1,5 @@
 use easing::CubicBezierEasing;
-use ribir_core::{prelude::*, smooth_width};
+use ribir_core::{prelude::*, smooth_layout};
 use ribir_widgets::prelude::*;
 
 use crate::md;
@@ -69,9 +69,10 @@ pub(super) fn init(classes: &mut Classes) {
     .into_widget()
   });
   classes.insert(LINEAR_DETERMINATE_INDICATOR, move |host| {
-    smooth_width! {
+    smooth_layout! {
+      axes: SmoothAxes::WIDTH,
       transition: DETERMINATE_TRANS,
-      init_value: 0.,
+      init_width: 0.,
       @md_base_linear_indicator(host)
     }
     .into_widget()
