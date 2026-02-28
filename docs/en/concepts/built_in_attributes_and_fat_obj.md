@@ -109,7 +109,8 @@ These attributes are used to control the appearance and layout of Widgets.
 *   **Layout**:
     *   `margin`: Sets outer margin.
     *   `padding`: Sets inner padding.
-    *   `x` / `y`: Sets horizontal/vertical positioning using `PosX` and `PosY`.
+    *   `x` / `y`: Sets horizontal/vertical positioning using `AnchorX` and `AnchorY`.
+    *   `pos`: Sets both horizontal and vertical positioning at once using `Anchor`.
     *   `clamp`: Forces constraints on the Widget's size range (Layout Constraints).
     *   `box_fit`: Controls how child elements fit into container space (like fill, contain, etc.).
     *   `scrollable`: Controls the Widget's scrolling behavior (X-axis, Y-axis, or both).
@@ -281,7 +282,7 @@ The wrapping order from **inner to outer** is as follows (simplified for common 
 21. `opacity`
 22. `visibility`
 23. `disabled`
-24. `x` / `y` (position)
+24. `x` / `y` / `pos` (position)
 25. `keep_alive`
 26. `reuse`
 

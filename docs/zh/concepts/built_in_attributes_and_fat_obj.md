@@ -107,7 +107,8 @@ fn example() -> Widget<'static> {
 *   **布局**:
     *   `margin`: 设置外边距。
     *   `padding`: 设置内边距。
-    *   `x` / `y`: 使用 `PosX` 和 `PosY` 设置水平/垂直定位。
+    *   `x` / `y`: 使用 `AnchorX` 和 `AnchorY` 设置水平/垂直定位。
+    *   `pos`: 使用 `Anchor` 同时设置水平和垂直定位。
     *   `clamp`: 强制对 Widget 大小范围的约束（布局约束）。
     *   `box_fit`: 控制子元素如何适应容器空间（如填充、包含等）。
     *   `scrollable`: 控制 Widget 的滚动行为（X轴、Y轴或两者）。
@@ -279,7 +280,7 @@ fn simple_card(w: Widget<'static>) -> Widget<'static> {
 21. `opacity`
 22. `visibility`
 23. `disabled`
-24. `x` / `y` (position)
+24. `x` / `y` / `pos` (position)
 25. `keep_alive`
 26. `reuse`
 
