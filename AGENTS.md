@@ -110,18 +110,24 @@ See `dev-docs/debug-features.md` for detailed API documentation.
 
 ### Custom Debug Names (`debug_name`)
 
-Assign stable names to widgets for easier inspection:
+**IMPORTANT FOR AI AGENTS**: When debugging or interacting with a Ribir application, **proactively** assign stable names to target widgets using `debug_name: "some_name"` in the widget declaration. This allows you to easily find and interact with them via MCP tools (`inspect_widget`, `inject_events`, `add_overlay`, etc.) using the `name:some_name` format without needing to traverse the tree for a numeric `index1` ID.
 
 ```rust
 button! {
-  debug_name: "counter_button",
+  debug_name: "counter_button", // Add this to target it via MCP
   @{ "+1" }
 }
 ```
 
-- Works via builtin `with_debug_name` on `FatObj`
-- Only active in debug builds
-- Falls back to type-based names if not set
+Then, you can directly use it in MCP tools:
+- `inspect_widget` with `{"id": "name:counter_button"}`
+- `inject_events` with `{"events": [{"type": "click", "id": "name:counter_button"}]}`
+- `add_overlay` with `{"id": "name:counter_button"}`
+
+Rules for `debug_name`:
+- Works via builtin `with_debug_name` on `FatObj`.
+- Only active in debug builds.
+- Falls back to type-based names if not set, but explicit names are highly recommended for robust MCP tool interactions.
 
 ## 7. Interaction & Data Flow
 For interactive widgets, follow the **Single Source of Truth** rule: UI is a projection of data.
