@@ -33,7 +33,7 @@ cfg_if::cfg_if! {
       use tokio::task::LocalSet;
       use winit::event_loop::EventLoopProxy;
 
-      use super::super::{AppEvent, RibirAppEvent};
+      use super::super::RibirAppEvent;
 
       pub(crate) struct UiExecutor {
         rt: tokio::runtime::Runtime,
@@ -113,7 +113,7 @@ cfg_if::cfg_if! {
               }
               let _ = self
                 .event_loop_proxy
-                .send_event(RibirAppEvent::App(AppEvent::FuturesWake));
+                .send_event(RibirAppEvent::FuturesWake);
             }
           }
 

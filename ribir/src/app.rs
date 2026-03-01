@@ -35,15 +35,15 @@ pub struct App {
 }
 
 pub enum AppEvent {
-  /// The event is sent when any future is waked to poll.
-  FuturesWake,
   /// The event is sent when the application window focus changed.
   WndFocusChanged(WindowId, bool),
   /// The custom event, you can send any data with this event.
   Custom(Box<dyn Any + Send>),
 }
 
-pub enum RibirAppEvent {
+pub(crate) enum RibirAppEvent {
+  /// The event is sent when any future is waked to poll.
+  FuturesWake,
   App(AppEvent),
   Cmd(ShellCmd),
 }

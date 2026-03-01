@@ -118,6 +118,9 @@ impl ApplicationHandler<RibirAppEvent> for AppHandler {
   fn user_event(&mut self, event_loop: &ActiveEventLoop, event: RibirAppEvent) {
     let _guard = active_event_guard(event_loop);
     match event {
+      RibirAppEvent::FuturesWake => {
+        App::pump_ui_tasks();
+      }
       RibirAppEvent::App(mut e) => {
         App::shared().events_stream.clone().next(&mut e);
       }
