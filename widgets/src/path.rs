@@ -11,8 +11,6 @@ impl Render for PathPaintKit {
   #[inline]
   fn measure(&self, _: BoxClamp, _: &mut MeasureCtx) -> Size { Size::zero() }
 
-  fn visual_box(&self, _: &mut VisualCtx) -> Option<Rect> { Some(self.path.bounds(None)) }
-
   #[inline]
   fn size_affected_by_child(&self) -> bool { false }
 

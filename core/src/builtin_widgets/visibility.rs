@@ -61,15 +61,6 @@ impl WrapRender for VisibilityRender {
     if self.display { host.measure(clamp, ctx) } else { clamp.min }
   }
 
-  fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
-    if self.display {
-      host.visual_box(ctx)
-    } else {
-      ctx.clip(Rect::from_size(Size::zero()));
-      None
-    }
-  }
-
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
     if self.display {
       host.paint(ctx)

@@ -568,8 +568,6 @@ impl Render for PipeNode {
     self.as_ref().data.place_children(size, ctx)
   }
 
-  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> { self.as_ref().data.visual_box(ctx) }
-
   fn paint(&self, ctx: &mut PaintingCtx) { self.as_ref().data.paint(ctx) }
 
   fn size_affected_by_child(&self) -> bool {

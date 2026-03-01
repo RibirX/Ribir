@@ -90,17 +90,6 @@ impl Render for Text {
     clamp.clamp(size)
   }
 
-  fn visual_box(&self, _: &mut VisualCtx) -> Option<Rect> {
-    Some(
-      self
-        .glyphs
-        .borrow()
-        .as_ref()
-        .map(|info| info.visual_rect())
-        .unwrap_or_default(),
-    )
-  }
-
   #[inline]
   fn size_affected_by_child(&self) -> bool { false }
 

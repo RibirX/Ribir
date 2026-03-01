@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ribir_geom::{Rect, ZERO_SIZE};
+use ribir_geom::ZERO_SIZE;
 
 use super::{Lerp, WidgetId, WidgetTree};
 use crate::prelude::{INFINITY_SIZE, Measure, Point, RFrom, Size};
@@ -173,25 +173,6 @@ impl BoxClamp {
     // Prefer finite maximum constraint when available, otherwise use clamped child
     // height
     if max.is_finite() { max } else { min.max(child_height) }
-  }
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Copy)]
-pub struct VisualBox {
-  /// the bounds rect of the render object
-  pub rect: Option<Rect>,
-  /// the bounds rect of the subtree
-  pub subtree: Option<Rect>,
-}
-
-impl VisualBox {
-  pub fn bounds_rect(&self) -> Option<Rect> {
-    match (self.rect, self.subtree) {
-      (Some(rect), Some(subtree)) => Some(rect.union(&subtree)),
-      (Some(rect), None) => Some(rect),
-      (None, Some(subtree)) => Some(subtree),
-      (None, None) => None,
-    }
   }
 }
 
@@ -399,9 +380,6 @@ pub struct LayoutInfo {
   pub size: Option<Size>,
   /// The position of the widget relative to its parent.
   pub pos: Point,
-
-  /// the visual box of the render object
-  pub visual_box: VisualBox,
 }
 
 /// Store the render object's place relative to parent coordinate and the

@@ -35,10 +35,6 @@ pub trait WrapRender {
 
   fn get_transform(&self, host: &dyn Render) -> Option<Transform> { host.get_transform() }
 
-  fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
-    host.visual_box(ctx)
-  }
-
   fn dirty_phase(&self, host: &dyn Render) -> DirtyPhase { host.dirty_phase() }
 
   fn adjust_position(&self, host: &dyn Render, pos: Point, ctx: &mut PlaceCtx) -> Point {
@@ -114,10 +110,6 @@ impl Render for RenderPair {
     self
       .wrapper
       .place_children(size, &*self.host, ctx)
-  }
-
-  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
-    self.wrapper.visual_box(&*self.host, ctx)
   }
 
   fn paint(&self, ctx: &mut PaintingCtx) { self.wrapper.paint(&*self.host, ctx); }
@@ -210,10 +202,6 @@ where
 
   fn get_transform(&self, host: &dyn Render) -> Option<Transform> {
     self.read().get_transform(host)
-  }
-
-  fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
-    self.read().visual_box(host, ctx)
   }
 
   /// Returns the dirty phase of the wrapped render, this value should

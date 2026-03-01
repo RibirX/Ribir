@@ -39,12 +39,6 @@ impl Render for Clip {
 
   fn paint(&self, ctx: &mut PaintingCtx) { ctx.painter().clip(self.clip_path.clone().into()); }
 
-  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
-    let clip_rect = self.clip_path.bounds(None);
-    ctx.clip(clip_rect);
-    Some(clip_rect)
-  }
-
   #[cfg(feature = "debug")]
   fn debug_name(&self) -> std::borrow::Cow<'static, str> { std::borrow::Cow::Borrowed("clip") }
 }

@@ -73,18 +73,6 @@ pub trait Render: 'static {
   /// painted automatically by the framework after parent painting completes.
   fn paint(&self, _: &mut PaintingCtx) {}
 
-  /// Calculates the visual bounding box of the widget's painting effects
-  ///
-  /// # Parameters
-  /// - `ctx`: Provides access to layout and visual context information
-  ///
-  /// # Returns
-  /// - `Some(Rect)`: Bounding box in local coordinates if the widget paints
-  ///   content
-  /// - `None`: Default value indicating no visual representation
-  #[allow(unused_variables)]
-  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> { None }
-
   /// Child size dependency flag
   ///
   /// Return `false` for fixed-size containers to optimize layout passes.
