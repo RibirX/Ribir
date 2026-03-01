@@ -33,6 +33,18 @@ pub trait Transition {
   #[doc(hidden)]
   fn dyn_clone(&self) -> Box<dyn Transition>;
 
+  /// Convert `self` into a `Box<dyn Transition>`.
+  ///
+  /// The default implementation wraps `self` in a `Box`. Override this for
+  /// `Box<dyn Transition>` to return `self` directly and avoid double-boxing.
+  #[doc(hidden)]
+  fn into_box(self) -> Box<dyn Transition>
+  where
+    Self: Sized + 'static,
+  {
+    Box::new(self)
+  }
+
   /// Transition will apply with repeat times
   fn repeat(self, repeat: f32) -> RepeatTransition<Self>
   where
@@ -101,6 +113,13 @@ impl Transition for Box<dyn Transition> {
   fn duration(&self) -> Duration { (**self).duration() }
 
   fn dyn_clone(&self) -> Box<dyn Transition> { (**self).dyn_clone() }
+
+  fn into_box(self) -> Box<dyn Transition>
+  where
+    Self: Sized + 'static,
+  {
+    self
+  }
 }
 
 impl<E: Easing + Clone + 'static> Transition for EasingTransition<E> {

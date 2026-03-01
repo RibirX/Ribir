@@ -132,4 +132,52 @@ mod tests {
     assert_eq!(mounted_ids.len(), 3);
     assert_eq!(&mounted_ids, &*c_disposed.read());
   }
+
+  #[test]
+  fn disposed_can_map_to_global_with_detached_parent() {
+    reset_test_env!();
+
+    let show = Stateful::new(true);
+    let mounted_id = Stateful::new(None::<WidgetId>);
+    let disposed_pos = Stateful::new(None::<Point>);
+
+    let c_show = show.clone_writer();
+    let c_mounted_id = mounted_id.clone_reader();
+    let c_disposed_pos = disposed_pos.clone_reader();
+
+    let w = fn_widget! {
+      @MockBox {
+        size: Size::new(200., 200.),
+        x: 37.,
+        y: 23.,
+        @ {
+          pipe!(*$read(show)).map(move |visible| {
+            if visible {
+              @MockBox {
+                size: Size::new(50., 50.),
+                x: 11.,
+                y: 13.,
+                on_mounted: move |e| *$write(mounted_id) = Some(e.id),
+                on_disposed: move |e| *$write(disposed_pos) = Some(e.map_to_global(Point::zero())),
+              }.into_widget()
+            } else {
+              @Void {}.into_widget()
+            }
+          })
+        }
+      }
+    };
+
+    let wnd = TestWindow::new_with_size(w, Size::new(400., 400.));
+    wnd.draw_frame();
+    let id = c_mounted_id
+      .read()
+      .expect("child should be mounted before dispose");
+    let expected = wnd.map_to_global(Point::zero(), id);
+
+    *c_show.write() = false;
+    wnd.draw_frame();
+
+    assert_eq!(*c_disposed_pos.read(), Some(expected));
+  }
 }

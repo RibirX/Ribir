@@ -26,6 +26,19 @@ pub enum DirtyPhase {
   Paint,
 }
 
+impl DirtyPhase {
+  /// Returns the priority of this dirty phase. Higher values mean broader
+  /// invalidation scope and take precedence when merging.
+  fn priority(self) -> u8 {
+    match self {
+      DirtyPhase::Paint => 0,
+      DirtyPhase::Position => 1,
+      DirtyPhase::Layout => 2,
+      DirtyPhase::LayoutSubtree => 3,
+    }
+  }
+}
+
 pub(crate) type DirtySet = Rc<RefCell<ahash::HashMap<WidgetId, DirtyPhase>>>;
 
 pub(crate) struct WidgetTree {
@@ -33,6 +46,7 @@ pub(crate) struct WidgetTree {
   pub(crate) wnd_id: WindowId,
   pub(crate) arena: TreeArena,
   pub(crate) store: LayoutStore,
+  pub(crate) detached_parent: ahash::HashMap<WidgetId, WidgetId>,
   pub(crate) dirty_set: DirtySet,
   pub(crate) dummy_id: WidgetId,
 }
@@ -46,6 +60,7 @@ type TreeArena = Arena<Box<dyn RenderQueryable>>;
 impl WidgetTree {
   pub fn init(&mut self, wnd: &Window, content: GenWidget) -> WidgetId {
     self.root.0.remove_subtree(&mut self.arena);
+    self.detached_parent.clear();
     let _guard = BuildCtx::init(BuildCtx::empty(wnd.tree));
 
     let theme = AppCtx::app_theme().clone_writer();
@@ -302,11 +317,27 @@ impl WidgetTree {
     id.0.detach(&mut self.arena);
   }
 
+  pub(crate) fn set_detached_parent(&mut self, id: WidgetId, parent: Option<WidgetId>) {
+    if let Some(parent) = parent {
+      self.detached_parent.insert(id, parent);
+    } else {
+      self.detached_parent.remove(&id);
+    }
+  }
+
+  pub(crate) fn detached_parent(&self, id: WidgetId) -> Option<WidgetId> {
+    self.detached_parent.get(&id).copied()
+  }
+
+  pub(crate) fn clear_detached_parent(&mut self, id: WidgetId) { self.detached_parent.remove(&id); }
+
   pub(crate) fn remove_subtree(&mut self, id: WidgetId) {
     assert_ne!(id, self.root(), "You should detach the root widget before remove it.");
 
     id.0.descendants(&self.arena).for_each(|id| {
-      self.store.remove(WidgetId(id));
+      let id = WidgetId(id);
+      self.store.remove(id);
+      self.detached_parent.remove(&id);
     });
     id.0.remove_subtree(&mut self.arena);
   }
@@ -337,7 +368,15 @@ impl WidgetTree {
     let dummy_id = new_node(&mut arena, Box::new(PureRender(Void::default())));
     dummy_id.0.remove(&mut arena);
 
-    Self { root, dummy_id, wnd_id, arena, store: <_>::default(), dirty_set: <_>::default() }
+    Self {
+      root,
+      dummy_id,
+      wnd_id,
+      arena,
+      store: <_>::default(),
+      detached_parent: <_>::default(),
+      dirty_set: <_>::default(),
+    }
   }
 
   pub fn disposed(&mut self) {
@@ -356,7 +395,7 @@ impl DirtyMarker {
   pub(crate) fn mark(&self, id: WidgetId, scope: DirtyPhase) -> bool {
     let mut map = self.0.borrow_mut();
     if let Some(s) = map.get_mut(&id) {
-      if *s == DirtyPhase::Paint && scope == DirtyPhase::Layout {
+      if scope.priority() > s.priority() {
         *s = scope;
         return true;
       }

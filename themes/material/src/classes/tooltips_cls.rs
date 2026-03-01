@@ -17,17 +17,19 @@ pub(super) fn init(classes: &mut Classes) {
           y: AnchorY::center(),
         }
       };
-      let animate = w.opacity()
-        .transition(EasingTransition{
-          easing: md::easing::STANDARD_ACCELERATE,
-          duration: md::easing::duration::SHORT2
-        });
-      @(w) {
-        keep_alive: pipe!($read(animate).is_running() || *$read(w.opacity()) != 0.),
-        on_disposed: move |_| {
-          *$write(w.opacity()) = 0.;
-        }
-      }
+      let opacity = w.opacity();
+
+      AnimatePresence {
+        enter: None,
+        leave: Some(LeaveAction {
+          state: opacity,
+          transition: EasingTransition {
+            easing: md::easing::STANDARD_ACCELERATE,
+            duration: md::easing::duration::SHORT2,
+          },
+          to: 0.,
+        }.into()),
+      }.with_child(w)
     }
     .into_widget()
   });

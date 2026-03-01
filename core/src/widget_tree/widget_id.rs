@@ -109,23 +109,24 @@ impl WidgetId {
     }
   }
 
-  fn delay_drop_parent(&self, tree: &WidgetTree) -> Option<WidgetId> {
-    if self == &tree.root() {
+  pub(crate) fn tree_parent(self, tree: &WidgetTree) -> Option<WidgetId> {
+    self.node_feature(tree, |node| node.parent())
+  }
+
+  fn detached_parent(self, tree: &WidgetTree) -> Option<WidgetId> {
+    if self == tree.root() {
       return None;
     }
-    let wnd = tree.window();
-    let delay_drop_widgets = wnd.delay_drop_widgets.borrow();
-    delay_drop_widgets.iter().find_map(
-      |(parent, id)| {
-        if id.get() == Some(*self) { *parent } else { None }
-      },
-    )
+
+    tree
+      .detached_parent(self)
+      .filter(|parent| !parent.is_dropped(tree))
   }
 
   pub(crate) fn parent(self, tree: &WidgetTree) -> Option<WidgetId> {
     self
-      .node_feature(tree, |node| node.parent())
-      .or_else(|| self.delay_drop_parent(tree))
+      .tree_parent(tree)
+      .or_else(|| self.detached_parent(tree))
   }
 
   pub(crate) fn first_child(self, tree: &WidgetTree) -> Option<WidgetId> {
@@ -157,21 +158,21 @@ impl WidgetId {
     // another node,so we need check it manually.
     assert!(!self.is_dropped(tree));
 
-    let last_elem = Rc::new(RefCell::new(self));
-    let last_elem2 = last_elem.clone();
-    self
+    let mut ancestors = self
       .0
       .ancestors(&tree.arena)
-      .map(move |id| {
-        *last_elem2.borrow_mut() = WidgetId(id);
-        WidgetId(id)
-      })
-      .chain(
-        Some(last_elem)
-          .into_iter()
-          .filter_map(|v| v.borrow().delay_drop_parent(tree))
-          .flat_map(|wid| wid.0.ancestors(&tree.arena).map(WidgetId)),
-      )
+      .map(WidgetId)
+      .collect::<Vec<_>>();
+    let mut tail = *ancestors.last().unwrap_or(&self);
+    while let Some(parent) = tail.detached_parent(tree) {
+      if ancestors.contains(&parent) {
+        break;
+      }
+      ancestors.extend(parent.0.ancestors(&tree.arena).map(WidgetId));
+      tail = *ancestors.last().unwrap_or(&tail);
+    }
+
+    ancestors.into_iter()
   }
 
   #[inline]
@@ -205,22 +206,26 @@ impl WidgetId {
 
   /// Dispose the whole subtree of `id`, include `id` itself.
   pub(crate) fn dispose_subtree(self, tree: &mut WidgetTree) {
-    let parent = self.parent(tree);
+    let parent = self.tree_parent(tree);
     tree.detach(self);
+    tree.set_detached_parent(self, parent);
     tree
       .window()
-      .add_delay_event(DelayEvent::Disposed { id: self, parent });
+      .add_delay_event(DelayEvent::Disposed(self));
   }
 
   pub(crate) fn insert_after(self, next: WidgetId, tree: &mut WidgetTree) {
+    tree.clear_detached_parent(self);
     self.0.insert_after(next.0, &mut tree.arena);
   }
 
   pub(crate) fn insert_before(self, prev: WidgetId, tree: &mut WidgetTree) {
+    tree.clear_detached_parent(self);
     self.0.insert_before(prev.0, &mut tree.arena);
   }
 
   pub(crate) fn append(self, child: WidgetId, tree: &mut WidgetTree) {
+    tree.clear_detached_parent(child);
     self.0.append(child.0, &mut tree.arena);
   }
 
