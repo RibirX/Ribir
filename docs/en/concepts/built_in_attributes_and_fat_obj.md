@@ -140,7 +140,6 @@ These attributes are used to control the appearance and layout of Widgets.
     *   `font_face`: Sets font family.
 
 *   **Other**:
-    *   `keep_alive`: Keeps Widget state even when removed from view.
     *   `tooltips`: Sets tooltip text.
     *   `disabled`: Disables interaction for Widget and its children.
     *   `providers`: Sets provider context for the widget.
@@ -283,8 +282,7 @@ The wrapping order from **inner to outer** is as follows (simplified for common 
 22. `visibility`
 23. `disabled`
 24. `x` / `y` / `pos` (position)
-25. `keep_alive`
-26. `reuse`
+25. `reuse`
 
 #### Key Takeaways
 

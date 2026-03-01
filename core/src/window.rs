@@ -199,12 +199,6 @@ pub struct Window {
   /// executed first.
   pub(crate) priority_task_queue: PriorityTaskQueue,
   shell_wnd: RefCell<BoxShellWindow>,
-  /// A vector store the widget id pair of (parent, child). The child need to
-  /// drop after its `KeepAlive::keep_alive` be false or its parent
-  /// is dropped.
-  ///
-  /// This widgets it's detached from its parent, but still need to paint.
-  pub(crate) delay_drop_widgets: RefCell<Vec<(Option<WidgetId>, TrackId)>>,
 
   flags: Cell<WindowFlags>,
 }
@@ -409,7 +403,6 @@ impl Window {
       };
 
       self.tree().draw();
-      self.draw_delay_drop_widgets();
 
       let mut painter = self.painter.borrow_mut();
 
@@ -496,7 +489,6 @@ impl Window {
       running_animates: <_>::default(),
       priority_task_queue: PriorityTaskQueue::default(),
       shell_wnd: RefCell::new(shell_wnd),
-      delay_drop_widgets: <_>::default(),
       flags: Cell::new(flags),
       pre_edit: <_>::default(),
     };
@@ -570,45 +562,6 @@ impl Window {
     self.delay_emitter.borrow_mut().push_back(e);
   }
 
-  fn draw_delay_drop_widgets(&self) {
-    let mut painter = self.painter.borrow_mut();
-
-    self
-      .delay_drop_widgets
-      .borrow_mut()
-      .retain(|(parent, wid)| {
-        let wid = wid.get().unwrap();
-        let tree = self.tree_mut();
-        let drop_conditional = wid
-          .query_ref::<KeepAlive>(tree)
-          .is_none_or(|d| !d.keep_alive);
-        let parent_dropped = parent
-          .as_ref()
-          .is_some_and(|p| p.ancestors(tree).any(|w| w.is_dropped(tree)));
-        let need_drop = drop_conditional || parent_dropped;
-        if need_drop {
-          tree.remove_subtree(wid);
-        }
-        !need_drop
-      });
-    self
-      .delay_drop_widgets
-      .borrow()
-      .iter()
-      .for_each(|(parent, wid)| {
-        if let Some(wid) = wid.get() {
-          let tree = self.tree();
-          let mut painter = painter.save_guard();
-          if let Some(p) = parent {
-            let offset = tree.map_to_global(Point::zero(), *p);
-            painter.translate(offset.x, offset.y);
-          }
-
-          wid.paint_subtree(tree, &mut painter);
-        }
-      });
-  }
-
   fn run_priority_tasks(&self) {
     while let Some((task, _)) = self.priority_task_queue.pop() {
       // `pipe` used priority task queue to update the subtree, we need to force
@@ -638,8 +591,8 @@ impl Window {
           let mut e = Event::PerformedLayout(LifecycleEvent::new(id, self.tree));
           self.emit_from_inside(id, &mut e);
         }
-        DelayEvent::Disposed { id, parent } => {
-          let mut stack = vec![id];
+        DelayEvent::Disposed(root_id) => {
+          let mut stack = vec![root_id];
           while let Some(id) = stack.pop() {
             stack.extend(id.children(self.tree()));
             if Some(id) == self.focusing() {
@@ -652,22 +605,13 @@ impl Window {
             self.emit_from_outside(id, &mut e);
           }
 
-          let keep_alive_id = id
-            .query_ref::<KeepAlive>(self.tree())
-            .filter(|d| d.keep_alive)
-            .map(|d| d.track_id());
-
-          if let Some(keep_alive_id) = keep_alive_id {
-            self
-              .delay_drop_widgets
-              .borrow_mut()
-              .push((parent, keep_alive_id));
-          } else {
-            self.add_delay_event(DelayEvent::RemoveSubtree(id));
-          }
+          self.add_delay_event(DelayEvent::RemoveSubtree(root_id));
         }
         DelayEvent::RemoveSubtree(id) => {
-          self.tree_mut().remove_subtree(id);
+          let tree = self.tree_mut();
+          if id != tree.root() && !id.is_dropped(tree) && id.tree_parent(tree).is_none() {
+            tree.remove_subtree(id);
+          }
         }
         DelayEvent::Focus { id, reason } => {
           let mut e = Event::Focus(FocusEvent::new(id, reason, self.tree));
@@ -1079,10 +1023,7 @@ impl Drop for Window {
 pub(crate) enum DelayEvent {
   Mounted(WidgetId),
   PerformedLayout(WidgetId),
-  Disposed {
-    parent: Option<WidgetId>,
-    id: WidgetId,
-  },
+  Disposed(WidgetId),
   RemoveSubtree(WidgetId),
   Focus {
     id: WidgetId,

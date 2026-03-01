@@ -138,7 +138,6 @@ fn example() -> Widget<'static> {
     *   `font_face`: 设置字体系列。
 
 *   **其他**:
-    *   `keep_alive`: 保持 Widget 状态即使从视图中移除。
     *   `tooltips`: 设置工具提示文本。
     *   `disabled`: 禁用 Widget 及其子项的交互。
     *   `providers`: 为 Widget 设置提供者上下文。
@@ -281,8 +280,7 @@ fn simple_card(w: Widget<'static>) -> Widget<'static> {
 22. `visibility`
 23. `disabled`
 24. `x` / `y` / `pos` (position)
-25. `keep_alive`
-26. `reuse`
+25. `reuse`
 
 #### 关键要点
 

@@ -17,8 +17,9 @@ pub use widget_scope::*;
 pub mod image;
 
 pub use image::{DecodedFrame, FrameIterator, Image, LoopCount};
-pub mod keep_alive;
-pub use keep_alive::*;
+
+pub mod animate_presence;
+pub use animate_presence::*;
 pub mod backdrop_filter;
 pub use backdrop_filter::*;
 pub mod box_shadow;
@@ -166,8 +167,6 @@ pub struct FatObj<T> {
   painting_style: Option<Stateful<PaintingStyleWidget>>,
   text_align: Option<Stateful<TextAlignWidget>>,
   text_style: Option<Stateful<TextStyleWidget>>,
-  keep_alive: Option<Stateful<KeepAlive>>,
-  keep_alive_unsubscribe_handle: Option<Box<dyn Any>>,
   tooltips: Option<Stateful<Tooltips>>,
   disabled: Option<Stateful<Disabled>>,
   clip_boundary: Option<Stateful<ClipBoundary>>,
@@ -226,8 +225,6 @@ impl<T> FatObj<T> {
       tooltips: self.tooltips,
       clip_boundary: self.clip_boundary,
       disabled: self.disabled,
-      keep_alive: self.keep_alive,
-      keep_alive_unsubscribe_handle: self.keep_alive_unsubscribe_handle,
       providers: self.providers,
       reuse: self.reuse,
     }
@@ -266,7 +263,6 @@ impl<T> FatObj<T> {
       && self.text_style.is_none()
       && self.visibility.is_none()
       && self.opacity.is_none()
-      && self.keep_alive.is_none()
       && self.tooltips.is_none()
       && self.disabled.is_none()
       && self.clip_boundary.is_none()
@@ -923,26 +919,6 @@ impl<T> FatObj<T> {
     init_sub_widget!(self, clip_boundary, clip_boundary, v)
   }
 
-  /// Initializes the `keep_alive` value of the `KeepAlive` widget.
-  pub fn with_keep_alive<K: ?Sized>(&mut self, v: impl RInto<PipeValue<bool>, K>) -> &mut Self {
-    let (v, o) = v.r_into().unzip();
-    let d = sub_widget!(self, keep_alive);
-    d.write().keep_alive = v;
-    if let Some(o) = o {
-      let c_delay = d.clone_writer();
-
-      // KeepAliveWidget may continue to exist after `on_disposed` is fired. It needs
-      // to accept value changes to determine when to drop. So instead of
-      // unsubscribing in `on_disposed`, we unsubscribe when the widget node is
-      // dropped.
-      let u = o
-        .subscribe(move |v| c_delay.write().keep_alive = v)
-        .unsubscribe_when_dropped();
-      self.keep_alive_unsubscribe_handle = Some(Box::new(u));
-    }
-    self
-  }
-
   /// Initializes the providers of the widget.
   pub fn with_providers(&mut self, providers: impl Into<SmallVec<[Provider; 1]>>) -> &mut Self {
     if let Some(vec) = self.providers.as_mut() {
@@ -1301,13 +1277,6 @@ impl<T> FatObj<T> {
     part_writer!(&mut opacity.opacity)
   }
 
-  /// Returns a state writer for modifying keep-alive behavior.
-  /// When true, preserves widget state even when not visible in the UI.
-  pub fn keep_alive(&mut self) -> impl StateWriter<Value = bool> {
-    let keep_alive = sub_widget!(self, keep_alive);
-    part_writer!(&mut keep_alive.keep_alive)
-  }
-
   /// Returns a state writer for modifying tooltip content.
   /// Controls the text displayed when hovering over the widget.
   pub fn tooltips(&mut self) -> impl StateWriter<Value = CowArc<str>> {
@@ -1553,14 +1522,9 @@ impl<'a> FatObj<Widget<'a>> {
           visibility,
           disabled,
           anchor,
-          keep_alive,
           reuse
         ]
     );
-
-    if let Some(h) = self.keep_alive_unsubscribe_handle {
-      host = host.attach_anonymous_data(h);
-    }
 
     #[cfg(feature = "debug")]
     if let Some(name) = self.debug_name {
