@@ -3,9 +3,7 @@
   "fallback_init_result": {
     "protocolVersion": "2024-11-05",
     "capabilities": {
-      "tools": {
-        "listChanged": false
-      },
+      "tools": {"listChanged": false},
       "resources": {
         "listChanged": false,
         "subscribe": false,
@@ -76,10 +74,7 @@
     {
       "name": "stop_app",
       "description": "Stop only the process currently managed by this MCP server (launched or adopted). No-op when nothing is managed.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {}
-      }
+      "inputSchema": {"type": "object", "properties": {}}
     },
     {
       "name": "capture_screenshot",
@@ -130,7 +125,8 @@
           },
           "id": {
             "type": "string",
-            "description": "Widget ID to inspect. Supported formats: '3', '3:0', or '{\"index1\":3,\"stamp\":0}'."
+            "description": "Widget ID to inspect. Supported formats: '3', '3:0', '{\"index1\":3,\"stamp\":0}', or 'name:<debug_name>'.",
+            "examples": ["3:0", "name:counter_button"]
           }
         },
         "required": ["id"]
@@ -200,7 +196,7 @@
           },
           "id": {
             "type": "string",
-            "description": "Widget ID of the overlay to remove. Supported formats: '3', '3:0', or '{\"index1\":3,\"stamp\":0}'."
+            "description": "Widget ID of the overlay to remove. Supported formats: '3', '3:0', '{\"index1\":3,\"stamp\":0}', or 'name:<debug_name>'."
           }
         },
         "required": ["id"]
@@ -239,10 +235,7 @@
     {
       "name": "stop_recording",
       "description": "Stop the active recording session and return absolute capture and manifest paths.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {}
-      }
+      "inputSchema": {"type": "object", "properties": {}}
     },
     {
       "name": "capture_one_shot",
@@ -316,10 +309,7 @@
                 "key": "a",
                 "chars": "a"
               },
-              {
-                "type": "chars",
-                "chars": "hello"
-              }
+              {"type": "chars", "chars": "hello"}
             ]
           }
         ],
@@ -327,9 +317,7 @@
           "window_id": {
             "type": "integer",
             "description": "Window ID as u64 from ribir://windows (optional). If omitted, uses the first active window. If no active window exists, the call fails.",
-            "examples": [
-              140226801569568
-            ]
+            "examples": [140226801569568]
           },
           "events": {
             "type": "array",
@@ -403,7 +391,9 @@
                 {
                   "required": ["type", "key", "state"],
                   "properties": {
-                    "type": {"const": "raw_keyboard_input"},
+                    "type": {
+                      "const": "raw_keyboard_input"
+                    },
                     "key": {
                       "type": "string",
                       "description": "Logical key value using W3C KeyboardEvent.key names."
@@ -422,7 +412,12 @@
                     },
                     "location": {
                       "type": "string",
-                      "enum": ["standard", "left", "right", "numpad"],
+                      "enum": [
+                        "standard",
+                        "left",
+                        "right",
+                        "numpad"
+                      ],
                       "description": "Physical key location."
                     },
                     "chars": {
@@ -437,7 +432,7 @@
                     "type": {"const": "click"},
                     "id": {
                       "type": "string",
-                      "description": "Optional widget target ID. Supported formats: '3', '3:0', or '{\"index1\":3,\"stamp\":0}'. If both `id` and `x`/`y` are present, `x`/`y` takes precedence."
+                      "description": "Optional widget target ID. Supported formats: '3', '3:0', '{\"index1\":3,\"stamp\":0}', or 'name:<debug_name>'. If both `id` and `x`/`y` are present, `x`/`y` takes precedence."
                     },
                     "x": {"type": "number"},
                     "y": {"type": "number"},
@@ -460,7 +455,7 @@
                     "type": {"const": "double_click"},
                     "id": {
                       "type": "string",
-                      "description": "Optional widget target ID. Supported formats: '3', '3:0', or '{\"index1\":3,\"stamp\":0}'. If both `id` and `x`/`y` are present, `x`/`y` takes precedence."
+                      "description": "Optional widget target ID. Supported formats: '3', '3:0', '{\"index1\":3,\"stamp\":0}', or 'name:<debug_name>'. If both `id` and `x`/`y` are present, `x`/`y` takes precedence."
                     },
                     "x": {"type": "number"},
                     "y": {"type": "number"},

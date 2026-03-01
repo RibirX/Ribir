@@ -327,8 +327,9 @@ async fn handle_tool_call(
         Err(ServiceError::NotFound) => JsonRpcResponse::error(
           id,
           -32001,
-          "Widget not found. Supported id formats: '3', '3:0', or '{\"index1\":3,\"stamp\":0}'. \
-           Tip: call inspect_tree(options='id') to discover valid IDs.",
+          "Widget not found. Supported id formats: \'3\', \'3:0\', \
+           \'{\"index1\":3,\"stamp\":0}\', or \'name:<debug_name>\'. Tip: call \
+           inspect_tree(options='id') to discover valid IDs.",
         ),
         Err(e) => JsonRpcResponse::error(id, -32000, e.to_string()),
       }
@@ -391,8 +392,8 @@ async fn handle_tool_call(
         Err(ServiceError::NotFound) => JsonRpcResponse::error(
           id,
           -32001,
-          "Widget not found for overlay. Supported id formats: '3', '3:0', or \
-           '{\"index1\":3,\"stamp\":0}'.",
+          "Widget not found for overlay. Supported id formats: \'3\', \'3:0\', \
+           \'{\"index1\":3,\"stamp\":0}\', or \'name:<debug_name>\'.",
         ),
         Err(e) => JsonRpcResponse::error(id, -32000, format!("Failed to add overlay: {}", e)),
       }
