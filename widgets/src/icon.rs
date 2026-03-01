@@ -126,10 +126,6 @@ impl Render for IconRender {
     ctx.update_position(child, Point::new(layout_offset.width, layout_offset.height));
   }
 
-  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
-    Some(Rect::from_size(ctx.box_size()?))
-  }
-
   fn paint(&self, ctx: &mut PaintingCtx) {
     let child_size = ctx.single_child_box().unwrap().size;
     if !child_size.is_empty() {

@@ -176,12 +176,6 @@ impl Render for FittedBox {
     ctx.update_position(child, pos);
   }
 
-  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
-    let clip_rect = Rect::from_size(ctx.box_size()?);
-    ctx.clip(clip_rect);
-    Some(clip_rect)
-  }
-
   fn paint(&self, ctx: &mut PaintingCtx) {
     let scale = self.scale_factor.get();
     if matches!(self.box_fit, BoxFit::Cover | BoxFit::CoverHeight | BoxFit::CoverWidth) {

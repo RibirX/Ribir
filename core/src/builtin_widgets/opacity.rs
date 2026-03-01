@@ -44,15 +44,6 @@ impl WrapRender for Opacity {
     }
   }
 
-  fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
-    if self.opacity > 0. {
-      host.visual_box(ctx)
-    } else {
-      ctx.clip(Rect::from_size(Size::zero()));
-      None
-    }
-  }
-
   #[inline]
   fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
 

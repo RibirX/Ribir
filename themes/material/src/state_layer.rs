@@ -132,20 +132,6 @@ impl<const M: u8> WrapRender for StateLayer<M> {
     ctx.painter().merge(&mut layer);
   }
 
-  fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
-    if let LayerArea::Circle { radius, .. } = self.area
-      && self.draw_opacity > 0.
-    {
-      let rect = Rect::from_size(Size::splat(radius * 2.));
-      let union = host
-        .visual_box(ctx)
-        .map_or(rect, |v| v.union(&rect));
-      return Some(union);
-    }
-
-    host.visual_box(ctx)
-  }
-
   #[inline]
   fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
 }

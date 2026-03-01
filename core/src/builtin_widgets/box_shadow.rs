@@ -136,20 +136,6 @@ impl WrapRender for BoxShadowWidget {
     host.paint(ctx);
   }
 
-  fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
-    let size = ctx.box_size().unwrap();
-    let box_shadow = self.box_shadow;
-    let blur_radius = box_shadow.blur_radius.round();
-
-    let shadow_rect = box_shadow.shadow_rect(size, blur_radius);
-    Some(
-      host
-        .visual_box(ctx)
-        .map(|rect| rect.union(&shadow_rect))
-        .unwrap_or(shadow_rect),
-    )
-  }
-
   #[inline]
   fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
 

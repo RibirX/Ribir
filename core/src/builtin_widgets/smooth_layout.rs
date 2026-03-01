@@ -711,31 +711,6 @@ impl WrapRender for SmoothLayout {
     }
   }
 
-  fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
-    if !self.is_content_motion_active(animations_enabled(&ctx.window())) {
-      return host.visual_box(ctx);
-    }
-
-    let animated_size = self.animated_size();
-    let scale = self.scale_factor();
-
-    match self.content_motion {
-      ContentMotion::ClipReveal => {
-        let clip_rect = Rect::from_size(animated_size);
-        ctx.clip(clip_rect);
-        host
-          .visual_box(ctx)
-          .and_then(|rect| rect.intersection(&clip_rect))
-          .or(Some(clip_rect))
-      }
-      ContentMotion::Scale => host
-        .visual_box(ctx)
-        .map_or(Some(Rect::from_size(ctx.box_size()?)), |rect| {
-          Some(Transform::scale(scale.x, scale.y).outer_transformed_rect(&rect))
-        }),
-    }
-  }
-
   fn get_transform(&self, host: &dyn Render) -> Option<Transform> {
     // Scale transform applies whenever the scale animation is geometrically
     // active, regardless of the window ANIMATIONS flag.

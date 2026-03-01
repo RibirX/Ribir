@@ -128,11 +128,6 @@ impl Render for SpinnerArc {
   fn size_affected_by_child(&self) -> bool { false }
   fn measure(&self, clamp: BoxClamp, _: &mut MeasureCtx) -> Size { clamp.clamp(Size::splat(40.)) }
 
-  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
-    let size = ctx.box_size()?;
-    Some(Rect::from_size(size))
-  }
-
   fn paint(&self, ctx: &mut PaintingCtx) {
     let Self { start, end } = *self;
     let size = ctx.box_size().unwrap();

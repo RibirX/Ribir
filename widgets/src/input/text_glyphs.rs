@@ -73,11 +73,6 @@ impl<T: VisualText + 'static> Render for TextGlyphs<T> {
     size
   }
 
-  fn visual_box(&self, _: &mut VisualCtx) -> Option<Rect> {
-    let visual_glyphs = self.glyphs()?;
-    Some(visual_glyphs.visual_rect())
-  }
-
   fn paint(&self, ctx: &mut PaintingCtx) {
     let box_rect = Rect::from_size(ctx.box_size().unwrap());
     if ctx

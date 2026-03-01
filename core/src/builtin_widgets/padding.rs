@@ -61,15 +61,6 @@ impl WrapRender for Padding {
     host.paint(ctx);
   }
 
-  fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
-    host
-      .visual_box(ctx)
-      .map_or(Some(Rect::from_size(ctx.box_size()?)), |mut rect| {
-        rect.size += self.padding.thickness();
-        Some(rect)
-      })
-  }
-
   /// Returns the transform to apply to the child widget.
   /// The padding is applied when mapping the child's coordinates(content area).
   fn get_transform(&self, host: &dyn Render) -> Option<Transform> {

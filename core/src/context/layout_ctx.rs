@@ -2,9 +2,8 @@ use ribir_geom::Size;
 
 use super::{WidgetCtx, WidgetCtxImpl};
 use crate::{
-  context::VisualCtx,
   prelude::{Point, ProviderCtx},
-  widget::{BoxClamp, VisualBox, WidgetTree},
+  widget::{BoxClamp, WidgetTree},
   widget_tree::WidgetId,
 };
 
@@ -81,10 +80,6 @@ impl<'a> MeasureCtx<'a> {
           let mut layout_ctx =
             PlaceCtx { id, tree: self.tree, provider_ctx: &mut self.provider_ctx };
           layout_ctx.perform_place(size);
-        }
-
-        {
-          VisualCtx::from_layout_ctx(self).update_visual_box();
         }
 
         self.provider_ctx.pop_providers_for(id);
@@ -168,15 +163,6 @@ impl<'a> MeasureCtx<'a> {
   fn get_calculated_size(&self, child: WidgetId, clamp: BoxClamp) -> Option<Size> {
     let info = self.tree.store.layout_info(child)?;
     if info.clamp == clamp { info.size } else { None }
-  }
-
-  pub(crate) fn visual_box(&mut self, id: WidgetId) -> VisualBox {
-    let info = self.tree.store.layout_info_or_default(id);
-    info.visual_box
-  }
-
-  pub(crate) fn update_visual_box(&mut self) -> VisualBox {
-    VisualCtx::from_layout_ctx(self).update_visual_box()
   }
 }
 

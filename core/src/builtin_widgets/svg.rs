@@ -20,10 +20,6 @@ impl Render for Svg {
   #[inline]
   fn measure(&self, clamp: BoxClamp, _: &mut MeasureCtx) -> Size { clamp.clamp(self.size()) }
 
-  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
-    Some(Rect::from_size(ctx.box_size()?))
-  }
-
   fn paint(&self, ctx: &mut PaintingCtx) {
     let size = ctx.box_size().unwrap();
     let painter = ctx.painter();

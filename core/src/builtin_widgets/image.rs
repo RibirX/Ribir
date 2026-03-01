@@ -377,12 +377,6 @@ impl Render for Resource<PixelImage> {
     }
   }
 
-  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
-    let box_rect = Rect::from_size(ctx.box_size()?);
-    let img_rect = Rect::from_size(Size::new(self.width() as f32, self.height() as f32));
-    img_rect.intersection(&box_rect)
-  }
-
   #[cfg(feature = "debug")]
   fn debug_name(&self) -> std::borrow::Cow<'static, str> { std::borrow::Cow::Borrowed("image") }
 }
