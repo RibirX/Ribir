@@ -49,6 +49,9 @@ pub struct InjectEventsResult {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum InjectedUiEvent {
+  Delay {
+    ms: u64,
+  },
   CursorMoved {
     x: f32,
     y: f32,

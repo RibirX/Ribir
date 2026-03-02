@@ -1038,6 +1038,11 @@ async fn handle_command(cmd: DebugCommand) {
       let mut accepted = 0usize;
 
       for event in events {
+        if let InjectedUiEvent::Delay { ms } = event {
+          AppCtx::timer(std::time::Duration::from_millis(ms)).await;
+          continue;
+        }
+
         let ui_events = match injected_to_ui_events(&target_wnd, event) {
           Ok(events) => events,
           Err(msg) => {
@@ -1211,6 +1216,7 @@ fn build_raw_keyboard_input_events(
 fn injected_to_ui_events(wnd: &Window, event: InjectedUiEvent) -> Result<Vec<UiEvent>, String> {
   let window_id = wnd.id();
   let ui_events = match event {
+    InjectedUiEvent::Delay { .. } => unreachable!("Delay should be handled before conversion"),
     InjectedUiEvent::CursorMoved { x, y } => {
       vec![UiEvent::CursorMoved { wnd_id: window_id, pos: ribir_geom::Point::new(x, y) }]
     }

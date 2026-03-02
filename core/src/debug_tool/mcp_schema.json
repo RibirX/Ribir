@@ -273,7 +273,7 @@
     },
     {
       "name": "inject_events",
-      "description": "Inject serialized input events into the application's UI event loop for interaction simulation. Events are executed in array order. Categories: Functional events (`click`, `double_click`, `keyboard_input`, `chars`) and low-level events (`cursor_moved`, `mouse_input` press/release, `raw_keyboard_input` press/release). IMPORTANT: event `type` values are snake_case and button values use `primary|secondary|auxiliary|fourth|fifth` (not `left|right|middle`).",
+      "description": "Inject serialized input events into the application's UI event loop for interaction simulation. You can use the `delay` event to simulate more realistic interactions over time. Events are executed in array order. Categories: Functional events (`click`, `double_click`, `keyboard_input`, `chars`) and low-level events (`delay`, `cursor_moved`, `mouse_input` press/release, `raw_keyboard_input` press/release). IMPORTANT: event `type` values are snake_case and button values use `primary|secondary|auxiliary|fourth|fifth` (not `left|right|middle`).",
       "inputSchema": {
         "type": "object",
         "required": ["events"],
@@ -325,6 +325,16 @@
             "items": {
               "type": "object",
               "oneOf": [
+                {
+                  "required": ["type", "ms"],
+                  "properties": {
+                    "type": {"const": "delay"},
+                    "ms": {
+                      "type": "integer",
+                      "description": "Wait for given milliseconds before executing next event."
+                    }
+                  }
+                },
                 {
                   "required": ["type", "x", "y"],
                   "properties": {
