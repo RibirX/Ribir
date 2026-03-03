@@ -4,13 +4,13 @@ use std::{
 };
 
 use ribir_algo::{FrameCache, Rc, Substr};
-pub use rustybuzz::ttf_parser::GlyphId;
-use rustybuzz::{GlyphInfo, UnicodeBuffer};
+use swash::shape::ShapeContext;
 
 use super::{GlyphUnit, font_db::GlyphBaseline};
 use crate::{
   Glyph, TextDirection,
   font_db::{Face, FontDB, ID},
+  text::GlyphId,
 };
 
 pub const NEWLINE_GLYPH_ID: GlyphId = GlyphId(u16::MAX);
@@ -39,7 +39,6 @@ struct ShapeKey {
 
 struct GlyphsWithoutFallback {
   glyphs: Vec<Glyph>,
-  buffer: UnicodeBuffer,
 }
 
 impl TextShaper {
@@ -62,9 +61,31 @@ impl TextShaper {
 
       if let Some(last_char) = text.bytes().last()
         && (last_char == b'\r' || last_char == b'\n')
-        && let Some(g) = glyphs.last_mut()
       {
-        g.glyph_id = NEWLINE_GLYPH_ID;
+        // Check if the last glyph already corresponds to the newline character.
+        // swash may not emit a glyph for control characters, so we may need to
+        // append a synthetic one.
+        let newline_cluster = text.len().saturating_sub(1) as u32;
+        if let Some(g) = glyphs.last_mut()
+          && g.cluster == newline_cluster
+        {
+          g.glyph_id = NEWLINE_GLYPH_ID;
+        } else {
+          // swash didn't emit a glyph for the newline — append a synthetic one
+          let face_id = glyphs
+            .last()
+            .map(|g| g.face_id)
+            .unwrap_or_default();
+          glyphs.push(Glyph {
+            face_id,
+            glyph_id: NEWLINE_GLYPH_ID,
+            x_advance: GlyphUnit::ZERO,
+            y_advance: GlyphUnit::ZERO,
+            x_offset: GlyphUnit::ZERO,
+            y_offset: GlyphUnit::ZERO,
+            cluster: newline_cluster,
+          });
+        }
       }
 
       let glyphs = Rc::new(ShapeResult { text: text.clone(), glyphs });
@@ -82,50 +103,63 @@ impl TextShaper {
   ) -> Option<Vec<Glyph>> {
     let mut font_fallback = FallBackFaceHelper::new(face_ids, &self.font_db);
     let face = font_fallback.next_fallback_face(text)?;
-    let mut buffer = UnicodeBuffer::new();
-    buffer.push_str(text);
-    buffer.set_direction(dir.into());
 
-    let GlyphsWithoutFallback { mut glyphs, mut buffer } =
-      Self::directly_shape(buffer, baseline, dir.is_horizontal(), &face);
+    let GlyphsWithoutFallback { mut glyphs } = Self::directly_shape(text, baseline, dir, &face);
     let mut new_part = vec![(0, glyphs.len(), font_fallback.clone())];
     loop {
       if new_part.is_empty() {
         break;
       }
       let miss_part = collect_miss_part(&glyphs, &new_part);
-      (buffer, new_part) = regen_miss_part(text, dir, baseline, &mut glyphs, miss_part, buffer);
+      new_part = regen_miss_part(text, dir, baseline, &mut glyphs, miss_part);
     }
 
     Some(glyphs)
   }
 
   fn directly_shape(
-    text: UnicodeBuffer, baseline: GlyphBaseline, hor_text: bool, face: &Face,
+    text: &str, baseline: GlyphBaseline, dir: TextDirection, face: &Face,
   ) -> GlyphsWithoutFallback {
-    let output = rustybuzz::shape(face.as_rb_face(), &[], text);
-    let mut glyphs = Vec::with_capacity(output.len());
+    let mut context = ShapeContext::new();
+    let swash_font = face.as_font_ref();
+    let mut shaper = context
+      .builder(swash_font)
+      .direction(dir.into())
+      .size(face.units_per_em() as f32)
+      .features([("rlig", 1), ("liga", 1), ("clig", 1)])
+      .build();
+    shaper.add_str(text);
 
-    let infos = output.glyph_infos();
-    let positions = output.glyph_positions();
-
+    let mut glyphs = Vec::new();
     let shift = face.baseline_offset(baseline);
     let scale = GlyphUnit::UNITS_PER_EM as f32 / face.units_per_em() as f32;
     let shift = GlyphUnit::new(f32::ceil(shift as f32 * scale) as i32);
 
-    (0..output.len()).for_each(|idx| {
-      let &GlyphInfo { glyph_id, cluster, .. } = &infos[idx];
-      let p = &positions[idx];
-      let mut g = Glyph::new(GlyphId(glyph_id as u16), cluster, p, face);
-      if hor_text {
-        g.y_offset -= shift;
-      } else {
-        g.x_offset -= shift;
+    shaper.shape_with(|cluster| {
+      for g in cluster.glyphs {
+        let mut glyph = Glyph::new(
+          GlyphId(g.id),
+          cluster.source.start as u32,
+          g.advance as i32,
+          0,
+          g.x as i32,
+          g.y as i32,
+          face,
+        );
+        if dir.is_horizontal() {
+          glyph.y_offset -= shift;
+        } else {
+          glyph.x_offset -= shift;
+        }
+        glyphs.push(glyph);
       }
-      glyphs.push(g)
     });
 
-    GlyphsWithoutFallback { glyphs, buffer: output.clear() }
+    if matches!(dir, TextDirection::RightToLeft | TextDirection::BottomToTop) {
+      glyphs.reverse();
+    }
+
+    GlyphsWithoutFallback { glyphs }
   }
 
   pub fn get_cache(
@@ -181,10 +215,9 @@ fn collect_miss_part<'a>(
 
 fn regen_miss_part<'a>(
   text: &str, dir: TextDirection, baseline: GlyphBaseline, glyphs: &mut Vec<Glyph>,
-  miss_part: Vec<(usize, usize, FallBackFaceHelper<'a>)>, mut buffer: UnicodeBuffer,
-) -> (UnicodeBuffer, Vec<(usize, usize, FallBackFaceHelper<'a>)>) {
+  miss_part: Vec<(usize, usize, FallBackFaceHelper<'a>)>,
+) -> Vec<(usize, usize, FallBackFaceHelper<'a>)> {
   let is_rtl = matches!(dir, TextDirection::RightToLeft | TextDirection::BottomToTop);
-  let hb_direction = dir.into();
 
   let cluster_to_range_byte = |glyphs: &Vec<Glyph>, idx: usize| -> usize {
     let is_end = (is_rtl && 0 == idx) || (!is_rtl && idx == glyphs.len());
@@ -208,20 +241,18 @@ fn regen_miss_part<'a>(
     };
     let miss_text = &text[miss_range.clone()];
     if let Some(face) = helper.next_fallback_face(miss_text) {
-      buffer.push_str(miss_text);
-      buffer.set_direction(hb_direction);
-      let mut res = TextShaper::directly_shape(buffer, baseline, dir.is_horizontal(), &face);
-      buffer = res.buffer;
-      for g in res.glyphs.iter_mut() {
+      let res = TextShaper::directly_shape(miss_text, baseline, dir, &face);
+      let mut res_glyphs = res.glyphs;
+      for g in res_glyphs.iter_mut() {
         g.cluster += miss_range.start as u32;
       }
 
-      offset += (res.glyphs.len() as i32) - ((miss_end - miss_start) as i32);
-      new_part.push((miss_start, miss_start + res.glyphs.len(), helper));
-      glyphs.splice(miss_start..miss_end, res.glyphs);
+      offset += (res_glyphs.len() as i32) - ((miss_end - miss_start) as i32);
+      new_part.push((miss_start, miss_start + res_glyphs.len(), helper));
+      glyphs.splice(miss_start..miss_end, res_glyphs);
     }
   }
-  (buffer, new_part)
+  new_part
 }
 
 trait ShapeKeySlice {
@@ -275,13 +306,13 @@ impl ShapeKeySlice for (&[ID], &str, TextDirection, GlyphBaseline) {
   fn baseline(&self) -> GlyphBaseline { self.3 }
 }
 
-impl From<TextDirection> for rustybuzz::Direction {
+impl From<TextDirection> for swash::shape::Direction {
   fn from(dir: TextDirection) -> Self {
     match dir {
-      TextDirection::LeftToRight => rustybuzz::Direction::LeftToRight,
-      TextDirection::RightToLeft => rustybuzz::Direction::RightToLeft,
-      TextDirection::TopToBottom => rustybuzz::Direction::TopToBottom,
-      TextDirection::BottomToTop => rustybuzz::Direction::BottomToTop,
+      TextDirection::LeftToRight => swash::shape::Direction::LeftToRight,
+      TextDirection::RightToLeft => swash::shape::Direction::RightToLeft,
+      TextDirection::TopToBottom => swash::shape::Direction::LeftToRight,
+      TextDirection::BottomToTop => swash::shape::Direction::RightToLeft,
     }
   }
 }
@@ -344,7 +375,7 @@ impl<'a> FallBackFaceHelper<'a> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{FontFace, FontFamily};
+  use crate::{FontFace, FontFamily, TextDirection};
 
   #[test]
   fn smoke() {
@@ -559,6 +590,31 @@ mod tests {
       TextDirection::LeftToRight,
       GlyphBaseline::Alphabetic,
     );
-    assert!(res.glyphs.len() == 7);
+    assert_eq!(res.glyphs.len(), 4);
+  }
+
+  #[test]
+  fn material_search_ligature_should_shape_to_single_glyph() {
+    let mut shaper = TextShaper::new(<_>::default());
+    let ids = {
+      let mut db = shaper.font_db.borrow_mut();
+      db.load_from_bytes(include_bytes!("../../../fonts/material-search.ttf").to_vec());
+      db.select_all_match(&FontFace {
+        families: Box::new([FontFamily::Name("Material Symbols Rounded 48pt".into())]),
+        ..<_>::default()
+      })
+    };
+
+    assert!(!ids.is_empty(), "material search font family not matched");
+
+    let shaped = shaper.shape_text(
+      &Substr::from("search"),
+      &ids,
+      TextDirection::LeftToRight,
+      GlyphBaseline::Alphabetic,
+    );
+
+    assert_eq!(shaped.glyphs.len(), 1, "material icon ligature should shape to one glyph");
+    assert_eq!(shaped.glyphs[0].cluster, 0);
   }
 }
