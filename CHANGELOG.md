@@ -10,6 +10,59 @@ For older versions:
 
 <!-- next-header -->
 
+## [0.4.0-alpha.59](https://github.com/RibirX/Ribir/releases/tag/v0.4.0-alpha.59) - 2026-03-03
+
+### 🎨 Features
+
+- **cli**: fallback to new session if existing debug server is unresponsive (\#902 @M-Adoo)
+- **core**: add delay support to event injection for realistic interaction simulation (\#907 @M-Adoo)
+- **core**: add pos attribute to FatObj for combined X and Y positioning (\#903 @M-Adoo)
+- **core**: add transition\_with\_init to AnimateState for custom start values (\#898 @M-Adoo)
+- **core**: add unified SmoothLayout widget with configurable axes, layout impact, and content motion (\#900 @M-Adoo)
+- **core**: enhance Animate with optional WindowId and safer initialization (\#900 @M-Adoo)
+- **core**: implement Lerp for Anchor to enable smooth transitions (\#903 @M-Adoo)
+- **core**: introduce AnimatePresence for automatic enter/leave animations (\#903 @M-Adoo)
+- **core**: support injecting UI events into the application event loop in debug mode (\#901 @wjian23)
+- **core**: support reactive individual items in ClassList (\#899 @M-Adoo)
+- **debug**: attach origin names to widgets for improved inspection context (\#901 @wjian23)
+- **gpu**: enhance WGPU texture format and surface compatibility (\#897 @wjian23)
+- **tools**: add inject\_events API to simulate mouse and keyboard interactions via MCP (\#901 @wjian23)
+
+### 🐛 Fixed
+
+- **core**: handle clipboard initialization errors gracefully (\#897 @wjian23)
+- **core**: resolve circular reference leaks and lifecycle issues in transitions (\#898 @M-Adoo)
+- **widgets**: stop linear progress animation on disposal (\#897 @wjian23)
+
+### 🔄 Changed
+
+- **core**: merge AnimateStateSetter trait into AnimateState (\#898 @M-Adoo)
+- **core**: migrate global logging from log to tracing and update prelude (\#896 @M-Adoo)
+- **painter**: add PathKind to track simple geometric shapes (\#897 @wjian23)
+
+### ⚡ Performance
+
+- **gpu**: implement SDF-based masking for simple shapes (\#897 @wjian23)
+- **gpu**: improve batching with primitive pooling and stream buffers (\#897 @wjian23)
+- **widgets**: optimize uniform border rendering (\#897 @wjian23)
+
+### 📚 Documentation
+
+- **core**: update animation guide with usage rules for transition APIs (\#898 @M-Adoo)
+- **tools**: update debug and MCP documentation including new resource URIs (\#902 @M-Adoo)
+- **tools**: update MCP documentation and schemas to support debug\_name for widget identification (\#905 @M-Adoo)
+- update tutorials and examples to reflect the tracing migration (\#896 @M-Adoo)
+
+### 💥 Breaking
+
+- **core**: move FuturesWake from public AppEvent to internal framework handling (\#906 @M-Adoo)
+- **core**: remove device\_id from inject\_events tool and events enum (\#902 @M-Adoo)
+- **core**: remove keep\_alive attribute in favor of AnimatePresence (\#903 @M-Adoo)
+- **core**: remove specialized smooth widgets (SmoothX, SmoothY, SmoothWidth, SmoothHeight, SmoothPos, SmoothSize) (\#900 @M-Adoo)
+- **core**: remove VisualCtx and visual\_box method from Render trait (\#904 @wjian23)
+- **core**: replace tuple-based state grouping with animate\_state\_pack\! macro (\#898 @M-Adoo)
+- **core**: update Class and ClassList structures and APIs for reactivity (\#899 @M-Adoo)
+
 ## [0.4.0-alpha.58](https://github.com/RibirX/Ribir/releases/tag/v0.4.0-alpha.58) - 2026-02-17
 
 ### 🎨 Features
@@ -42,8 +95,8 @@ For older versions:
 <details>
 <summary>🔧 Internal</summary>
 
-- build: 🤖 use cache-cargo-install-action for ribir-bot in all workflows (#883 @M-Adoo)
-- 💡 migrate CLI logging from `env_logger` to `tracing` (#889 @M-Adoo)
+- build: 🤖 use cache-cargo-install-action for ribir-bot in all workflows (\#883 @M-Adoo)
+- 💡 migrate CLI logging from `env_logger` to `tracing` (\#889 @M-Adoo)
 
 </details>
 
