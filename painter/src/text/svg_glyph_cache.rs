@@ -6,10 +6,11 @@ use quick_xml::{
   name::QName,
   reader::Reader,
 };
-use rustybuzz::ttf_parser::GlyphId;
+use swash::FontRef;
 use tracing::warn;
+use ttf_parser;
 
-use crate::Svg;
+use crate::{Svg, text::GlyphId};
 
 #[derive(Default)]
 pub struct SvgGlyphCache {
@@ -18,18 +19,27 @@ pub struct SvgGlyphCache {
 }
 
 impl SvgGlyphCache {
-  pub fn svg_or_insert(&mut self, glyph_id: GlyphId, rb_face: &rustybuzz::Face) -> &Option<Svg> {
+  pub fn svg_or_insert(
+    &mut self, glyph_id: GlyphId, font: &FontRef, face_index: u32,
+  ) -> &Option<Svg> {
     let SvgGlyphCache { svg_docs, svg_glyphs } = self;
     svg_glyphs.entry(glyph_id).or_insert_with(|| {
       if let Some(doc) = svg_docs.get(glyph_id) {
-        doc.glyph_svg(glyph_id, rb_face)
+        doc.glyph_svg(glyph_id, font)
       } else {
-        rb_face.glyph_svg_image(glyph_id).and_then(|doc| {
-          let doc = SvgDocument::new(doc.glyphs_range(), doc.data);
-          let svg = doc.glyph_svg(glyph_id, rb_face);
-          svg_docs.insert(doc);
-          svg
-        })
+        // We use ttf-parser to extract SVG glyphs as swash doesn't expose it easily.
+        // fontdb depends on ttf-parser so it's already in the tree.
+        let slice = font.data;
+        let tp_face = ttf_parser::Face::parse(slice, face_index).ok()?;
+        tp_face
+          .glyph_svg_image(ttf_parser::GlyphId(glyph_id.0))
+          .and_then(|doc| {
+            let doc =
+              SvgDocument::new(doc.glyphs_range().start().0..=doc.glyphs_range().end().0, doc.data);
+            let svg = doc.glyph_svg(glyph_id, font);
+            svg_docs.insert(doc);
+            svg
+          })
       }
     })
   }
@@ -58,13 +68,13 @@ struct SvgDocument {
 }
 
 impl SvgDocument {
-  fn new(range: RangeInclusive<GlyphId>, content: &[u8]) -> Self {
+  fn new(range: RangeInclusive<u16>, content: &[u8]) -> Self {
     let elems = Self::parse(content).unwrap_or_default();
 
-    Self { range, elems }
+    Self { range: GlyphId(*range.start())..=GlyphId(*range.end()), elems }
   }
 
-  fn glyph_svg(&self, glyph: GlyphId, face: &rustybuzz::Face) -> Option<Svg> {
+  fn glyph_svg(&self, glyph: GlyphId, font: &FontRef) -> Option<Svg> {
     let key = format!("glyph{}", glyph.0);
     if !self.elems.contains_key(&key) {
       return None;
@@ -79,8 +89,9 @@ impl SvgDocument {
       }
     }
 
-    let units_per_em = face.units_per_em();
-    let ascender = face.ascender() as i32;
+    let units_per_em = font.metrics(&[]).units_per_em;
+    let metrics = font.metrics(&[]);
+    let ascender = metrics.ascent as i32;
     let mut writer = std::io::Cursor::new(Vec::new());
 
     writer
@@ -231,10 +242,8 @@ impl SvgDocument {
 
 #[cfg(test)]
 mod tests {
-  use rustybuzz::ttf_parser::GlyphId;
-
   use super::{SvgDocument, SvgDocumentCache};
-  use crate::font_db::FontDB;
+  use crate::{font_db::FontDB, text::GlyphId};
 
   #[test]
   fn test_svg_document() {
@@ -258,7 +267,7 @@ mod tests {
               transform="matrix(7.674 0 0 7.674 12593.511 3663.078)" fill="#FFCC32" />
           </g>
         </svg>"##;
-    let doc = super::SvgDocument::new(GlyphId(2428)..=GlyphId(2428), content.as_bytes());
+    let doc = super::SvgDocument::new(2428..=2428, content.as_bytes());
     let mut db = FontDB::default();
     let dummy_face = db
       .face_data_or_insert(db.default_fonts()[0])
@@ -266,12 +275,12 @@ mod tests {
     assert_eq!(doc.elems.len(), 4);
     assert!(
       doc
-        .glyph_svg(GlyphId(2428), dummy_face.as_rb_face())
+        .glyph_svg(GlyphId(2428), &dummy_face.as_font_ref())
         .is_some()
     );
     assert!(
       doc
-        .glyph_svg(GlyphId(0), dummy_face.as_rb_face())
+        .glyph_svg(GlyphId(0), &dummy_face.as_font_ref())
         .is_none()
     );
   }
@@ -279,9 +288,9 @@ mod tests {
   #[test]
   fn test_svg_document_cache() {
     let mut cache = SvgDocumentCache::default();
-    cache.insert(SvgDocument::new(GlyphId(0)..=GlyphId(10), "".as_bytes()));
-    cache.insert(SvgDocument::new(GlyphId(11)..=GlyphId(20), "".as_bytes()));
-    cache.insert(SvgDocument::new(GlyphId(31)..=GlyphId(40), "".as_bytes()));
+    cache.insert(SvgDocument::new(0..=10, "".as_bytes()));
+    cache.insert(SvgDocument::new(11..=20, "".as_bytes()));
+    cache.insert(SvgDocument::new(31..=40, "".as_bytes()));
 
     assert_eq!(
       Some(GlyphId(11)),

@@ -11,7 +11,8 @@ use font_db::Face;
 pub use fontdb::{ID, Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
 pub use ribir_algo::Substr;
 use ribir_geom::{Rect, rect};
-use rustybuzz::{GlyphPosition, ttf_parser::GlyphId};
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct GlyphId(pub u16);
 pub mod text_reorder;
 pub mod typography;
 pub use text_reorder::TextReorder;
@@ -223,14 +224,17 @@ impl TextStyle {
 }
 
 impl Glyph {
-  fn new(glyph_id: GlyphId, cluster: u32, pos: &GlyphPosition, face: &Face) -> Self {
+  fn new(
+    glyph_id: GlyphId, cluster: u32, x_advance: i32, y_advance: i32, x_offset: i32, y_offset: i32,
+    face: &Face,
+  ) -> Self {
     let scale = GlyphUnit::UNITS_PER_EM as f32 / face.units_per_em() as f32;
     Glyph {
       face_id: face.face_id,
-      x_advance: cast(pos.x_advance, scale),
-      y_advance: cast(pos.y_advance, scale),
-      x_offset: cast(pos.x_offset, scale),
-      y_offset: cast(pos.y_offset, scale),
+      x_advance: cast(x_advance, scale),
+      y_advance: cast(y_advance, scale),
+      x_offset: cast(x_offset, scale),
+      y_offset: cast(y_offset, scale),
       glyph_id,
       cluster,
     }

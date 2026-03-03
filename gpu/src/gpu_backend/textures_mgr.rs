@@ -41,7 +41,6 @@ pub(super) struct TexturesMgr<T: Texture> {
   bundle_atlas: Atlas<Resource<dyn Any>, T>,
   tess_task: Vec<TessTask>,
   tess_task_buffer: VertexBuffers<()>,
-  need_clear_areas: Vec<DeviceRect>,
 }
 
 struct TessTask {
@@ -105,7 +104,6 @@ where
       ),
       tess_task: <_>::default(),
       tess_task_buffer: <_>::default(),
-      need_clear_areas: vec![],
     }
   }
 
@@ -183,6 +181,26 @@ where
         let offset = (visual_rect.origin - slice.rect.origin).to_f32();
         (slice.expand_for_paste(), Transform::translation(offset.x, offset.y))
       }
+      PaintPath::PixelImage(img) => {
+        let key = PathKey::Fill(img.clone().into_any());
+        let (slice, _scale) = if let Some(h) = self.alpha_atlas.get(&key, 1.).copied() {
+          let mask_slice = self.alpha_atlas_dist_to_tex_slice(&h.dist);
+          (mask_slice, h.scale)
+        } else {
+          let (dist, slice) = self.alpha_allocate(img.size(), gpu);
+          let _ = self.alpha_atlas.cache(key, 1., dist);
+
+          let texture = self.alpha_atlas.get_texture_mut(dist.tex_id());
+          texture.write_data(&slice.rect, img.pixel_bytes(), gpu);
+
+          (slice, 1.0)
+        };
+
+        let slice_origin = slice.rect.origin.to_vector().to_f32();
+        let ts = Transform::translation(-slice_origin.x, -slice_origin.y).then(matrix);
+
+        (slice.expand_for_paste(), ts)
+      }
     }
   }
 
@@ -204,7 +222,7 @@ where
         let h = atlas.get_or_cache(key, 1., img.size(), gpu, |rect, texture, gpu| {
           texture.write_data(rect, img.pixel_bytes(), gpu)
         });
-        TextureSlice { tex_id: TextureID::Rgba(h.tex_id()), rect: h.tex_rect(atlas) }
+        TextureSlice { tex_id: TextureID::Alpha(h.tex_id()), rect: h.tex_rect(atlas) }
       }
     }
   }
@@ -310,12 +328,6 @@ where
       return;
     }
 
-    if !self.need_clear_areas.is_empty() {
-      let tex = self.alpha_atlas.get_texture_mut(0);
-      tex.clear_areas(&self.need_clear_areas, gpu_impl);
-      self.need_clear_areas.clear();
-    }
-
     self.tess_task.sort_by(|a, b| {
       let a_clip = a.clip_rect.is_some();
       let b_clip = b.clip_rect.is_some();
@@ -417,12 +429,21 @@ where
     self.tess_task_buffer.indices.clear();
   }
 
-  pub(crate) fn end_frame(&mut self) {
+  pub(crate) fn end_frame(&mut self, gpu_impl: &mut T::Host) -> bool {
+    let mut clear_areas = vec![];
     self.alpha_atlas.end_frame_with(|rect| {
-      self.need_clear_areas.push(rect);
+      clear_areas.push(rect);
     });
     self.rgba_atlas.end_frame();
     self.bundle_atlas.end_frame();
+
+    if clear_areas.is_empty() {
+      false
+    } else {
+      let texture = self.alpha_atlas.get_texture_mut(0);
+      texture.clear_areas(&clear_areas, gpu_impl);
+      true
+    }
   }
 }
 
@@ -590,7 +611,7 @@ pub mod tests {
     }
 
     for _ in 0..10 {
-      mgr.end_frame();
+      mgr.end_frame(&mut wgpu);
       let red_img = color_image(Color::RED, 32, 32).into_any();
       assert!(mgr.rgba_atlas.get(&red_img, 1.).is_none());
     }

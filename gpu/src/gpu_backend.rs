@@ -127,7 +127,9 @@ where
   fn end_frame(&mut self) {
     self.frame_no += 1;
     self.mask_layers.clear();
-    self.tex_mgr.end_frame();
+    if self.tex_mgr.end_frame(&mut self.gpu_impl) {
+      self.gpu_impl.flush_draw_commands();
+    }
     self.gpu_impl.end_frame();
   }
 }

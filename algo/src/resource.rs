@@ -8,6 +8,8 @@ use std::{
 use rclite::Arc;
 use serde::{Deserialize, Serialize};
 
+static RESOURCE_ID_COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(1);
+
 /// A smarter pointer help us to share resource in application, and it' use a
 /// cheap way to compare if two resource is same one.
 ///
@@ -16,6 +18,7 @@ use serde::{Deserialize, Serialize};
 /// compare its content.
 #[derive(Debug)]
 pub struct Resource<T: ?Sized = dyn Any> {
+  id: usize,
   inner: Arc<Box<dyn Any>>,
   _marker: PhantomData<*const T>,
 }
@@ -27,7 +30,11 @@ unsafe impl<T: ?Sized + Send + Sync> Sync for Resource<T> {}
 impl<T: 'static> Resource<T> {
   #[inline]
   pub fn new(v: T) -> Self {
-    Resource { inner: Arc::new(Box::new(v) as Box<dyn Any>), _marker: PhantomData }
+    Resource {
+      id: RESOURCE_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+      inner: Arc::new(Box::new(v) as Box<dyn Any>),
+      _marker: PhantomData,
+    }
   }
 
   /// Convert to a type-erased Resource while preserving pointer identity.
@@ -35,7 +42,7 @@ impl<T: 'static> Resource<T> {
   /// regardless of how it was obtained (directly or via clone + into_any).
   #[inline]
   pub fn into_any(self) -> Resource<dyn Any> {
-    Resource { inner: self.inner, _marker: PhantomData }
+    Resource { id: self.id, inner: self.inner, _marker: PhantomData }
   }
 }
 
@@ -71,19 +78,19 @@ where
 
 impl<T: ?Sized> Clone for Resource<T> {
   #[inline]
-  fn clone(&self) -> Self { Self { inner: self.inner.clone(), _marker: PhantomData } }
+  fn clone(&self) -> Self { Self { id: self.id, inner: self.inner.clone(), _marker: PhantomData } }
 }
 
 impl<T: ?Sized> PartialEq for Resource<T> {
   #[inline]
-  fn eq(&self, other: &Self) -> bool { Arc::ptr_eq(&self.inner, &other.inner) }
+  fn eq(&self, other: &Self) -> bool { self.id == other.id }
 }
 
 impl<T: ?Sized> Eq for Resource<T> {}
 
 impl<T: ?Sized> Hash for Resource<T> {
   #[inline]
-  fn hash<H: Hasher>(&self, state: &mut H) { Arc::as_ptr(&self.inner).hash(state); }
+  fn hash<H: Hasher>(&self, state: &mut H) { self.id.hash(state); }
 }
 
 impl<T: Serialize + 'static> Serialize for Resource<T> {

@@ -1,16 +1,16 @@
-use std::{cell::RefCell, num::NonZeroU16, ops::Deref, sync::Arc};
+use std::{cell::RefCell, sync::Arc};
 
 use ahash::HashMap;
 use fontdb::{Database, Query};
 pub use fontdb::{FaceInfo, Family, ID};
 use ribir_algo::{Rc, Resource};
 use ribir_geom::{Point, Rect, rect};
-use rustybuzz::ttf_parser::{GlyphId, OutlineBuilder};
+use swash::FontRef;
 
 use crate::{
   Path, PixelImage, Svg,
   path_builder::PathBuilder,
-  text::{FontFace, FontFamily, svg_glyph_cache::SvgGlyphCache},
+  text::{FontFace, FontFamily, GlyphId, svg_glyph_cache::SvgGlyphCache},
 };
 /// A wrapper of fontdb and cache font data.
 pub struct FontDB {
@@ -36,9 +36,8 @@ pub struct Face {
   pub face_id: ID,
   pub source_data: Arc<dyn AsRef<[u8]> + Sync + Send>,
   pub face_data_index: u32,
-  pub rb_face: rustybuzz::Face<'static>,
-  raster_image_glyphs: FontGlyphCache<GlyphId, Resource<PixelImage>>,
-  outline_glyphs: FontGlyphCache<GlyphId, Resource<Path>>,
+  raster_image_glyphs: FontGlyphCache<(u16, u16), (Resource<PixelImage>, Point)>,
+  outline_glyphs: FontGlyphCache<u16, Resource<Path>>,
   svg_glyphs: Rc<RefCell<SvgGlyphCache>>,
   x_height: u16,
   cap_height: i16,
@@ -279,33 +278,18 @@ impl Face {
     let ptr_data = source_data.as_ref().as_ref() as *const [u8];
     // Safety: we know the ptr_data has some valid lifetime with source data, and
     // hold them in same struct.
-    let rb_face = rustybuzz::Face::from_slice(unsafe { &*ptr_data }, face_index)?;
-    let ascender = rb_face.ascender();
-    let descender = rb_face.descender();
-    let x_height = rb_face
-      .x_height()
-      .and_then(|x| u16::try_from(x).ok())
-      .and_then(NonZeroU16::new);
-    let x_height = match x_height {
-      Some(height) => height,
-      None => {
-        // If not set - fallback to height * 45%.
-        // 45% is what Firefox uses.
-        u16::try_from((f32::from(ascender - descender) * 0.45) as i32)
-          .ok()
-          .and_then(NonZeroU16::new)
-          .unwrap()
-      }
-    }
-    .get();
-    let cap_height = rb_face
-      .capital_height()
-      .unwrap_or((x_height as f32 * 1.4) as i16);
+    let slice = unsafe { &*ptr_data };
+    let swash_font = FontRef::from_index(slice, face_index as usize)?;
+    let metrics = swash_font.metrics(&[]);
+
+    let ascender = metrics.ascent as i16;
+    let descender = (-metrics.descent) as i16;
+    let cap_height = metrics.cap_height as i16;
+    let x_height = metrics.x_height as u16;
 
     Some(Face {
       source_data,
       face_data_index: face_index,
-      rb_face,
       face_id,
       outline_glyphs: <_>::default(),
       raster_image_glyphs: <_>::default(),
@@ -323,6 +307,8 @@ impl Face {
 
   pub fn x_height(&self) -> u16 { self.x_height }
 
+  pub fn vertical_height(&self) -> Option<i16> { Some(self.ascender - self.descender) }
+
   pub fn baseline_offset(&self, baseline: GlyphBaseline) -> i16 {
     match baseline {
       GlyphBaseline::Alphabetic => 0,
@@ -331,61 +317,123 @@ impl Face {
   }
 
   #[inline]
-  pub fn has_char(&self, c: char) -> bool { self.rb_face.as_ref().glyph_index(c).is_some() }
+  pub fn has_char(&self, c: char) -> bool {
+    let swash_font = self.as_font_ref();
+    swash_font.charmap().map(c) != 0
+  }
 
-  pub fn as_rb_face(&self) -> &rustybuzz::Face<'_> { &self.rb_face }
+  pub fn as_font_ref(&self) -> FontRef<'_> {
+    let ptr_data = self.source_data.as_ref().as_ref() as *const [u8];
+    let slice = unsafe { &*ptr_data };
+    FontRef::from_index(slice, self.face_data_index as usize).unwrap()
+  }
 
-  pub fn outline_glyph(&self, glyph_id: GlyphId) -> Option<Resource<Path>> {
+  pub fn outline_glyph(&self, glyph_id: u16) -> Option<Resource<Path>> {
     self
       .outline_glyphs
       .borrow_mut()
       .entry(glyph_id)
       .or_insert_with(|| {
+        let swash_font = self.as_font_ref();
+        let mut scaler = swash::scale::ScaleContext::new();
         let mut builder = GlyphOutlineBuilder::default();
-        let bounds = self
-          .rb_face
-          .outline_glyph(glyph_id, &mut builder as &mut dyn OutlineBuilder);
-        bounds.map(move |b| {
-          let path = builder.build(rect(b.x_min, b.y_min, b.width(), b.height()).to_f32());
-          Resource::new(path)
-        })
+        if let Some(outline) = scaler
+          .builder(swash_font)
+          .size(self.units_per_em() as f32)
+          .build()
+          .scale_outline(glyph_id)
+        {
+          let mut points = outline.points().iter();
+          for verb in outline.verbs() {
+            match verb {
+              swash::zeno::Verb::MoveTo => {
+                let p = points.next().unwrap();
+                builder.move_to(p.x, p.y);
+              }
+              swash::zeno::Verb::LineTo => {
+                let p = points.next().unwrap();
+                builder.line_to(p.x, p.y);
+              }
+              swash::zeno::Verb::QuadTo => {
+                let p1 = points.next().unwrap();
+                let p = points.next().unwrap();
+                builder.quad_to(p1.x, p1.y, p.x, p.y);
+              }
+              swash::zeno::Verb::CurveTo => {
+                let p1 = points.next().unwrap();
+                let p2 = points.next().unwrap();
+                let p = points.next().unwrap();
+                builder.curve_to(p1.x, p1.y, p2.x, p2.y, p.x, p.y);
+              }
+              swash::zeno::Verb::Close => {
+                builder.close();
+              }
+            }
+          }
+          let path = builder.build(rect(0., 0., 0., 0.));
+          Some(Resource::new(path))
+        } else {
+          None
+        }
       })
       .as_ref()
       .cloned()
   }
 
   pub fn glyph_raster_image(
-    &self, glyph_id: GlyphId, img_size: u16,
-  ) -> Option<Resource<PixelImage>> {
+    &self, glyph_id: u16, img_size: u16,
+  ) -> Option<(Resource<PixelImage>, ribir_geom::Point)> {
     self
       .raster_image_glyphs
       .borrow_mut()
-      .entry(glyph_id)
+      .entry((glyph_id, img_size))
       .or_insert_with(|| {
-        self
-          .rb_face
-          .glyph_raster_image(glyph_id, img_size)
-          .and_then(|img| match img.format {
-            #[cfg(feature = "png")]
-            rustybuzz::ttf_parser::RasterImageFormat::PNG => {
-              Some(Resource::new(PixelImage::from_png(img.data)))
-            }
-            _ => None,
-          })
+        let swash_font = self.as_font_ref();
+        let mut scaler = swash::scale::ScaleContext::new();
+        let mut scaler = scaler
+          .builder(swash_font)
+          .size(img_size as f32)
+          .hint(true)
+          .build();
+        let image = swash::scale::Render::new(&[
+          swash::scale::Source::ColorBitmap(swash::scale::StrikeWith::BestFit),
+          swash::scale::Source::Bitmap(swash::scale::StrikeWith::BestFit),
+          swash::scale::Source::Outline,
+        ])
+        .render(&mut scaler, glyph_id);
+
+        image.map(|img| {
+          let format = match img.content {
+            swash::scale::image::Content::Color => crate::ColorFormat::Rgba8,
+            _ => crate::ColorFormat::Alpha8,
+          };
+          let pixel_img = PixelImage::new(
+            std::borrow::Cow::Owned(img.data),
+            img.placement.width,
+            img.placement.height,
+            format,
+          );
+          (
+            Resource::new(pixel_img),
+            ribir_geom::Point::new(img.placement.left as f32, -img.placement.top as f32),
+          )
+        })
       })
       .clone()
   }
 
-  pub fn glyph_svg_image(&self, glyph_id: GlyphId) -> Option<Svg> {
+  // Used to map a GlyphId back to its primary char.
+
+  pub fn glyph_svg_image(&self, glyph_id: u16) -> Option<Svg> {
     self
       .svg_glyphs
       .borrow_mut()
-      .svg_or_insert(glyph_id, &self.rb_face)
+      .svg_or_insert(GlyphId(glyph_id), &self.as_font_ref(), self.face_data_index)
       .clone()
   }
 
   #[inline]
-  pub fn units_per_em(&self) -> u16 { self.rb_face.deref().units_per_em() }
+  pub fn units_per_em(&self) -> u16 { self.as_font_ref().metrics(&[]).units_per_em }
 }
 
 fn to_db_family(f: &FontFamily) -> Family<'_> {
@@ -414,7 +462,7 @@ impl GlyphOutlineBuilder {
   }
 }
 
-impl OutlineBuilder for GlyphOutlineBuilder {
+impl GlyphOutlineBuilder {
   fn move_to(&mut self, x: f32, y: f32) {
     self.closed = false;
     self.builder.begin_path(Point::new(x, y));
@@ -448,10 +496,10 @@ impl OutlineBuilder for GlyphOutlineBuilder {
 }
 
 impl std::ops::Deref for Face {
-  type Target = rustybuzz::ttf_parser::Face<'static>;
+  type Target = ID;
 
   #[inline]
-  fn deref(&self) -> &Self::Target { &self.rb_face }
+  fn deref(&self) -> &Self::Target { &self.face_id }
 }
 
 pub struct FaceIter<'a, T>

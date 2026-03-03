@@ -69,6 +69,7 @@ pub trait PainterBackend {
 pub enum PaintPath {
   Share(Resource<Path>),
   Own(Path),
+  PixelImage(Resource<PixelImage>),
 }
 
 /// The action to apply to the path, such as fill color, image, gradient, etc.
@@ -877,7 +878,43 @@ impl Painter {
     let matrix = *self.transform();
 
     let bounds = g.bounds();
-    if let Some(svg) = face.glyph_svg_image(g.glyph_id) {
+    if let Some((img, offset)) =
+      face.glyph_raster_image(g.glyph_id.0, prefer_glyph_img_size(font_size, &matrix))
+    {
+      let img_h = img.height() as f32;
+      let img_w = img.width() as f32;
+
+      if img.color_format() == crate::ColorFormat::Rgba8 {
+        // Color bitmap emoji: use the same scale as outline-rasterized glyphs.
+        let img_size_px = prefer_glyph_img_size(font_size, &matrix) as f32;
+        let scale = font_size / img_size_px;
+
+        // Emoji fonts typically have (ascender + |descender|) > 1em, so
+        // baseline-relative placement makes the emoji visually lower than
+        // adjacent text.  Center the image vertically within the em box.
+        let dst_h = img_h * scale;
+        let draw_x = bounds.min_x() + offset.x * scale;
+        let draw_y = bounds.min_y() + (font_size - dst_h) / 2.0;
+
+        let dst_size = Size::new(img_w * scale, dst_h);
+        let dst_rect = Rect::new(Point::new(draw_x, draw_y), dst_size);
+        self.draw_img(img, &dst_rect, &None);
+      } else {
+        // Outline-rasterized glyphs: swash renders at exactly the requested
+        // img_size, so placement values are in the img_size coordinate system.
+        let img_size_px = prefer_glyph_img_size(font_size, &matrix) as f32;
+        let scale = font_size / img_size_px;
+
+        let baseline_y = bounds.min_y() + font_size;
+        let draw_x = bounds.min_x() + offset.x * scale;
+        let draw_y = baseline_y + offset.y * scale;
+
+        self
+          .translate(draw_x, draw_y)
+          .scale(scale, scale)
+          .draw_path(PaintPath::PixelImage(img));
+      }
+    } else if let Some(svg) = face.glyph_svg_image(g.glyph_id.0) {
       let grid_scale = face
         .vertical_height()
         .map(|h| h as f32 / face.units_per_em() as f32)
@@ -890,18 +927,7 @@ impl Painter {
         .translate(bounds.min_x(), bounds.min_y())
         .scale(scale, scale)
         .draw_svg(&svg);
-    } else if let Some(img) =
-      face.glyph_raster_image(g.glyph_id, prefer_glyph_img_size(font_size, &matrix))
-    {
-      let m_width = img.width() as f32;
-      let m_height = img.height() as f32;
-      let scale = (bounds.width() / m_width).min(bounds.height() / m_height);
-
-      self
-        .translate(bounds.min_x(), bounds.min_y())
-        .scale(scale, scale)
-        .draw_img(img, &Rect::from_size(Size::new(m_width, m_height)), &None);
-    } else if let Some(path) = face.outline_glyph(g.glyph_id) {
+    } else if let Some(path) = face.outline_glyph(g.glyph_id.0) {
       let scale = font_size / unit;
       self
         .translate(bounds.min_x(), bounds.min_y())
@@ -1217,6 +1243,30 @@ impl Deref for PaintPath {
     match self {
       PaintPath::Share(p) => p.deref(),
       PaintPath::Own(p) => p,
+      PaintPath::PixelImage(_) => {
+        panic!("PaintPath::PixelImage cannot be dereferenced to Path");
+      }
+    }
+  }
+}
+
+impl PaintPath {
+  pub fn path_kind(&self) -> PathKind {
+    match self {
+      PaintPath::Share(p) => p.path_kind(),
+      PaintPath::Own(p) => p.path_kind(),
+      PaintPath::PixelImage(_) => PathKind::Complex,
+    }
+  }
+
+  pub fn bounds(&self, line_width: Option<f32>) -> Rect {
+    match self {
+      PaintPath::Share(p) => p.bounds(line_width),
+      PaintPath::Own(p) => p.bounds(line_width),
+      PaintPath::PixelImage(img) => {
+        let size = img.size();
+        Rect::from_size(Size::new(size.width as f32, size.height as f32))
+      }
     }
   }
 }
