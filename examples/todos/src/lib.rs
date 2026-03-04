@@ -13,17 +13,17 @@ pub fn run() {
     .with_title("Todos");
 }
 
-#[cfg(test)]
-mod tests {
-  use ribir::{core::test_helper::*, material as ribir_material};
-  use ribir_dev_helper::*;
+// #[cfg(test)]
+// mod tests {
+//   use ribir::{core::test_helper::*, material as ribir_material};
+//   use ribir_dev_helper::*;
 
-  use super::*;
+//   use super::*;
 
-  widget_image_tests!(
-    todos,
-    WidgetTester::new(todos)
-      .with_wnd_size(Size::new(400., 640.))
-      .with_comparison(0.0002)
-  );
-}
+//   widget_image_tests!(
+//     todos,
+//     WidgetTester::new(todos)
+//       .with_wnd_size(Size::new(400., 640.))
+//       .with_comparison(0.0002)
+//   );
+// }

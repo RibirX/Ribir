@@ -472,7 +472,7 @@ fn simple_ref_bind_work() {
 
   let flex_size = Size::new(200., 100.);
   let wnd = TestWindow::from_widget(w);
-  wnd.layout(wnd.size());
+  wnd.draw_frame();
   wnd.assert_root_size(flex_size);
 
   tap_at(&wnd, (1., 1.));

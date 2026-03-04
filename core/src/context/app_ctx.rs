@@ -10,14 +10,14 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 #[cfg(target_arch = "wasm32")]
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 use smallvec::SmallVec;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 #[cfg(not(target_arch = "wasm32"))]
 use tokio::{runtime::Runtime, task::LocalSet};
 
 use crate::{
   builtin_widgets::Theme,
   clipboard::{Clipboard, MockClipboard},
-  event_loop::{EventLoop, FrameworkEvent},
+  event_loop::{CoreMsg, EventLoop},
   local_sender::LocalSender,
   prelude::Duration,
   state::{ModifyEffect, ModifyInfo, PartialId, StateWriter, Stateful, WriterInfo},
@@ -45,9 +45,7 @@ pub struct AppCtx {
   font_db: Rc<RefCell<FontDB>>,
   typography_store: RefCell<TypographyStore>,
   clipboard: RefCell<Box<dyn Clipboard>>,
-  event_sender: RefCell<Option<UnboundedSender<FrameworkEvent>>>,
-  #[cfg(feature = "debug")]
-  ui_event_sender: RefCell<Option<UnboundedSender<UiEvent>>>,
+  core_event_sender: RefCell<Option<UnboundedSender<CoreMsg>>>,
   shell: RefCell<Option<BoxShell>>,
   change_dataset: ChangeDataset,
   #[cfg(not(target_arch = "wasm32"))]
@@ -66,6 +64,8 @@ struct ChangeDatasetInner {
 }
 
 impl ChangeDataset {
+  fn has_pending_changes(&self) -> bool { !self.0.borrow().dirty_info.is_empty() }
+
   fn emit_change(&self) -> bool {
     let mut changed = false;
     if self.0.borrow().in_emit {
@@ -94,7 +94,7 @@ impl ChangeDataset {
     self.0.borrow_mut().dirty_info.push(dirty_info);
     if !self.0.borrow().in_emit
       && self.0.borrow().dirty_info.len() == 1
-      && !AppCtx::send_event(FrameworkEvent::DataChanged)
+      && !AppCtx::send_event(CoreMsg::DataChanged)
     {
       AppCtx::spawn_local(async move {
         AppCtx::shared().change_dataset.emit_change();
@@ -117,110 +117,52 @@ static APP_CTX: LazyLock<LocalSender<AppCtx>> =
 impl AppCtx {
   /// Initialize the application context.
   /// should be called only once and before any other access to the context.
-  pub(crate) fn init(shell: BoxShell) -> EventLoop {
-    assert!(APP_CTX.event_sender.borrow().is_none());
+  pub(crate) fn init(core_event_sender: UnboundedSender<CoreMsg>, shell: BoxShell) {
+    assert!(APP_CTX.core_event_sender.borrow().is_none());
 
-    let (sender, receiver) = unbounded_channel();
-    *APP_CTX.event_sender.borrow_mut() = Some(sender);
+    *APP_CTX.core_event_sender.borrow_mut() = Some(core_event_sender);
     *APP_CTX.shell.borrow_mut() = Some(shell);
-    EventLoop::new(receiver)
   }
 
   /// Run the application logic in a separate thread. The AppCtx can be used in
   /// this same thread.
   pub fn run<F: Future + 'static + Send>(
-    ui_events: UnboundedReceiver<UiEvent>, shell: BoxShell, init: F,
+    core_event_sender: UnboundedSender<CoreMsg>, core_events: UnboundedReceiver<CoreMsg>,
+    shell: BoxShell, init: F,
   ) {
     #[cfg(not(target_arch = "wasm32"))]
     std::thread::spawn(move || {
-      let event_loop = AppCtx::init(shell);
-
-      #[cfg(feature = "debug")]
-      let (ui_sender, ui_receiver) = unbounded_channel();
-
-      #[cfg(feature = "debug")]
-      {
-        *AppCtx::shared().ui_event_sender.borrow_mut() = Some(ui_sender.clone());
-      }
+      AppCtx::init(core_event_sender, shell);
+      let event_loop = EventLoop::new(core_events);
 
       // Drive the app main future inside a LocalSet for the whole lifetime of
       // the AppCtx thread. This ensures `spawn_local` remains valid as long as
       // the main loop is running.
       let main_fut = async {
         #[cfg(feature = "debug")]
-        let mut upstream_ui_events = ui_events;
-
-        #[cfg(feature = "debug")]
-        let merged_sender = ui_sender.clone();
-
-        #[cfg(feature = "debug")]
-        AppCtx::spawn_local(async move {
-          while let Some(event) = upstream_ui_events.recv().await {
-            if merged_sender.send(event).is_err() {
-              break;
-            }
-          }
-        });
-
-        init.await;
-
-        #[cfg(feature = "debug")]
         {
           crate::debug_tool::start_debug_server();
         }
 
-        #[cfg(feature = "debug")]
-        {
-          event_loop.run(ui_receiver).await;
-        }
-
-        #[cfg(not(feature = "debug"))]
-        {
-          event_loop.run(ui_events).await;
-        }
+        init.await;
+        event_loop.run().await;
       };
       let local_set = &*AppCtx::shared().local_set.borrow();
       RUNTIME.block_on(local_set.run_until(main_fut));
     });
     #[cfg(target_arch = "wasm32")]
     {
-      let event_loop = AppCtx::init(shell);
-
-      #[cfg(feature = "debug")]
-      let (ui_sender, ui_receiver) = unbounded_channel();
-
-      #[cfg(feature = "debug")]
-      {
-        *AppCtx::shared().ui_event_sender.borrow_mut() = Some(ui_sender.clone());
-      }
+      AppCtx::init(core_event_sender, shell);
+      let event_loop = EventLoop::new(core_events);
 
       AppCtx::spawn_local(async move {
         #[cfg(feature = "debug")]
-        let mut upstream_ui_events = ui_events;
-
-        #[cfg(feature = "debug")]
-        let merged_sender = ui_sender.clone();
-
-        #[cfg(feature = "debug")]
-        AppCtx::spawn_local(async move {
-          while let Some(event) = upstream_ui_events.recv().await {
-            if merged_sender.send(event).is_err() {
-              break;
-            }
-          }
-        });
+        {
+          crate::debug_tool::start_debug_server();
+        }
 
         init.await;
-
-        #[cfg(feature = "debug")]
-        {
-          event_loop.run(ui_receiver).await;
-        }
-
-        #[cfg(not(feature = "debug"))]
-        {
-          event_loop.run(ui_events).await;
-        }
+        event_loop.run().await;
       });
     }
   }
@@ -232,16 +174,12 @@ impl AppCtx {
   pub fn shared() -> &'static Self { &APP_CTX }
 
   pub fn exit() {
+    let _ = AppCtx::send_event(CoreMsg::Exit);
     AppCtx::spawn_local(async move {
-      AppCtx::shared().event_sender.borrow_mut().take();
-
-      #[cfg(feature = "debug")]
-      {
-        AppCtx::shared()
-          .ui_event_sender
-          .borrow_mut()
-          .take();
-      }
+      AppCtx::shared()
+        .core_event_sender
+        .borrow_mut()
+        .take();
     });
   }
 
@@ -273,8 +211,9 @@ impl AppCtx {
       .insert(id, wnd.clone());
 
     wnd.init(content);
-
-    // request draw the first frame.
+    // After init the tree is dirty; request the platform to schedule the first
+    // frame directly.  winit coalesces multiple request_redraw() calls
+    // automatically, so no extra Scheduler-level bookkeeping is needed here.
     wnd.shell_wnd().borrow().request_draw(false);
 
     wnd
@@ -368,26 +307,28 @@ impl AppCtx {
       .add_changed((path, writer));
   }
 
+  pub(crate) fn has_pending_changes() -> bool {
+    AppCtx::shared()
+      .change_dataset
+      .has_pending_changes()
+  }
+
   pub(crate) fn emit_change() -> bool { AppCtx::shared().change_dataset.emit_change() }
 
-  pub(crate) fn send_event(event: FrameworkEvent) -> bool {
-    if let Some(event_sender) = AppCtx::shared().event_sender.borrow().as_ref() {
+  pub(crate) fn send_event(event: CoreMsg) -> bool {
+    if let Some(event_sender) = AppCtx::shared()
+      .core_event_sender
+      .borrow()
+      .as_ref()
+    {
       event_sender.send(event).is_ok()
     } else {
-      warn!("Event sender not found, must call inner AppCtx::run().");
+      warn!("Core event sender not found, must call inner AppCtx::run().");
       false
     }
   }
 
-  #[cfg(feature = "debug")]
-  pub(crate) fn send_ui_event(event: UiEvent) -> bool {
-    if let Some(event_sender) = AppCtx::shared().ui_event_sender.borrow().as_ref() {
-      event_sender.send(event).is_ok()
-    } else {
-      warn!("UI event sender not found, must call AppCtx::run().");
-      false
-    }
-  }
+  pub fn send_ui_event(event: UiEvent) -> bool { AppCtx::send_event(event.into()) }
 }
 
 impl AppCtx {
@@ -493,9 +434,7 @@ impl Default for AppCtx {
 
       windows: RefCell::new(ahash::HashMap::default()),
       change_dataset: ChangeDataset::default(),
-      event_sender: RefCell::new(None),
-      #[cfg(feature = "debug")]
-      ui_event_sender: RefCell::new(None),
+      core_event_sender: RefCell::new(None),
       shell: RefCell::new(None),
       #[cfg(not(target_arch = "wasm32"))]
       local_set: RefCell::new(LocalSet::new()), // Will be reset in first test
@@ -507,21 +446,14 @@ impl Default for AppCtx {
 
 #[cfg(all(feature = "test-utils", not(target_arch = "wasm32")))]
 pub mod test_utils {
-  use std::{
-    cell::RefCell,
-    sync::{Mutex, MutexGuard},
-  };
+  use std::sync::{Mutex, MutexGuard};
 
   use ribir_algo::Rc;
-  use tokio::{
-    runtime::EnterGuard,
-    sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel},
-    task::LocalSet,
-  };
+  use tokio::{runtime::EnterGuard, sync::mpsc::unbounded_channel, task::LocalSet};
 
   use crate::{
     context::{AppCtx, app_ctx::APP_CTX},
-    event_loop::{EventLoop, FrameworkEvent},
+    event_loop::EventLoop,
     test_helper::{TestShell, TestWindow},
     window::{UiEvent, Window},
   };
@@ -581,16 +513,7 @@ pub mod test_utils {
     }
   }
 
-  thread_local! {
-    static RUNTIME_EVENTS: RefCell<Option<UnboundedReceiver<FrameworkEvent>>> =
-      const { RefCell::new(None) };
-  }
-
   pub struct TestRuntimeGuard {
-    _sender: UnboundedSender<UiEvent>,
-    old_sender: Option<UnboundedSender<FrameworkEvent>>,
-    #[cfg(feature = "debug")]
-    old_ui_sender: Option<UnboundedSender<UiEvent>>,
     _runtime_guard: EnterGuard<'static>,
     _local_enter_guard: tokio::task::LocalEnterGuard,
   }
@@ -599,31 +522,14 @@ pub mod test_utils {
     fn drop(&mut self) {
       AppCtx::run_until_stalled();
       for wnd_id in AppCtx::windows().borrow().keys() {
-        let _ = self
-          ._sender
-          .send(UiEvent::CloseRequest { wnd_id: *wnd_id });
+        let _ = AppCtx::send_ui_event(UiEvent::CloseRequest { wnd_id: *wnd_id });
       }
       AppCtx::run_until_stalled();
-      AppCtx::shared().event_sender.borrow_mut().take();
-
-      #[cfg(feature = "debug")]
-      {
-        AppCtx::shared()
-          .ui_event_sender
-          .borrow_mut()
-          .take();
-      }
-
+      AppCtx::shared()
+        .core_event_sender
+        .borrow_mut()
+        .take();
       AppCtx::run_until_stalled();
-      std::mem::swap(&mut *AppCtx::shared().event_sender.borrow_mut(), &mut self.old_sender);
-
-      #[cfg(feature = "debug")]
-      {
-        std::mem::swap(
-          &mut *AppCtx::shared().ui_event_sender.borrow_mut(),
-          &mut self.old_ui_sender,
-        );
-      }
     }
   }
 
@@ -631,7 +537,10 @@ pub mod test_utils {
     pub fn new_test_frame(wnd: &TestWindow) {
       wnd.run_frame_tasks();
       AppCtx::run_until_stalled();
-      AppCtx::send_event(FrameworkEvent::NewFrame { wnd_id: wnd.id(), force_redraw: false });
+      assert!(
+        AppCtx::send_ui_event(UiEvent::RedrawRequest { wnd_id: wnd.id(), force: false }),
+        "failed to queue redraw request for test window",
+      );
 
       // Continuously run the event loop until the frame is fully processed.
       // Complex widgets may require multiple poll cycles to complete their layout.
@@ -679,12 +588,9 @@ pub mod test_utils {
 
     pub fn reset_test_env() -> TestRuntimeGuard {
       let (sender, receiver) = unbounded_channel();
-      let (ui_sender, ui_receiver) = unbounded_channel();
-      let old_sender = Option::replace(&mut *AppCtx::shared().event_sender.borrow_mut(), sender);
-
-      #[cfg(feature = "debug")]
-      let old_ui_sender =
-        Option::replace(&mut *AppCtx::shared().ui_event_sender.borrow_mut(), ui_sender.clone());
+      let old_sender =
+        Option::replace(&mut *AppCtx::shared().core_event_sender.borrow_mut(), sender);
+      assert!(old_sender.is_none(), "reset_test_env expects AppCtx::core_event_sender to be empty",);
 
       *AppCtx::shared().shell.borrow_mut() = Some(Box::new(TestShell {}));
 
@@ -703,17 +609,10 @@ pub mod test_utils {
 
       AppCtx::spawn_local(async move {
         let event_loop = EventLoop::new(receiver);
-        event_loop.run(ui_receiver).await;
+        event_loop.run().await;
       });
       let _runtime_guard = AppCtx::enter();
-      TestRuntimeGuard {
-        _sender: ui_sender,
-        old_sender,
-        #[cfg(feature = "debug")]
-        old_ui_sender,
-        _runtime_guard,
-        _local_enter_guard,
-      }
+      TestRuntimeGuard { _runtime_guard, _local_enter_guard }
     }
 
     pub fn insert_window(wnd: Rc<Window>) {

@@ -1,9 +1,11 @@
-use std::collections::VecDeque;
+use std::collections::HashMap;
 
 use ribir_algo::Rc;
-use ribir_geom::Size;
 use rxrust::prelude::Observer;
-use tokio::{select, sync::mpsc::UnboundedReceiver};
+use tokio::{
+  sync::mpsc::{UnboundedReceiver, error::TryRecvError},
+  task::yield_now,
+};
 use winit::event::ElementState;
 
 use crate::{
@@ -11,325 +13,417 @@ use crate::{
   ticker::{FrameMsg, Instant},
   window::{UiEvent, Window, WindowId},
 };
-pub(crate) enum RibirEvent {
-  Ui(UiEvent),
-  Framework(FrameworkEvent),
-}
 
-pub(crate) enum FrameworkEvent {
+#[cfg(debug_assertions)]
+const MAX_LAYOUT_ITERS: usize = usize::MAX;
+#[cfg(not(debug_assertions))]
+const MAX_LAYOUT_ITERS: usize = 128;
+
+pub enum CoreMsg {
+  Platform(UiEvent),
+  FrameReady {
+    wnd_id: WindowId,
+    force: bool,
+  },
+  /// Wake the scheduler so it can globally flush pending reactive changes.
   DataChanged,
-
-  NewFrame { wnd_id: WindowId, force_redraw: bool },
-
-  BeforeLayout { wnd_id: WindowId },
-
-  Layout { wnd_id: WindowId, wnd_size: Size },
-
-  FrameFinish { wnd_id: WindowId, wnd_size: Size },
-
-  CloseWindow { wnd_id: WindowId },
+  CloseWindow {
+    wnd_id: WindowId,
+  },
+  Exit,
 }
 
-impl From<FrameworkEvent> for RibirEvent {
-  fn from(value: FrameworkEvent) -> Self { RibirEvent::Framework(value) }
-}
-
-impl From<UiEvent> for RibirEvent {
-  fn from(value: UiEvent) -> Self { RibirEvent::Ui(value) }
-}
-
-enum EventLoopHandle {
-  Idle(IdleHandle),
-  FrameLayout(FrameHandle),
-}
-
-impl From<IdleHandle> for EventLoopHandle {
-  fn from(value: IdleHandle) -> Self { EventLoopHandle::Idle(value) }
-}
-
-impl From<FrameHandle> for EventLoopHandle {
-  fn from(value: FrameHandle) -> Self { EventLoopHandle::FrameLayout(value) }
-}
-
-impl Default for EventLoopHandle {
-  fn default() -> Self { IdleHandle::default().into() }
-}
-
-pub struct EventLoop {
-  handle: EventLoopHandle,
-  framework_events: UnboundedReceiver<FrameworkEvent>,
-}
-
-impl EventLoop {
-  pub(crate) fn new(framework_events: UnboundedReceiver<FrameworkEvent>) -> Self {
-    EventLoop { handle: EventLoopHandle::default(), framework_events }
-  }
-
-  pub async fn run(self, mut ui_events: UnboundedReceiver<UiEvent>) {
-    let mut queue: VecDeque<RibirEvent> = VecDeque::new();
-    let Self { mut handle, mut framework_events } = self;
-    loop {
-      select! {
-       event = framework_events.recv() => {
-          if let Some(event) = event {
-            queue.push_back(event.into());
-          } else {
-            if let Some(shell) = AppCtx::shell_mut().take(){
-              shell.exit();
-            }
-            break;
-          }
-        }
-        Some(event) = ui_events.recv() => {
-          queue.push_back(event.into());
-        }
-      }
-      handle = handle.run(&mut queue);
+impl From<UiEvent> for CoreMsg {
+  fn from(event: UiEvent) -> Self {
+    match event {
+      UiEvent::RedrawRequest { wnd_id, force } => Self::FrameReady { wnd_id, force },
+      event => Self::Platform(event),
     }
   }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum WindowPhase {
+  #[default]
+  Idle,
+  RedrawPending,
+  InFrame,
+}
+
+#[derive(Clone, Debug, Default)]
+struct WindowController {
+  phase: WindowPhase,
+  frame_ready: bool,
+  force_redraw: bool,
 }
 
 #[derive(Default)]
-struct IdleHandle {}
-
-struct FrameHandle {
-  wnd: Rc<Window>,
-  need_redraw: bool,
-  has_data_changed: bool,
-  events: Vec<RibirEvent>,
+struct Scheduler {
+  controllers: HashMap<WindowId, WindowController>,
+  active_frame: Option<WindowId>,
 }
 
-impl FrameHandle {
-  fn new(wnd: Rc<Window>, force_draw: bool) -> Self {
+pub struct EventLoop {
+  events: UnboundedReceiver<CoreMsg>,
+  scheduler: Scheduler,
+}
+
+impl EventLoop {
+  pub(crate) fn new(events: UnboundedReceiver<CoreMsg>) -> Self {
+    Self { events, scheduler: Scheduler::default() }
+  }
+
+  pub async fn run(mut self) {
+    loop {
+      if self.scheduler.has_ready_frame() {
+        self.scheduler.run_ready_frame().await;
+        continue;
+      }
+
+      let Some(event) = self.events.recv().await else {
+        self.shutdown_shell();
+        break;
+      };
+
+      if !self.on_core_msg(event) {
+        break;
+      }
+
+      while !self.scheduler.has_ready_frame() {
+        match self.events.try_recv() {
+          Ok(event) => {
+            if !self.on_core_msg(event) {
+              return;
+            }
+          }
+          Err(TryRecvError::Empty) => break,
+          Err(TryRecvError::Disconnected) => {
+            self.shutdown_shell();
+            return;
+          }
+        }
+      }
+    }
+  }
+
+  fn shutdown_shell(&mut self) {
+    if let Some(shell) = AppCtx::shell_mut().take() {
+      shell.exit();
+    }
+  }
+
+  fn on_core_msg(&mut self, event: CoreMsg) -> bool {
+    match event {
+      CoreMsg::Platform(event) => {
+        self.on_platform_event(event);
+      }
+      CoreMsg::FrameReady { wnd_id, force } => {
+        if let Some(wnd) = self.scheduler.get_window(wnd_id) {
+          self.scheduler.on_redraw_ready(wnd, force);
+        }
+      }
+      CoreMsg::DataChanged => {
+        self.scheduler.flush_global_changes();
+      }
+      CoreMsg::CloseWindow { wnd_id } => {
+        if let Some(wnd) = self.scheduler.get_window(wnd_id) {
+          self.scheduler.close_window(wnd);
+        }
+      }
+      CoreMsg::Exit => {
+        self.shutdown_shell();
+        return false;
+      }
+    }
+    true
+  }
+
+  fn on_platform_event(&mut self, event: UiEvent) {
+    let Some(wnd_id) = event.wnd_id() else { return };
+    let Some(wnd) = self.scheduler.get_window(wnd_id) else { return };
+
+    match event {
+      UiEvent::RedrawRequest { force, .. } => {
+        self.scheduler.on_redraw_ready(wnd, force);
+        return;
+      }
+      UiEvent::Resize { .. } => {
+        self.scheduler.on_resize(wnd);
+        return;
+      }
+      UiEvent::CloseRequest { .. } => {
+        self.scheduler.close_window(wnd);
+        return;
+      }
+      UiEvent::ModifiersChanged { state, .. } => wnd
+        .dispatcher
+        .borrow_mut()
+        .modifiers_changed(state),
+      UiEvent::ReceiveChars { chars, .. } => wnd.process_receive_chars(chars),
+      UiEvent::CursorLeft { .. } => wnd.process_cursor_leave(),
+      UiEvent::MouseWheel { delta_x, delta_y, .. } => wnd.process_wheel(delta_x, delta_y),
+      UiEvent::CursorMoved { pos, .. } => wnd.process_cursor_move(pos),
+      UiEvent::ImePreEdit { ime, .. } => wnd.process_ime(ime),
+      UiEvent::KeyBoard { physical_key, key, is_repeat, location, state, .. } => {
+        wnd.process_keyboard_event(physical_key, key, is_repeat, location, state);
+      }
+      UiEvent::MouseInput { device_id, button, state, .. } => match state {
+        ElementState::Pressed => {
+          wnd.force_exit_pre_edit();
+          wnd.process_mouse_press(device_id, button);
+        }
+        ElementState::Released => wnd.process_mouse_release(device_id, button),
+      },
+    }
+
+    self.scheduler.finish_window_input(wnd);
+  }
+}
+
+impl Scheduler {
+  fn controller_mut(&mut self, wnd_id: WindowId) -> &mut WindowController {
+    self.controllers.entry(wnd_id).or_default()
+  }
+
+  fn clear_closed_window(&mut self, wnd_id: WindowId) { self.controllers.remove(&wnd_id); }
+
+  /// Return the window if it still exists; if not, clean up any stale
+  /// controller state for that id.
+  fn get_window(&mut self, wnd_id: WindowId) -> Option<Rc<Window>> {
+    AppCtx::get_window(wnd_id).or_else(|| {
+      self.clear_closed_window(wnd_id);
+      None
+    })
+  }
+
+  /// Emit a ticker message for `wnd`.
+  fn tick(wnd: &Window, msg: FrameMsg) { wnd.frame_ticker.clone().next(msg); }
+
+  fn flush_global_changes(&mut self) -> bool {
+    let changed = AppCtx::emit_change();
+    if !changed {
+      return false;
+    }
+
+    let wnd_ids: Vec<_> = AppCtx::windows()
+      .borrow()
+      .keys()
+      .copied()
+      .collect();
+    for wnd_id in wnd_ids {
+      if let Some(wnd) = self.get_window(wnd_id) {
+        self.schedule_platform_redraw(wnd, false);
+      }
+    }
+
+    true
+  }
+
+  fn finish_window_input(&mut self, wnd: Rc<Window>) {
+    self.drain_frame_queue(&wnd);
+    if !self.flush_global_changes() {
+      self.schedule_platform_redraw(wnd, false);
+    }
+  }
+
+  fn on_resize(&mut self, wnd: Rc<Window>) { self.schedule_platform_redraw(wnd, false); }
+
+  fn schedule_platform_redraw(&mut self, wnd: Rc<Window>, force: bool) {
     let wnd_id = wnd.id();
-    let this = Self { wnd, events: vec![], need_redraw: force_draw, has_data_changed: false };
+    let controller = self.controller_mut(wnd_id);
+    controller.force_redraw |= force;
 
-    let mut ticker = this.wnd.frame_ticker.clone();
-    ticker.next(FrameMsg::NewFrame(Instant::now()));
-    this.wnd.run_frame_tasks();
-
-    AppCtx::send_event(FrameworkEvent::BeforeLayout { wnd_id });
-    this
-  }
-
-  fn on_event(self, event: RibirEvent) -> (Vec<RibirEvent>, EventLoopHandle) {
-    match event {
-      RibirEvent::Ui(e) => self.on_ui_event(e),
-      RibirEvent::Framework(e) => self.on_framework_event(e),
-    }
-  }
-
-  fn on_framework_event(mut self, event: FrameworkEvent) -> (Vec<RibirEvent>, EventLoopHandle) {
-    match event {
-      FrameworkEvent::NewFrame { wnd_id, force_redraw } => {
-        if wnd_id == self.wnd.id() {
-          self.need_redraw |= force_redraw;
-        } else {
-          self.events.push(event.into());
-        }
-      }
-      FrameworkEvent::BeforeLayout { wnd_id } => {
-        assert!(wnd_id == self.wnd.id());
-        let mut ticker = self.wnd.frame_ticker.clone();
-        ticker.next(FrameMsg::BeforeLayout(Instant::now()));
-        let wnd_size = self.wnd.size();
-        self.wnd.update_painter_viewport();
-        AppCtx::send_event(FrameworkEvent::Layout { wnd_id, wnd_size });
-      }
-      FrameworkEvent::FrameFinish { wnd_id, wnd_size: size } => {
-        assert!(wnd_id == self.wnd.id());
-        self.layout_ready(size);
-
-        return self.frame_end();
-      }
-      FrameworkEvent::Layout { wnd_id, wnd_size } => {
-        assert!(wnd_id == self.wnd.id());
-        let next_event = if self.wnd.tree().is_dirty() {
-          self.layout(wnd_size);
-          FrameworkEvent::Layout { wnd_id, wnd_size }
-        } else {
-          FrameworkEvent::FrameFinish { wnd_id, wnd_size }
-        };
-        AppCtx::send_event(next_event);
-      }
-      FrameworkEvent::DataChanged => {
-        self.has_data_changed = AppCtx::emit_change();
-      }
-      FrameworkEvent::CloseWindow { .. } => {
-        self.events.push(event.into());
-      }
+    if !matches!(controller.phase, WindowPhase::Idle) {
+      return;
     }
 
-    (vec![], self.into())
+    wnd.shell_wnd().borrow().request_draw(force);
+    controller.frame_ready = false;
+    controller.phase = WindowPhase::RedrawPending;
   }
 
-  fn on_ui_event(mut self, event: UiEvent) -> (Vec<RibirEvent>, EventLoopHandle) {
-    match event {
-      UiEvent::RedrawRequest { wnd_id, force } => {
-        if wnd_id != self.wnd.id() {
-          self.events.push(event.into());
-        } else {
-          self.need_redraw |= force;
-        }
+  fn on_redraw_ready(&mut self, wnd: Rc<Window>, force: bool) {
+    let wnd_id = wnd.id();
+    let controller = self.controller_mut(wnd_id);
+    controller.force_redraw |= force;
+
+    if matches!(controller.phase, WindowPhase::InFrame) {
+      // Keep a redraw request that arrives during a frame so it can schedule
+      // the following frame after we return to `Idle`.
+      controller.force_redraw = true;
+      return;
+    }
+
+    controller.phase = WindowPhase::RedrawPending;
+    controller.frame_ready = true;
+  }
+
+  fn has_ready_frame(&self) -> bool {
+    self.controllers.values().any(|controller| {
+      matches!(controller.phase, WindowPhase::RedrawPending) && controller.frame_ready
+    })
+  }
+
+  async fn run_ready_frame(&mut self) -> bool {
+    let ready_wnd_ids: Vec<_> = self
+      .controllers
+      .iter()
+      .filter_map(|(wnd_id, controller)| {
+        (matches!(controller.phase, WindowPhase::RedrawPending) && controller.frame_ready)
+          .then_some(*wnd_id)
+      })
+      .collect();
+
+    for wnd_id in ready_wnd_ids {
+      let Some(wnd) = self.get_window(wnd_id) else {
+        continue;
+      };
+
+      {
+        let controller = self.controller_mut(wnd_id);
+        controller.phase = WindowPhase::InFrame;
+        controller.frame_ready = false;
       }
-      _ => self.events.push(event.into()),
+
+      self.active_frame = Some(wnd_id);
+      self.run_window_frame(wnd).await;
+      return true;
     }
-    (vec![], EventLoopHandle::FrameLayout(self))
+
+    false
   }
 
-  fn layout(&mut self, size: Size) {
-    self.wnd.update_painter_viewport();
-    self.wnd.run_frame_tasks();
-    if self.wnd.tree().is_dirty() {
-      self.wnd.layout(size);
-      self.need_redraw = true;
-    }
-  }
+  async fn run_window_frame(&mut self, wnd: Rc<Window>) {
+    let wnd_id = wnd.id();
+    let mut need_redraw = std::mem::take(&mut self.controller_mut(wnd_id).force_redraw);
 
-  fn layout_ready(&self, wnd_size: Size) {
-    if self.need_redraw {
-      self.wnd.draw_frame(Some(wnd_size));
-    }
-    let mut ticker = self.wnd.frame_ticker.clone();
-    ticker.next(FrameMsg::Finish(Instant::now()));
-  }
+    Scheduler::tick(&wnd, FrameMsg::NewFrame(Instant::now()));
+    self.drain_frame_work(&wnd).await;
 
-  fn frame_end(self) -> (Vec<RibirEvent>, EventLoopHandle) {
-    if self.has_data_changed {
-      for wnd in AppCtx::windows().borrow().values() {
-        wnd.shell_wnd().borrow().request_draw(false);
+    Scheduler::tick(&wnd, FrameMsg::BeforeLayout(Instant::now()));
+    wnd.update_painter_viewport();
+    self.drain_frame_work(&wnd).await;
+
+    let mut notified_widgets = ahash::HashSet::default();
+    let mut layout_converged = false;
+    for _ in 0..MAX_LAYOUT_ITERS {
+      if wnd.tree().is_dirty() {
+        need_redraw |= wnd.layout(wnd.size(), &mut notified_widgets);
       }
+
+      self.drain_frame_work(&wnd).await;
+
+      if wnd.tree().is_dirty() || AppCtx::has_pending_changes() {
+        continue;
+      }
+
+      {
+        let tree = wnd.tree_mut();
+        wnd
+          .focus_mgr
+          .borrow_mut()
+          .on_widget_tree_update(tree);
+      }
+      self.drain_frame_work(&wnd).await;
+
+      if wnd.tree().is_dirty() || AppCtx::has_pending_changes() {
+        continue;
+      }
+
+      Scheduler::tick(&wnd, FrameMsg::LayoutReady(Instant::now()));
+      self.drain_frame_work(&wnd).await;
+
+      if wnd.tree().is_dirty() || AppCtx::has_pending_changes() {
+        continue;
+      }
+
+      layout_converged = true;
+      break;
     }
+
+    assert!(layout_converged, "Layout failed to converge within {MAX_LAYOUT_ITERS} iterations");
+
+    if need_redraw || wnd.need_draw() {
+      wnd.draw_frame(Some(wnd.size()));
+    }
+
+    Scheduler::tick(&wnd, FrameMsg::Finish(Instant::now()));
+    self.drain_frame_work(&wnd).await;
+
     AppCtx::end_frame();
-    (self.events, EventLoopHandle::Idle(IdleHandle::default()))
+    self.active_frame = None;
+
+    if self.get_window(wnd_id).is_none() {
+      return;
+    }
+
+    self.controller_mut(wnd_id).phase = WindowPhase::Idle;
+    self.schedule_platform_redraw(wnd, false);
   }
+
+  async fn drain_frame_work(&mut self, wnd: &Window) {
+    self.drain_frame_queue(wnd);
+    yield_now().await;
+    self.flush_global_changes();
+  }
+
+  fn close_window(&mut self, wnd: Rc<Window>) {
+    self.clear_closed_window(wnd.id());
+    wnd.dispose();
+    if !AppCtx::has_wnd() {
+      AppCtx::exit();
+    }
+  }
+
+  fn drain_frame_queue(&self, wnd: &Window) { wnd.run_frame_tasks(); }
 }
 
-impl IdleHandle {
-  fn on_event(self, event: RibirEvent) -> (Vec<RibirEvent>, EventLoopHandle) {
-    match event {
-      RibirEvent::Ui(e) => self.on_ui_event(e),
-      RibirEvent::Framework(e) => (vec![], self.on_framework_event(e)),
-    }
-  }
-  fn on_ui_event(self, event: UiEvent) -> (Vec<RibirEvent>, EventLoopHandle) {
-    let wnd_id = event.wnd_id();
-    match event {
-      UiEvent::RedrawRequest { wnd_id, force } => {
-        AppCtx::send_event(FrameworkEvent::NewFrame { wnd_id, force_redraw: force });
-      }
-      UiEvent::ModifiersChanged { wnd_id, state } => {
-        if let Some(wnd) = AppCtx::get_window(wnd_id) {
-          wnd
-            .dispatcher
-            .borrow_mut()
-            .modifiers_changed(state);
-        }
-      }
-      UiEvent::ReceiveChars { wnd_id, chars } => {
-        if let Some(wnd) = AppCtx::get_window(wnd_id) {
-          wnd.process_receive_chars(chars);
-        }
-      }
-      UiEvent::Resize { .. } => (),
-      UiEvent::CursorLeft { wnd_id } => {
-        if let Some(wnd) = AppCtx::get_window(wnd_id) {
-          wnd.process_cursor_leave();
-        }
-      }
-      UiEvent::MouseWheel { wnd_id, delta_x, delta_y } => {
-        if let Some(wnd) = AppCtx::get_window(wnd_id) {
-          wnd.process_wheel(delta_x, delta_y);
-        }
-      }
-      UiEvent::CursorMoved { wnd_id, pos } => {
-        if let Some(wnd) = AppCtx::get_window(wnd_id) {
-          wnd.process_cursor_move(pos);
-        }
-      }
-      UiEvent::ImePreEdit { wnd_id, ime } => {
-        if let Some(wnd) = AppCtx::get_window(wnd_id) {
-          wnd.process_ime(ime);
-        }
-      }
-      UiEvent::KeyBoard { wnd_id, key, state, physical_key, is_repeat, location } => {
-        if let Some(wnd) = AppCtx::get_window(wnd_id) {
-          wnd.process_keyboard_event(physical_key, key, is_repeat, location, state);
-        }
-      }
-      UiEvent::MouseInput { wnd_id, device_id, button, state } => {
-        if let Some(wnd) = AppCtx::get_window(wnd_id) {
-          if state == ElementState::Pressed {
-            wnd.force_exit_pre_edit()
-          }
+#[cfg(test)]
+mod tests {
+  use super::{Scheduler, WindowPhase};
+  use crate::{prelude::*, reset_test_env, test_helper::TestWindow};
 
-          match state {
-            ElementState::Pressed => wnd.process_mouse_press(device_id, button),
-            ElementState::Released => wnd.process_mouse_release(device_id, button),
-          }
-        }
-      }
-      UiEvent::CloseRequest { wnd_id } => {
-        AppCtx::send_event(FrameworkEvent::CloseWindow { wnd_id });
-      }
-    }
-    if let Some(wnd) = wnd_id.and_then(|id| AppCtx::get_window(id)) {
-      wnd.run_frame_tasks();
-    }
-    (vec![], self.into())
+  #[test]
+  fn pending_redraws_are_deduplicated_and_force_is_upgraded() {
+    reset_test_env!();
+    let wnd = TestWindow::from_widget(fn_widget! { @Void {} });
+    let mut scheduler = Scheduler::default();
+
+    let wnd_ref = AppCtx::get_window(wnd.id()).unwrap();
+    scheduler.schedule_platform_redraw(wnd_ref.clone(), false);
+    scheduler.schedule_platform_redraw(wnd_ref, true);
+
+    assert_eq!(wnd.request_draw_count(), 1);
+
+    let controller = scheduler.controllers.get(&wnd.id()).unwrap();
+    assert_eq!(controller.phase, WindowPhase::RedrawPending);
+    assert!(!controller.frame_ready);
+    assert!(controller.force_redraw);
   }
 
-  fn on_framework_event(self, event: FrameworkEvent) -> EventLoopHandle {
-    match event {
-      FrameworkEvent::DataChanged => {
-        let changed = AppCtx::emit_change();
-        if changed {
-          for wnd in AppCtx::windows().borrow().values() {
-            wnd.shell_wnd().borrow().request_draw(false);
-          }
-        }
-      }
-      FrameworkEvent::NewFrame { wnd_id, force_redraw } => {
-        if let Some(wnd) = AppCtx::get_window(wnd_id) {
-          return FrameHandle::new(wnd, force_redraw).into();
-        }
-      }
-      FrameworkEvent::CloseWindow { wnd_id } => {
-        if let Some(wnd) = AppCtx::get_window(wnd_id) {
-          wnd.dispose();
-        }
-        if !AppCtx::has_wnd() {
-          AppCtx::exit();
-        }
-      }
-      FrameworkEvent::BeforeLayout { .. }
-      | FrameworkEvent::Layout { .. }
-      | FrameworkEvent::FrameFinish { .. } => {
-        panic!("Unexpected layout event");
-      }
-    }
-    self.into()
-  }
-}
+  #[test]
+  fn redraw_requested_during_frame_is_rescheduled_after_frame() {
+    reset_test_env!();
+    let wnd = TestWindow::from_widget(fn_widget! { @Void {} });
+    let mut scheduler = Scheduler::default();
+    let wnd_ref = AppCtx::get_window(wnd.id()).unwrap();
 
-impl EventLoopHandle {
-  fn on_event(self, event: RibirEvent) -> (Vec<RibirEvent>, EventLoopHandle) {
-    match self {
-      EventLoopHandle::Idle(wnd_loop) => wnd_loop.on_event(event),
-      EventLoopHandle::FrameLayout(layout_loop) => layout_loop.on_event(event),
-    }
-  }
+    scheduler.controller_mut(wnd.id()).phase = WindowPhase::InFrame;
+    scheduler.on_redraw_ready(wnd_ref.clone(), false);
+    assert!(
+      scheduler
+        .controllers
+        .get(&wnd.id())
+        .unwrap()
+        .force_redraw
+    );
 
-  pub(crate) fn run(self, events: &mut VecDeque<RibirEvent>) -> EventLoopHandle {
-    let mut handle = self;
-    while let Some(event) = events.pop_front() {
-      let (left_events, new_handle) = handle.on_event(event);
-      handle = new_handle;
+    scheduler.controller_mut(wnd.id()).phase = WindowPhase::Idle;
+    scheduler.schedule_platform_redraw(wnd_ref, false);
 
-      for event in left_events.into_iter().rev() {
-        events.push_front(event);
-      }
-    }
-    handle
+    assert_eq!(wnd.request_draw_count(), 1);
+    let controller = scheduler.controllers.get(&wnd.id()).unwrap();
+    assert_eq!(controller.phase, WindowPhase::RedrawPending);
+    assert!(!controller.frame_ready);
   }
 }

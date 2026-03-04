@@ -234,8 +234,7 @@ pub struct DebugServerState {
 }
 
 /// Start the debug HTTP server on a dynamically assigned port.
-/// Start the debug HTTP server.
-/// - Initializes debug logging.
+/// Initializes debug logging and returns the command sender.
 pub fn start_debug_server() -> mpsc::Sender<DebugCommand> {
   crate::logging::init_debug_tracing("info");
   let bind_host = "127.0.0.1";
@@ -1270,30 +1269,16 @@ fn injected_to_ui_events(wnd: &Window, event: InjectedUiEvent) -> Result<Vec<UiE
         out.push(UiEvent::CursorMoved { wnd_id: window_id, pos });
       }
       let mapped_button = mouse_button(button);
-      out.push(UiEvent::MouseInput {
+      let make_input = |state| UiEvent::MouseInput {
         wnd_id: window_id,
         device_id: Box::new(RibirDeviceId::Dummy),
         button: mapped_button,
-        state: ElementState::Pressed,
-      });
-      out.push(UiEvent::MouseInput {
-        wnd_id: window_id,
-        device_id: Box::new(RibirDeviceId::Dummy),
-        button: mapped_button,
-        state: ElementState::Released,
-      });
-      out.push(UiEvent::MouseInput {
-        wnd_id: window_id,
-        device_id: Box::new(RibirDeviceId::Dummy),
-        button: mapped_button,
-        state: ElementState::Pressed,
-      });
-      out.push(UiEvent::MouseInput {
-        wnd_id: window_id,
-        device_id: Box::new(RibirDeviceId::Dummy),
-        button: mapped_button,
-        state: ElementState::Released,
-      });
+        state,
+      };
+      out.push(make_input(ElementState::Pressed));
+      out.push(make_input(ElementState::Released));
+      out.push(make_input(ElementState::Pressed));
+      out.push(make_input(ElementState::Released));
       out
     }
     InjectedUiEvent::Chars { chars } => {

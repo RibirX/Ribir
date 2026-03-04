@@ -50,7 +50,6 @@ impl ApplicationHandler<RibirAppEvent> for AppHandler {
           let ratio = shell_wnd.borrow().winit_wnd.scale_factor();
           let size = size.to_logical(ratio);
           App::send_event(UiEvent::Resize { wnd_id, size: Size::new(size.width, size.height) });
-          shell_wnd.borrow().winit_wnd.request_redraw();
         }
       }
       WindowEvent::Focused(focused) => {
