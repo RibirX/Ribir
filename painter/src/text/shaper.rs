@@ -139,7 +139,7 @@ impl TextShaper {
       for g in cluster.glyphs {
         let mut glyph = Glyph::new(
           GlyphId(g.id),
-          cluster.source.start as u32,
+          cluster.source.start,
           g.advance as i32,
           0,
           g.x as i32,

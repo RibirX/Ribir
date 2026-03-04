@@ -8,7 +8,6 @@ use quick_xml::{
 };
 use swash::FontRef;
 use tracing::warn;
-use ttf_parser;
 
 use crate::{Svg, text::GlyphId};
 
