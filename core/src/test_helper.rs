@@ -1,4 +1,7 @@
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::{
+  cell::Cell,
+  sync::atomic::{AtomicU64, Ordering},
+};
 
 #[cfg(test)]
 #[cfg(target_arch = "wasm32")]
@@ -129,6 +132,17 @@ impl TestWindow {
 
   pub fn fmt_tree(&self) -> String { self.tree().display_tree(self.tree().root()) }
 
+  pub fn request_draw_count(&self) -> usize {
+    self
+      .shell_wnd()
+      .borrow()
+      .as_any()
+      .downcast_ref::<TestShellWindow>()
+      .unwrap()
+      .request_draw_count
+      .get()
+  }
+
   pub fn request_resize(&self, size: Size) {
     let root = self.0.tree().root();
     self
@@ -151,6 +165,7 @@ pub struct TestShellWindow {
   pub id: WindowId,
   pub surface_color: Color,
   pub last_frame: Option<Frame>,
+  pub request_draw_count: Cell<usize>,
   pub size: Size,
 }
 
@@ -202,7 +217,11 @@ impl ShellWindow for TestShellWindow {
       Some(Frame { commands: commands.to_owned(), viewport, surface: surface_color });
   }
 
-  fn request_draw(&self, _force: bool) {}
+  fn request_draw(&self, _force: bool) {
+    self
+      .request_draw_count
+      .set(self.request_draw_count.get() + 1);
+  }
 
   fn id(&self) -> WindowId { self.id }
 
@@ -220,6 +239,7 @@ impl TestShellWindow {
       cursor: CursorIcon::Default,
       id: ID.fetch_add(1, Ordering::Relaxed).into(),
       last_frame: None,
+      request_draw_count: Cell::new(0),
       surface_color: Color::WHITE,
       size,
     }

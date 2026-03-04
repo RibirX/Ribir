@@ -8,6 +8,7 @@ use std::{
 
 use app_event_handler::AppHandler;
 use ribir_core::{
+  event_loop::CoreMsg,
   local_sender::LocalSender,
   prelude::*,
   window::{BoxShell, BoxShellWindow, UiEvent, WindowAttributes, WindowFlags, WindowId},
@@ -30,7 +31,7 @@ pub struct App {
   active_wnd: std::cell::Cell<Option<WindowId>>,
   events_stream: LocalSubjectMutRef<'static, AppEvent, Infallible>,
 
-  _app_handler: RefCell<Option<UnboundedSender<UiEvent>>>,
+  _app_handler: RefCell<Option<UnboundedSender<CoreMsg>>>,
   ui_executor: ui_executor::UiExecutor,
 }
 
@@ -86,7 +87,7 @@ impl App {
       .borrow()
       .as_ref()
       .unwrap()
-      .send(event);
+      .send(event.into());
   }
 }
 
@@ -242,10 +243,10 @@ impl App {
   #[track_caller]
   pub fn exec(app: impl FnOnce() + Send + 'static) {
     let (sender, recv) = unbounded_channel();
-    *Self::shared()._app_handler.borrow_mut() = Some(sender);
+    *Self::shared()._app_handler.borrow_mut() = Some(sender.clone());
     let shell: BoxShell = Box::new(RibirShell { cmd_sender: App::cmd_sender() });
 
-    AppCtx::run(recv, shell, async move {
+    AppCtx::run(sender.clone(), recv, shell, async move {
       #[cfg(not(target_arch = "wasm32"))]
       match crate::clipboard::Clipboard::new() {
         Ok(clipboard) => AppCtx::set_clipboard(Box::new(clipboard)),

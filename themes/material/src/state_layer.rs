@@ -1,4 +1,4 @@
-use ribir_core::{prelude::*, rxrust::ops::throttle::ThrottleEdge, wrap_render::WrapRender};
+use ribir_core::{prelude::*, wrap_render::WrapRender};
 
 use crate::md;
 
@@ -37,8 +37,6 @@ impl HoverLayer {
     });
 
     let u = watch!(*$read(host.is_hovered()))
-      // Delay hover effects to prevent displaying this layer while scrolling.
-      .throttle_time(HOVER_THROTTLE_TIME, ThrottleEdge::trailing())
       .distinct_until_changed()
       .subscribe({
         let layer = layer.clone_writer();

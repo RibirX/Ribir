@@ -420,41 +420,22 @@ impl Window {
     draw
   }
 
-  pub fn layout(&self, size: Size) -> bool {
+  pub fn layout(&self, size: Size, notified_widgets: &mut ahash::HashSet<WidgetId>) -> bool {
     let mut layout_queue = Vec::with_capacity(64);
-    let mut notified_widgets = ahash::HashSet::default();
-    let mut is_need_redraw = false;
-    loop {
-      self.run_frame_tasks();
 
-      let tree = self.tree_mut();
-      is_need_redraw |= tree.is_dirty();
-      tree.layout(size, &mut layout_queue);
+    let tree = self.tree_mut();
+    let is_need_redraw = tree.is_dirty();
+    tree.layout(size, &mut layout_queue);
 
-      // Process layout completion events
-      layout_queue
-        .drain(..)
-        .filter(|id| notified_widgets.insert(*id))
-        .for_each(|id| {
-          self.add_delay_event(DelayEvent::PerformedLayout(id));
-        });
-      notified_widgets.clear();
-      self.run_frame_tasks();
+    // Process layout completion events
+    layout_queue
+      .drain(..)
+      .filter(|id| notified_widgets.insert(*id))
+      .for_each(|id| {
+        self.add_delay_event(DelayEvent::PerformedLayout(id));
+      });
 
-      if !tree.is_dirty() {
-        self
-          .focus_mgr
-          .borrow_mut()
-          .on_widget_tree_update(tree);
-        self.run_frame_tasks();
-      }
-
-      if !tree.is_dirty() {
-        let ready = FrameMsg::LayoutReady(Instant::now());
-        self.frame_ticker.clone().next(ready);
-        return is_need_redraw;
-      }
-    }
+    is_need_redraw
   }
 
   pub fn update_painter_viewport(&self) {
@@ -934,7 +915,7 @@ impl Window {
   }
 
   pub fn close(&self) {
-    AppCtx::send_event(event_loop::FrameworkEvent::CloseWindow { wnd_id: self.id() });
+    AppCtx::send_event(event_loop::CoreMsg::CloseWindow { wnd_id: self.id() });
   }
 
   pub(crate) fn dispose(&self) {
