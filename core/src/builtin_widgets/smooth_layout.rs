@@ -7,7 +7,7 @@
 //! pipeline and interpolates geometry — position and/or size — from a *from*
 //! value toward a *target* value on each frame. The animation runs entirely
 //! inside the layout/paint pipeline: no reactive subscription chain is needed,
-//! and dirty marking is self-scheduled through `once_before_layout`.
+//! and dirty marking is self-scheduled through `paint()`.
 //!
 //! Axis selection is controlled by [`SmoothAxes`]. The default is
 //! [`SmoothAxes::ALL`] (both position and size). Use bit-flag combinations to
@@ -34,13 +34,12 @@
 //! # Size smoothing (`SmoothAxes::SIZE / WIDTH / HEIGHT`)
 //!
 //! For size animation, the behaviour visible to the rest of the layout is
-//! governed by [`LayoutImpact`]:
+//! governed by [`SizeMode`]:
 //!
-//! | [`LayoutImpact`]            | Effect                                             |
-//! |-----------------------------|----------------------------------------------------|
-//! | [`LayoutImpact::NoLayout`]    | Layout reports *target* size; visual only.        |
-//! | [`LayoutImpact::SelfLayout`]  | Layout reports *animated* size (default).         |
-//! | [`LayoutImpact::SubtreeLayout`]| Child also lays out at current animated size.    |
+//! | [`SizeMode`]               | Effect                                             |
+//! |----------------------------|----------------------------------------------------|
+//! | [`SizeMode::Visual`]       | Layout reports *target* size; animation is visual only. |
+//! | [`SizeMode::Layout`]       | Layout reports *animated* size and relayouts the child. |
 //!
 //! The visual effect during animation is set by [`ContentMotion`]:
 //!
@@ -99,29 +98,23 @@ use std::cell::Cell;
 
 use bitflags::bitflags;
 
-use crate::{prelude::*, widget_tree::WidgetId, window::WindowFlags, wrap_render::*};
+use crate::{prelude::*, window::WindowFlags, wrap_render::*};
 
-/// Controls how the animated size affects the layout of surrounding widgets.
+/// Controls how animated size changes interact with layout.
 ///
 /// This setting only applies when size axes (`W`/`H`) are active.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum LayoutImpact {
+pub enum SizeMode {
   /// Keep the reported layout size at the *target* (final) size at all times.
   /// The animation is purely visual: neighbours are never reflowed, and the
-  /// child always lays out at target size. This is the lightest option.
-  NoLayout,
-  /// Report the *animated* size to the parent, causing surrounding siblings to
-  /// shift as the size changes, but keep the child's own layout using the
-  /// *target* size (so the child is not recalculated on every frame).
+  /// child continues to lay out at target size.
+  Visual,
+  /// Report the *animated* size to the parent and re-layout the child at the
+  /// animated size on every frame.
   ///
   /// This is the default.
   #[default]
-  SelfLayout,
-  /// Report the *animated* size **and** constrain the child to lay out within
-  /// the animated size on every frame. Produces the most faithful animation
-  /// for content that reflows (e.g. text), at the cost of a full subtree
-  /// relayout per frame.
-  SubtreeLayout,
+  Layout,
 }
 
 /// Controls the visual effect applied to content during size animation.
@@ -179,45 +172,47 @@ bitflags! {
 /// using a configurable [`Transition`], and reports the interpolated result
 /// back to the layout system. The animation is entirely self-driven — no
 /// reactive subscription chain is required. Dirty marking is self-scheduled via
-/// `once_before_layout` so the widget keeps requesting redraws for as long as
-/// the animation is running.
+/// `paint()`: after each paint the widget checks whether a tween is still
+/// running and, if so, marks itself dirty so the framework automatically
+/// schedules the next frame.
 ///
 /// See the [module-level documentation](self) for a full usage guide.
+#[declare(stateless)]
 pub struct SmoothLayout {
+  #[declare(default = SmoothAxes::ALL)]
   axes: SmoothAxes,
-  layout_impact: LayoutImpact,
+  #[declare(default)]
+  size_mode: SizeMode,
+  #[declare(default)]
   content_motion: ContentMotion,
-  transition: Box<dyn Transition>,
+  #[declare(custom, default = default_transition())]
+  transition: Rc<Box<dyn Transition>>,
+  #[declare(default)]
   init_pos: Anchor,
+  #[declare(custom, default)]
   init_width: Option<Measure>,
+  #[declare(custom, default)]
   init_height: Option<Measure>,
-  /// Interpolation endpoints, owned directly (never accessed from closures).
-  target: Cell<Rect>,
-  from: Cell<Rect>,
-  /// True once the first layout has completed.
-  layout_settled: Cell<bool>,
-  /// Shared with `once_before_layout` closures: phase and schedule-guard.
-  anim: Rc<SharedAnimState>,
+  #[declare(skip, default = Rc::new(Cell::new(SmoothRuntime::default())))]
+  runtime: Rc<Cell<SmoothRuntime>>,
 }
 
-/// Creates a `fn_widget` with [`SmoothLayout`] as its root widget.
-///
-/// This is a convenience shorthand for:
-/// ```rust,ignore
-/// fn_widget! { @SmoothLayout { $($t)* } }
-/// ```
-///
-/// # Example
-/// ```rust,ignore
-/// smooth_layout! {
-///   axes: SmoothAxes::SIZE,
-///   init_size: Size::splat(0f32.into()),
-///   @MyWidget {}
-/// }
-/// ```
-#[macro_export]
-macro_rules! smooth_layout {
-  ($($t: tt)*) => { fn_widget! { @SmoothLayout { $($t)* } } };
+#[derive(Clone, Copy)]
+struct ActiveTween {
+  from: Rect,
+  to: Rect,
+  started_at: Instant,
+}
+
+#[derive(Clone, Copy, Default)]
+struct SmoothRuntime {
+  /// Latest target geometry. `measure` writes the size; `adjust_position`
+  /// writes the origin.
+  target: Rect,
+  /// True after the first full target has been committed.
+  initialized: bool,
+  /// Active animation timeline, if any.
+  active: Option<ActiveTween>,
 }
 
 /// Interpolate `from` → `to` per-axis, leaving non-selected axes at `to`.
@@ -238,109 +233,47 @@ fn lerp_rect_axes(from: &Rect, to: &Rect, factor: f32, axes: SmoothAxes) -> Rect
   out
 }
 
-/// Tracks the three mutually-exclusive animation phases.
-///
-/// - `Idle`: no animation running.
-/// - `Pending`: animation was initiated this frame; `started_at` will be set to
-///   `Instant::now()` in the next `once_before_layout` callback so the first
-///   interpolated frame starts from elapsed ≈ 0.
-/// - `Running(Instant)`: actively animating since the recorded start time.
-#[derive(Clone, Copy, Default)]
-enum AnimPhase {
-  #[default]
-  Idle,
-  Pending,
-  Running(Instant),
-}
-
-/// State shared via `Rc` between `SmoothLayout` and `once_before_layout`
-/// closures. Contains only what the closures actually need.
-#[derive(Default)]
-struct SharedAnimState {
-  phase: Cell<AnimPhase>,
-  scheduled: Cell<bool>,
-}
-
 impl SmoothLayout {
   fn has_pos_axes(&self) -> bool { self.axes.intersects(SmoothAxes::POS) }
 
   fn has_size_axes(&self) -> bool { self.axes.intersects(SmoothAxes::SIZE) }
 
-  /// Compute the current interpolated geometry.
-  ///
-  /// Non-selected axes always return the target value.
-  fn current(&self) -> Rect {
-    let factor = match self.anim.phase.get() {
-      AnimPhase::Idle => return self.target.get(),
-      // Animation just started this frame — use factor 0 to guarantee
-      // deterministic first-frame output at exact `from`.
-      AnimPhase::Pending => 0.0,
-      AnimPhase::Running(started) => self
-        .transition
-        .rate_of_change(Instant::now() - started)
-        .value(),
+  fn target_size(&self) -> Size { self.runtime.get().target.size }
+
+  fn sample_presented_rect(&self, runtime: &mut SmoothRuntime, now: Instant) -> Rect {
+    let Some(active) = runtime.active else {
+      return runtime.target;
     };
-    lerp_rect_axes(&self.from.get(), &self.target.get(), factor, self.axes)
-  }
 
-  fn is_animating(&self) -> bool {
-    match self.anim.phase.get() {
-      AnimPhase::Idle => false,
-      AnimPhase::Pending => true,
-      AnimPhase::Running(started) => !self
-        .transition
-        .rate_of_change(Instant::now() - started)
-        .is_finish(),
+    let progress = self
+      .transition
+      .rate_of_change(now - active.started_at);
+    if progress.is_finish() {
+      runtime.active = None;
+      active.to
+    } else {
+      lerp_rect_axes(&active.from, &active.to, progress.value(), self.axes)
     }
   }
 
-  fn target_size(&self) -> Size { self.target.get().size }
-
-  fn animated_size(&self) -> Size { self.current().size }
-
-  fn layout_size(&self) -> Size {
-    match self.layout_impact {
-      LayoutImpact::NoLayout => self.target_size(),
-      LayoutImpact::SelfLayout | LayoutImpact::SubtreeLayout => self.animated_size(),
-    }
+  fn presented_rect(&self, now: Instant) -> Rect {
+    let mut runtime = self.runtime.get();
+    let rect = self.sample_presented_rect(&mut runtime, now);
+    self.runtime.set(runtime);
+    rect
   }
 
-  fn basis_size(&self) -> Size {
-    match self.layout_impact {
-      LayoutImpact::SubtreeLayout => self.animated_size(),
-      LayoutImpact::NoLayout | LayoutImpact::SelfLayout => self.target_size(),
-    }
+  fn is_animating(&self, now: Instant) -> bool {
+    // Advance animation state (may clear `active` when the tween finishes).
+    self.presented_rect(now);
+    self.runtime.get().active.is_some()
   }
 
-  fn layout_pos(&self) -> Point { self.current().origin }
+  fn animated_size(&self, now: Instant) -> Size { self.presented_rect(now).size }
 
-  fn set_target_origin(&self, origin: Point) {
-    let mut t = self.target.get();
-    t.origin = origin;
-    self.target.set(t);
-  }
-
-  fn set_target_size(&self, size: Size) {
-    let mut t = self.target.get();
-    t.size = size;
-    self.target.set(t);
-  }
-
-  fn set_from_origin(&self, origin: Point) {
-    let mut t = self.from.get();
-    t.origin = origin;
-    self.from.set(t);
-  }
-
-  fn set_from_size(&self, size: Size) {
-    let mut t = self.from.get();
-    t.size = size;
-    self.from.set(t);
-  }
-
-  fn scale_factor(&self) -> Vector {
-    let basis = self.basis_size();
-    let animated = self.animated_size();
+  fn scale_factor(&self, now: Instant) -> Vector {
+    let basis = self.target_size();
+    let animated = self.animated_size(now);
 
     let sx = if basis.width > 0. { animated.width / basis.width } else { 1. };
     let sy = if basis.height > 0. { animated.height / basis.height } else { 1. };
@@ -350,247 +283,104 @@ impl SmoothLayout {
   fn required_dirty_phase(&self) -> DirtyPhase {
     if !self.has_size_axes() && self.has_pos_axes() {
       DirtyPhase::Position
-    } else if self.has_size_axes()
-      && self.layout_impact == LayoutImpact::NoLayout
-      && !self.has_pos_axes()
-    {
+    } else if self.has_size_axes() && self.size_mode == SizeMode::Visual && !self.has_pos_axes() {
       DirtyPhase::Paint
     } else {
       DirtyPhase::Layout
     }
   }
 
-  fn is_content_motion_active(&self, animations_on: bool) -> bool {
-    self.has_size_axes() && animations_on && self.is_animating()
+  fn is_content_motion_active(&self, animations_on: bool, now: Instant) -> bool {
+    self.has_size_axes()
+      && self.size_mode == SizeMode::Visual
+      && animations_on
+      && self.is_animating(now)
   }
 
-  fn resolve_init_size(&self, clamp_max: Size, fallback: Size) -> Option<Size> {
-    if !self.has_size_axes() {
-      return None;
+  fn resolve_init_rect(&self, target: Rect, clamp: BoxClamp) -> Option<Rect> {
+    let mut from = target;
+
+    if self.has_size_axes() {
+      if self.axes.contains(SmoothAxes::W)
+        && let Some(v) = self.init_width
+      {
+        from.size.width = v.into_pixel(clamp.max.width);
+      }
+      if self.axes.contains(SmoothAxes::H)
+        && let Some(v) = self.init_height
+      {
+        from.size.height = v.into_pixel(clamp.max.height);
+      }
     }
 
-    let mut width = fallback.width;
-    let mut height = fallback.height;
-    let mut has_init = false;
-
-    if self.axes.contains(SmoothAxes::W)
-      && let Some(v) = self.init_width
-    {
-      width = v.into_pixel(clamp_max.width);
-      has_init = true;
-    }
-
-    if self.axes.contains(SmoothAxes::H)
-      && let Some(v) = self.init_height
-    {
-      height = v.into_pixel(clamp_max.height);
-      has_init = true;
-    }
-
-    has_init.then_some(Size::new(width, height))
-  }
-
-  fn resolve_init_pos(&self, size: Size, clamp: BoxClamp, fallback: Point) -> Option<Point> {
-    let mut x = fallback.x;
-    let mut y = fallback.y;
-    let mut has_init = false;
-
-    let max = Size::new(clamp.container_width(size.width), clamp.container_height(size.height));
-
+    let max =
+      Size::new(clamp.container_width(from.size.width), clamp.container_height(from.size.height));
     if self.axes.contains(SmoothAxes::X)
       && let Some(anchor) = &self.init_pos.x
     {
-      x = anchor.calculate(max.width, size.width);
-      has_init = true;
+      from.origin.x = anchor.calculate(max.width, from.size.width);
     }
-
     if self.axes.contains(SmoothAxes::Y)
       && let Some(anchor) = &self.init_pos.y
     {
-      y = anchor.calculate(max.height, size.height);
-      has_init = true;
+      from.origin.y = anchor.calculate(max.height, from.size.height);
     }
 
-    has_init.then_some(Point::new(x, y))
+    (from != target).then_some(from)
   }
-}
 
-// --- Animation control ---
-
-impl SmoothLayout {
-  /// Mark animation as pending.
-  fn begin_animation(&self) { self.anim.phase.set(AnimPhase::Pending); }
-
-  /// Stop the animation if it has finished.
-  fn stop_if_idle(&self) {
-    if self.is_animating() {
-      return;
+  fn start_tween(
+    &self, runtime: &mut SmoothRuntime, from: Rect, to: Rect, started_at: Instant,
+    animations_on: bool,
+  ) {
+    if !animations_on || self.axes.is_empty() || from == to {
+      runtime.active = None;
+    } else {
+      runtime.active = Some(ActiveTween { from, to, started_at });
     }
-    self.anim.phase.set(AnimPhase::Idle);
   }
 
-  /// Schedule dirty marking for the next animation frame via
-  /// `once_before_layout`.
-  ///
-  /// The callback self-chains while animation is running, so frame progression
-  /// does not depend on layout/position hooks being triggered.
-  fn schedule_animation_frame(
-    &self, window: &Rc<Window>, widget_id: WidgetId, marker: &crate::widget_tree::DirtyMarker,
-  ) {
-    if self.anim.scheduled.get() {
-      return;
-    }
-    Self::schedule_animation_frame_inner(
-      window.clone(),
-      widget_id,
-      marker.clone(),
-      self.anim.clone(),
-      self.transition.dyn_clone(),
-      self.required_dirty_phase(),
-    );
-  }
-
-  fn schedule_animation_frame_inner(
-    window: Rc<Window>, widget_id: WidgetId, marker: crate::widget_tree::DirtyMarker,
-    anim: Rc<SharedAnimState>, transition: Box<dyn Transition>, dirty: DirtyPhase,
-  ) {
-    anim.scheduled.set(true);
-    let wnd = window.clone();
-    window.once_before_layout(move || {
-      anim.scheduled.set(false);
-
-      // Transition from pending to active: set the real start time now so
-      // the first interpolated frame starts from elapsed ≈ 0.
-      if matches!(anim.phase.get(), AnimPhase::Pending) {
-        anim.phase.set(AnimPhase::Running(Instant::now()));
-      }
-
-      let animating = if let AnimPhase::Running(started) = anim.phase.get() {
-        !transition
-          .rate_of_change(Instant::now() - started)
-          .is_finish()
-      } else {
-        false
-      };
-
-      // Mark dirty for one more frame (either continuing animation or
-      // settling at exact target on the final frame).
-      marker.mark(widget_id, dirty);
-
-      if animating {
-        Self::schedule_animation_frame_inner(wnd, widget_id, marker, anim, transition, dirty);
-      } else {
-        anim.phase.set(AnimPhase::Idle);
-      }
-    });
-  }
-
-  fn update_target_size(
-    &self, widget_id: WidgetId, target_size: Size, clamp_max: Size, animations_on: bool,
-    window: &Rc<Window>, marker: &crate::widget_tree::DirtyMarker,
-  ) {
-    let size_changed = self.target.get().size != target_size;
-    // Capture current visual position BEFORE updating target: `current()` falls
-    // back to `target` when no animation is running, so it must be read first.
-    let current = self.current();
-    self.set_target_size(target_size);
-
-    if !animations_on || !self.has_size_axes() {
-      self.stop_if_idle();
+  fn try_commit_initial_target(&self, clamp: BoxClamp, window: &Rc<Window>) {
+    let mut runtime = self.runtime.get();
+    if runtime.initialized {
       return;
     }
 
-    if !self.layout_settled.get() {
-      // First layout: start from init value.
-      let from_size = self
-        .resolve_init_size(clamp_max, target_size)
-        .unwrap_or(target_size);
-      self.set_from_size(from_size);
-      if from_size != target_size {
-        self.begin_animation();
-      }
-    } else if size_changed {
-      // Retarget from current visual position.
-      self.from.set(current);
-      self.begin_animation();
-    }
-
-    if self.is_animating() {
-      self.schedule_animation_frame(window, widget_id, marker);
-    }
+    let now = Instant::now();
+    let target = runtime.target;
+    let from = self
+      .resolve_init_rect(target, clamp)
+      .unwrap_or(target);
+    runtime.initialized = true;
+    self.start_tween(&mut runtime, from, target, now, animations_enabled(window));
+    self.runtime.set(runtime);
   }
 
-  #[allow(clippy::too_many_arguments)]
-  fn update_target_pos(
-    &self, widget_id: WidgetId, target_pos: Point, size: Size, clamp: BoxClamp,
-    animations_on: bool, window: &Rc<Window>, marker: &crate::widget_tree::DirtyMarker,
-  ) {
-    let pos_changed = self.target.get().origin != target_pos;
-    // Capture current visual position BEFORE updating target: `current()` falls
-    // back to `target` when no animation is running, so it must be read first.
-    let current = self.current();
-    self.set_target_origin(target_pos);
-
-    if !animations_on || !self.has_pos_axes() {
-      self.stop_if_idle();
-      self.layout_settled.set(true);
+  fn retarget_to(&self, new_target: Rect, window: &Rc<Window>) {
+    let mut runtime = self.runtime.get();
+    let now = Instant::now();
+    let current = self.sample_presented_rect(&mut runtime, now);
+    if runtime.target == new_target {
+      self.runtime.set(runtime);
       return;
     }
 
-    if !self.layout_settled.get() {
-      let from_pos = self
-        .resolve_init_pos(size, clamp, target_pos)
-        .unwrap_or(target_pos);
-      self.set_from_origin(from_pos);
-      if from_pos != target_pos {
-        self.begin_animation();
-      }
-      self.layout_settled.set(true);
-    } else if pos_changed {
-      // Retarget from current visual position.
-      self.from.set(current);
-      self.begin_animation();
-    }
-
-    if self.is_animating() {
-      self.schedule_animation_frame(window, widget_id, marker);
-    }
+    runtime.target = new_target;
+    self.start_tween(&mut runtime, current, new_target, now, animations_enabled(window));
+    self.runtime.set(runtime);
   }
 }
 
 impl Drop for SmoothLayout {
   fn drop(&mut self) {
-    // Set phase = Idle so that any still-queued `once_before_layout` closures
-    // (which share `anim` via `Rc`) see `phase = Idle` and stop the chain.
-    self.anim.phase.set(AnimPhase::Idle);
+    let mut runtime = self.runtime.get();
+    runtime.active = None;
+    self.runtime.set(runtime);
   }
 }
 
 fn point_in_size(pos: Point, size: Size) -> bool {
   pos.x >= 0. && pos.y >= 0. && pos.x <= size.width && pos.y <= size.height
-}
-
-fn apply_size_axes_to_clamp(clamp: &mut BoxClamp, axes: SmoothAxes, size: Size) {
-  if axes.contains(SmoothAxes::W) {
-    clamp.min.width = size.width;
-    clamp.max.width = size.width;
-  }
-
-  if axes.contains(SmoothAxes::H) {
-    clamp.min.height = size.height;
-    clamp.max.height = size.height;
-  }
-}
-
-fn combine_dirty_phase(wrapper: DirtyPhase, host: DirtyPhase) -> DirtyPhase {
-  use DirtyPhase::*;
-
-  match (wrapper, host) {
-    (LayoutSubtree, _) | (_, LayoutSubtree) => LayoutSubtree,
-    (Layout, _) | (_, Layout) => Layout,
-    (Position, _) | (_, Position) => Position,
-    (Paint, Paint) => Paint,
-  }
 }
 
 fn animations_enabled(window: &Rc<Window>) -> bool {
@@ -607,23 +397,41 @@ impl<'c> ComposeChild<'c> for SmoothLayout {
 
 impl WrapRender for SmoothLayout {
   fn measure(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut MeasureCtx) -> Size {
-    let widget_id = ctx.widget_id();
     let window = ctx.window();
-    let animations_on = animations_enabled(&window);
-    let marker = ctx.tree.dirty_marker();
-
     let target_size = host.measure(clamp, ctx);
-    self.update_target_size(widget_id, target_size, clamp.max, animations_on, &window, &marker);
+    let mut runtime = self.runtime.get();
+    if runtime.initialized {
+      let mut new_target = runtime.target;
+      self.runtime.set(runtime);
+      new_target.size = target_size;
+      self.retarget_to(new_target, &window);
+    } else {
+      runtime.target.size = target_size;
+      self.runtime.set(runtime);
+      // No pos axes: commit now. With pos axes: wait for adjust_position
+      // (always follows measure) to supply the full origin first.
+      if !self.has_pos_axes() {
+        self.try_commit_initial_target(clamp, &window);
+      }
+    }
 
-    let layout_size = self.layout_size();
+    let now = Instant::now();
+    let layout_size = if self.has_size_axes() && self.size_mode == SizeMode::Layout {
+      self.animated_size(now)
+    } else {
+      self.target_size()
+    };
 
-    if self.has_size_axes()
-      && self.layout_impact == LayoutImpact::SubtreeLayout
-      && animations_on
-      && layout_size != target_size
-    {
+    if self.has_size_axes() && self.size_mode == SizeMode::Layout && layout_size != target_size {
       let mut smooth_clamp = clamp;
-      apply_size_axes_to_clamp(&mut smooth_clamp, self.axes, layout_size);
+      if self.axes.contains(SmoothAxes::W) {
+        smooth_clamp.min.width = layout_size.width;
+        smooth_clamp.max.width = layout_size.width;
+      }
+      if self.axes.contains(SmoothAxes::H) {
+        smooth_clamp.min.height = layout_size.height;
+        smooth_clamp.max.height = layout_size.height;
+      }
       host.measure(smooth_clamp, ctx)
     } else {
       layout_size
@@ -631,46 +439,48 @@ impl WrapRender for SmoothLayout {
   }
 
   fn place_children(&self, size: Size, host: &dyn Render, ctx: &mut PlaceCtx) {
-    if self.has_size_axes() && self.layout_impact != LayoutImpact::SubtreeLayout {
-      host.place_children(self.basis_size(), ctx)
+    if self.has_size_axes() && self.size_mode == SizeMode::Visual {
+      host.place_children(self.target_size(), ctx)
     } else {
       host.place_children(size, ctx)
     }
   }
 
   fn adjust_position(&self, host: &dyn Render, pos: Point, ctx: &mut PlaceCtx) -> Point {
-    let widget_id = ctx.widget_id();
     let target_pos = host.adjust_position(pos, ctx);
     let window = ctx.window();
-    let animations_on = animations_enabled(&window);
-    let size = ctx.widget_box_size(widget_id).unwrap_or_default();
     let clamp = ctx.clamp();
-    let marker = ctx.tree.dirty_marker();
-    let first = !self.layout_settled.get();
-
-    // When both pos and size axes are active and past the first layout,
-    // position follows target directly -- size animation already accounts for
-    // the visual shift.
-    if animations_on && self.has_size_axes() && self.has_pos_axes() && !first {
-      if self.target.get().origin != target_pos {
-        self.set_target_origin(target_pos);
-      }
-      return target_pos;
+    let mut runtime = self.runtime.get();
+    if runtime.initialized {
+      let mut new_target = runtime.target;
+      self.runtime.set(runtime);
+      new_target.origin = target_pos;
+      self.retarget_to(new_target, &window);
+    } else {
+      runtime.target.origin = target_pos;
+      self.runtime.set(runtime);
+      self.try_commit_initial_target(clamp, &window);
     }
 
-    self.update_target_pos(widget_id, target_pos, size, clamp, animations_on, &window, &marker);
-    self.layout_pos()
+    self.presented_rect(Instant::now()).origin
   }
 
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
-    if self.is_content_motion_active(animations_enabled(&ctx.window())) {
+    let now = Instant::now();
+
+    // Sample BEFORE is_content_motion_active, which advances the tween via
+    // sample_presented_rect and may clear `active`. Sampling here ensures the
+    // final dirty mark is not missed on the last frame of an animation.
+    let was_active = self.runtime.get().active.is_some();
+
+    if self.is_content_motion_active(animations_enabled(&ctx.window()), now) {
       match self.content_motion {
         ContentMotion::ClipReveal => {
-          let rect = Rect::from_size(self.animated_size());
+          let rect = Rect::from_size(self.animated_size(now));
           ctx.box_painter().clip(Path::rect(&rect).into());
         }
         ContentMotion::Scale => {
-          let scale = self.scale_factor();
+          let scale = self.scale_factor(now);
           if scale != Vector::one() {
             ctx.painter().scale(scale.x, scale.y);
           }
@@ -678,18 +488,30 @@ impl WrapRender for SmoothLayout {
       }
     }
 
-    host.paint(ctx)
+    host.paint(ctx);
+
+    // Drive the frame loop. Covers both cases: tween still running (active
+    // is Some) and just-finished (active now None → one last mark to render
+    // the settled state, then the loop stops naturally).
+    if was_active {
+      ctx
+        .window()
+        .tree()
+        .dirty_marker()
+        .mark(ctx.widget_id(), self.required_dirty_phase());
+    }
   }
 
   fn hit_test(&self, host: &dyn Render, ctx: &mut HitTestCtx, pos: Point) -> HitTest {
-    if !self.is_content_motion_active(animations_enabled(&ctx.window())) {
+    let now = Instant::now();
+    if !self.is_content_motion_active(animations_enabled(&ctx.window()), now) {
       return host.hit_test(ctx, pos);
     }
 
     let box_pos = ctx.box_pos().unwrap_or(Point::zero());
     let local_pos = pos - box_pos.to_vector();
-    let animated_size = self.animated_size();
-    let scale = self.scale_factor();
+    let animated_size = self.animated_size(now);
+    let scale = self.scale_factor(now);
 
     match self.content_motion {
       ContentMotion::ClipReveal => {
@@ -712,14 +534,16 @@ impl WrapRender for SmoothLayout {
   }
 
   fn get_transform(&self, host: &dyn Render) -> Option<Transform> {
-    // Scale transform applies whenever the scale animation is geometrically
-    // active, regardless of the window ANIMATIONS flag.
-    if self.content_motion != ContentMotion::Scale || !self.has_size_axes() || !self.is_animating()
+    let now = Instant::now();
+    if self.content_motion != ContentMotion::Scale
+      || !self.has_size_axes()
+      || self.size_mode != SizeMode::Visual
+      || !self.is_animating(now)
     {
       return host.get_transform();
     }
 
-    let scale = self.scale_factor();
+    let scale = self.scale_factor(now);
     if scale == Vector::one() {
       return host.get_transform();
     }
@@ -729,30 +553,23 @@ impl WrapRender for SmoothLayout {
   }
 
   fn dirty_phase(&self, host: &dyn Render) -> DirtyPhase {
-    combine_dirty_phase(self.wrapper_dirty_phase(), host.dirty_phase())
+    use DirtyPhase::*;
+    match (self.required_dirty_phase(), host.dirty_phase()) {
+      (LayoutSubtree, _) | (_, LayoutSubtree) => LayoutSubtree,
+      (Layout, _) | (_, Layout) => Layout,
+      (Position, _) | (_, Position) => Position,
+      (Paint, Paint) => Paint,
+    }
   }
 
   fn wrapper_dirty_phase(&self) -> DirtyPhase { self.required_dirty_phase() }
 }
 
-fn default_transition() -> Box<dyn Transition> {
-  Box::new(EasingTransition { easing: easing::LinearEasing, duration: Duration::from_millis(200) })
-}
-
-/// Builder for [`SmoothLayout`].
-///
-/// Created via [`SmoothLayout::declarer`] and normally used implicitly through
-/// the `@SmoothLayout { … }` or [`smooth_layout!`] DSL.
-#[derive(Default)]
-pub struct SmoothLayoutDeclarer {
-  transition: Option<Box<dyn Transition>>,
-  axes: SmoothAxes,
-  layout_impact: LayoutImpact,
-  content_motion: ContentMotion,
-  init_pos: Anchor,
-  init_width: Option<Measure>,
-  init_height: Option<Measure>,
-  fat_obj: FatObj<()>,
+fn default_transition() -> Rc<Box<dyn Transition>> {
+  Rc::new(Box::new(EasingTransition {
+    easing: easing::LinearEasing,
+    duration: Duration::from_millis(200),
+  }))
 }
 
 impl SmoothLayoutDeclarer {
@@ -760,42 +577,7 @@ impl SmoothLayoutDeclarer {
   ///
   /// Defaults to a 200 ms linear ease when not specified.
   pub fn with_transition(&mut self, transition: impl Transition + 'static) -> &mut Self {
-    self.transition = Some(Box::new(transition));
-    self
-  }
-
-  /// Set how the animated size is reported to the layout system.
-  ///
-  /// See [`LayoutImpact`] for available options. Defaults to
-  /// [`LayoutImpact::SelfLayout`].
-  pub fn with_layout_impact(&mut self, impact: LayoutImpact) -> &mut Self {
-    self.layout_impact = impact;
-    self
-  }
-
-  /// Set the visual effect applied to content during a size animation.
-  ///
-  /// See [`ContentMotion`] for available options. Defaults to
-  /// [`ContentMotion::ClipReveal`].
-  pub fn with_content_motion(&mut self, motion: ContentMotion) -> &mut Self {
-    self.content_motion = motion;
-    self
-  }
-
-  /// Restrict animation to the specified axes.
-  ///
-  /// Defaults to [`SmoothAxes::ALL`].
-  pub fn with_axes(&mut self, axes: SmoothAxes) -> &mut Self {
-    self.axes = axes;
-    self
-  }
-
-  /// Set the initial position (both X and Y) for the entry animation.
-  ///
-  /// Only used on first appearance. If not set, the widget starts at its
-  /// target position (no entry animation).
-  pub fn with_init_pos(&mut self, init: impl Into<Anchor>) -> &mut Self {
-    self.init_pos = init.into();
+    self.transition = Some(Rc::new(Box::new(transition)));
     self
   }
 
@@ -805,20 +587,22 @@ impl SmoothLayoutDeclarer {
   /// of the containing box. Only used on first appearance.
   pub fn with_init_size(&mut self, init: impl Into<Size<Measure>>) -> &mut Self {
     let init = init.into();
-    self.init_width = Some(init.width);
-    self.init_height = Some(init.height);
+    self.init_width = Some(Some(init.width));
+    self.init_height = Some(Some(init.height));
     self
   }
 
   /// Set the initial X position for the entry animation.
   pub fn with_init_x(&mut self, init: impl Into<AnchorX>) -> &mut Self {
-    self.init_pos.x = Some(init.into());
+    let pos = self.init_pos.get_or_insert_with(Anchor::default);
+    pos.x = Some(init.into());
     self
   }
 
   /// Set the initial Y position for the entry animation.
   pub fn with_init_y(&mut self, init: impl Into<AnchorY>) -> &mut Self {
-    self.init_pos.y = Some(init.into());
+    let pos = self.init_pos.get_or_insert_with(Anchor::default);
+    pos.y = Some(init.into());
     self
   }
 
@@ -827,7 +611,7 @@ impl SmoothLayoutDeclarer {
   /// Accepts absolute pixels (`5.0_f32.into()`) or a percentage
   /// (`50.percent()`). Only used on first appearance.
   pub fn with_init_width(&mut self, init: impl Into<Measure>) -> &mut Self {
-    self.init_width = Some(init.into());
+    self.init_width = Some(Some(init.into()));
     self
   }
 
@@ -836,55 +620,8 @@ impl SmoothLayoutDeclarer {
   /// Accepts absolute pixels (`5.0_f32.into()`) or a percentage
   /// (`50.percent()`). Only used on first appearance.
   pub fn with_init_height(&mut self, init: impl Into<Measure>) -> &mut Self {
-    self.init_height = Some(init.into());
+    self.init_height = Some(Some(init.into()));
     self
-  }
-}
-
-impl std::ops::Deref for SmoothLayoutDeclarer {
-  type Target = FatObj<()>;
-  fn deref(&self) -> &Self::Target { &self.fat_obj }
-}
-
-impl std::ops::DerefMut for SmoothLayoutDeclarer {
-  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.fat_obj }
-}
-
-impl Declare for SmoothLayout {
-  type Builder = SmoothLayoutDeclarer;
-
-  fn declarer() -> Self::Builder {
-    SmoothLayoutDeclarer { axes: SmoothAxes::ALL, ..Default::default() }
-  }
-}
-
-impl ObjDeclarer for SmoothLayoutDeclarer {
-  type Target = FatObj<SmoothLayout>;
-
-  fn finish(self) -> Self::Target {
-    let Self {
-      transition,
-      axes,
-      layout_impact,
-      content_motion,
-      init_pos,
-      init_width,
-      init_height,
-      fat_obj,
-    } = self;
-    fat_obj.map(|_| SmoothLayout {
-      axes,
-      layout_impact,
-      content_motion,
-      transition: transition.unwrap_or_else(default_transition),
-      init_pos,
-      init_width,
-      init_height,
-      target: Cell::default(),
-      from: Cell::default(),
-      layout_settled: Cell::default(),
-      anim: Rc::new(SharedAnimState::default()),
-    })
   }
 }
 
@@ -1025,7 +762,7 @@ mod tests {
     reset_test_env!();
 
     assert_widget_eq_image!(
-      WidgetTester::new(crate::smooth_layout! {
+      WidgetTester::new(self::smooth_layout! {
         axes: SmoothAxes::SIZE,
         transition: TEST_TRANS,
         init_size: Size::splat(50.percent()),
@@ -1037,7 +774,7 @@ mod tests {
     );
 
     assert_widget_eq_image!(
-      WidgetTester::new(crate::smooth_layout! {
+      WidgetTester::new(self::smooth_layout! {
         axes: SmoothAxes::SIZE,
         transition: TEST_TRANS,
         init_size: Size::splat(5f32.into()),
@@ -1049,7 +786,7 @@ mod tests {
     );
 
     assert_widget_eq_image!(
-      WidgetTester::new(crate::smooth_layout! {
+      WidgetTester::new(self::smooth_layout! {
         axes: SmoothAxes::SIZE,
         transition: TEST_TRANS,
         @center_red_block_10_x_10()
@@ -1247,7 +984,7 @@ mod tests {
   }
 
   #[test]
-  fn smooth_layout_no_layout_size_keeps_redrawing_while_animating() {
+  fn smooth_layout_visual_size_keeps_redrawing_while_animating() {
     reset_test_env!();
 
     const SHORT_TRANS: EasingTransition<LinearEasing> =
@@ -1257,7 +994,7 @@ mod tests {
       fn_widget! {
         @SmoothLayout {
           axes: SmoothAxes::SIZE,
-          layout_impact: LayoutImpact::NoLayout,
+          size_mode: SizeMode::Visual,
           content_motion: ContentMotion::ClipReveal,
           transition: SHORT_TRANS,
           init_size: Size::splat(10f32.into()),
@@ -1285,9 +1022,82 @@ mod tests {
 
     assert!(
       redraw_count >= 2,
-      "expected smooth no-layout size animation to redraw across multiple frames, \
+      "expected smooth visual size animation to redraw across multiple frames, \
        redraw_count={redraw_count}",
     );
+  }
+
+  #[test]
+  fn smooth_layout_layout_mode_updates_layout_size_while_animating() {
+    reset_test_env!();
+
+    const SHORT_TRANS: EasingTransition<LinearEasing> =
+      EasingTransition { easing: easing::LinearEasing, duration: Duration::from_millis(120) };
+
+    let tracker = Stateful::new(None);
+    let wnd = TestWindow::new(
+      fn_widget! {
+        @SmoothLayout {
+          on_mounted: move |e| *$write(tracker) = Some(e.current_target()),
+          axes: SmoothAxes::SIZE,
+          size_mode: SizeMode::Layout,
+          transition: SHORT_TRANS,
+          init_size: Size::splat(10f32.into()),
+          @MockBox {
+            size: Size::new(100., 100.),
+          }
+        }
+      },
+      Size::new(200., 200.),
+      WindowFlags::ANIMATIONS,
+    );
+
+    wnd.draw_frame();
+    let id = (*tracker.read()).unwrap();
+    let size_1 = wnd.widget_size(id).unwrap();
+    assert!(size_1.width < 100. && size_1.height < 100., "size_1={size_1:?}");
+
+    std::thread::sleep(Duration::from_millis(20));
+    wnd.draw_frame();
+    let size_2 = wnd.widget_size(id).unwrap();
+    assert!(size_2.width > size_1.width, "size_1={size_1:?}, size_2={size_2:?}");
+    assert!(size_2.height > size_1.height, "size_1={size_1:?}, size_2={size_2:?}");
+  }
+
+  #[test]
+  fn smooth_layout_visual_mode_keeps_target_layout_size_while_animating() {
+    reset_test_env!();
+
+    const SHORT_TRANS: EasingTransition<LinearEasing> =
+      EasingTransition { easing: easing::LinearEasing, duration: Duration::from_millis(120) };
+
+    let tracker = Stateful::new(None);
+    let wnd = TestWindow::new(
+      fn_widget! {
+        @SmoothLayout {
+          on_mounted: move |e| *$write(tracker) = Some(e.current_target()),
+          axes: SmoothAxes::SIZE,
+          size_mode: SizeMode::Visual,
+          transition: SHORT_TRANS,
+          init_size: Size::splat(10f32.into()),
+          @MockBox {
+            size: Size::new(100., 100.),
+          }
+        }
+      },
+      Size::new(200., 200.),
+      WindowFlags::ANIMATIONS,
+    );
+
+    wnd.draw_frame();
+    let id = (*tracker.read()).unwrap();
+    let size_1 = wnd.widget_size(id).unwrap();
+    assert_eq!(size_1, Size::new(100., 100.));
+
+    std::thread::sleep(Duration::from_millis(20));
+    wnd.draw_frame();
+    let size_2 = wnd.widget_size(id).unwrap();
+    assert_eq!(size_2, Size::new(100., 100.));
   }
 
   #[test]
