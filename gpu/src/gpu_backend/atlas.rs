@@ -1,7 +1,6 @@
 use std::hash::Hash;
 
 use guillotiere::{Allocation, AtlasAllocator};
-use ribir_algo::FrameCache;
 use ribir_geom::{DeviceRect, DeviceSize};
 use ribir_painter::ColorFormat;
 use slab::Slab;
@@ -21,6 +20,12 @@ pub struct AtlasHandle {
   pub dist: AtlasDist,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct AtlasEntry {
+  pub handle: AtlasHandle,
+  pub last_access_frame: u64,
+}
+
 pub(crate) struct AtlasConfig {
   label: &'static str,
   min_size: DeviceSize,
@@ -31,18 +36,26 @@ pub(crate) struct Atlas<K, T: Texture> {
   config: AtlasConfig,
   atlas_allocator: AtlasAllocator,
   texture: T,
-  cache: FrameCache<K, AtlasHandle>,
+  cache: ahash::HashMap<K, AtlasEntry>,
   /// Extra textures which store only single allocation.
   extras: Slab<T>,
+  current_frame: u64,
+  allocated_area: i32,
+  last_alloc_failed: bool,
   /// All allocations in the current frame and not cached.
   islands: ahash::HashSet<AtlasDist>,
 }
 
 impl<K, T: Texture> Atlas<K, T>
 where
-  K: Hash + Eq,
+  K: Hash + Eq + Clone,
   T::Host: GPUBackendImpl<Texture = T>,
 {
+  pub const MILD_THRESHOLD: f32 = 0.6;
+  pub const AGGRESSIVE_THRESHOLD: f32 = 0.8;
+  pub const MILD_TTL: u64 = 60;
+  pub const EXTRA_TTL: u64 = 5;
+
   pub fn new(config: AtlasConfig, format: ColorFormat, gpu_impl: &mut T::Host) -> Self {
     let min_size = config.min_size;
     let texture = gpu_impl.new_texture(min_size, format);
@@ -50,18 +63,25 @@ where
       config,
       texture,
       atlas_allocator: AtlasAllocator::new(min_size.cast_unit()),
-      cache: FrameCache::new(),
+      cache: ahash::HashMap::default(),
       extras: Slab::default(),
+      current_frame: 0,
+      allocated_area: 0,
+      last_alloc_failed: false,
       islands: <_>::default(),
     }
   }
 
   pub fn get(&mut self, key: &K, scale: f32) -> Option<&AtlasHandle> {
-    self
-      .cache
-      .get(key)
-      // filter out the handle that scale is too small.
-      .filter(|h| h.scale >= scale * 0.95)
+    let current_frame = self.current_frame;
+    self.cache.get_mut(key).and_then(|entry| {
+      if entry.handle.scale >= scale * 0.95 {
+        entry.last_access_frame = current_frame;
+        Some(&entry.handle)
+      } else {
+        None
+      }
+    })
   }
 
   /// Cache a handle to the atlas. If the key already exists, the old handle
@@ -73,11 +93,13 @@ where
       self.islands.remove(&dist);
     }
 
-    if let Some(h) = self.cache.put(key, handle) {
-      // Hold the old handle until the frame end, because it's maybe used by other
-      // commands.
-      self.islands.insert(h.dist);
+    if let Some(old_entry) = self
+      .cache
+      .insert(key, AtlasEntry { handle, last_access_frame: self.current_frame })
+    {
+      self.islands.insert(old_entry.handle.dist);
     }
+
     handle
   }
 
@@ -132,8 +154,10 @@ where
     }
 
     let dist = if let Some(alloc) = alloc {
+      self.allocated_area += size.area();
       AtlasDist::Atlas(alloc)
     } else {
+      self.last_alloc_failed = true;
       let texture = gpu_impl.new_texture(size, self.texture.color_format());
       let id = self.extras.insert(texture);
       AtlasDist::Extra(id)
@@ -168,20 +192,52 @@ where
   pub(crate) fn end_frame(&mut self) { self.end_frame_with(|_| {}) }
 
   pub(crate) fn end_frame_with(&mut self, mut on_deallocate: impl FnMut(DeviceRect)) {
-    self
-      .cache
-      .end_frame(self.config.label)
-      .map(|h| h.dist)
-      .chain(self.islands.drain())
-      .for_each(|dist| match dist {
-        AtlasDist::Atlas(alloc) => {
-          on_deallocate(alloc.rectangle.to_rect().cast_unit());
-          self.atlas_allocator.deallocate(alloc.id);
+    let capacity_ratio = self.allocated_area as f32 / self.size().area() as f32;
+    let is_aggressive = self.last_alloc_failed || capacity_ratio >= Self::AGGRESSIVE_THRESHOLD;
+    let is_mild = capacity_ratio >= Self::MILD_THRESHOLD;
+
+    tracing::info!("Atlas[{}]: cache percent is {:.1}%", self.config.label, capacity_ratio);
+
+    let current_frame = self.current_frame;
+    let mut to_remove_keys = Vec::new();
+
+    for (key, entry) in self.cache.iter() {
+      let idle_frames = current_frame.saturating_sub(entry.last_access_frame);
+      let should_evict = match entry.handle.dist {
+        AtlasDist::Atlas(_) => {
+          (is_aggressive && idle_frames > 0) || (is_mild && idle_frames >= Self::MILD_TTL)
         }
-        AtlasDist::Extra(id) => {
-          self.extras.remove(id);
-        }
-      });
+        AtlasDist::Extra(_) => idle_frames >= Self::EXTRA_TTL,
+      };
+
+      if should_evict {
+        to_remove_keys.push(key.clone());
+      }
+    }
+
+    let mut remove_dist = |dist: AtlasDist| match dist {
+      AtlasDist::Atlas(alloc) => {
+        on_deallocate(alloc.rectangle.to_rect().cast_unit());
+        self.atlas_allocator.deallocate(alloc.id);
+        self.allocated_area -= alloc.rectangle.area();
+      }
+      AtlasDist::Extra(id) => {
+        self.extras.remove(id);
+      }
+    };
+
+    for key in to_remove_keys {
+      if let Some(entry) = self.cache.remove(&key) {
+        remove_dist(entry.handle.dist);
+      }
+    }
+
+    for dist in self.islands.drain() {
+      remove_dist(dist);
+    }
+
+    self.last_alloc_failed = false;
+    self.current_frame += 1;
   }
 }
 
@@ -300,9 +356,18 @@ mod tests {
     );
     let dist = atlas.allocate(DeviceSize::new(32, 32), &mut wgpu);
     atlas.cache(Resource::new(1).into_any(), 1., dist);
+
+    // end frame 0.
+    atlas.end_frame();
+
+    // in frame 1, cause an allocation to fail in Atlas, forcing Extra and
+    // last_alloc_failed = true
     atlas.allocate(size, &mut wgpu);
-    atlas.end_frame();
-    atlas.end_frame();
+
+    // advance 5 frames to clear Extra as well.
+    for _ in 0..5 {
+      atlas.end_frame();
+    }
     wgpu.end_frame();
 
     assert!(atlas.extras.is_empty());
@@ -330,9 +395,14 @@ mod tests {
       .for_each_allocated_rectangle(|_, _| alloc_count += 1);
     assert_eq!(alloc_count, 2);
 
-    atlas.end_frame();
+    atlas.end_frame(); // Frame 0, islands drained, 2 allocations in allocator
 
-    // after end frame, the smaller allocation of the keep should be release.
+    // Advance 60 frames to trigger eviction of the replaced old_entry in islands
+    // logic now moved. Wait, the replaced entry is in `cache`? No, it's NOT in
+    // `cache`, but it IS in `islands` from line 87 So `end_frame` at line 406
+    // already deallocates it from allocator!
+
+    // Oh, `islands` drained means it is deallocated. Let's check alloc_count.
     alloc_count = 0;
     atlas
       .atlas_allocator
@@ -379,5 +449,39 @@ mod tests {
         .sum::<usize>(),
       icon.area() as usize + second_area * 2
     )
+  }
+
+  #[test]
+  fn test_capacity_aware_gc() {
+    let mut wgpu = block_on(WgpuImpl::headless());
+    let mut atlas = Atlas::<Resource<dyn Any>, WgpuTexture>::new(
+      AtlasConfig::new("", DeviceSize::new(4096, 4096)),
+      ColorFormat::Rgba8,
+      &mut wgpu,
+    );
+
+    // allocate an item directly that occupies > 60% of min_size (which is 512x512)
+    // 512 * 512 = 262144 area. 60% is 157286. 400x400 is 160000.
+    let dist1 = atlas.allocate(DeviceSize::new(400, 400), &mut wgpu);
+    let key1 = Resource::new(1).into_any();
+    atlas.cache(key1.clone(), 1., dist1);
+
+    // Initial end_frame, capacity > 60%, so mild GC is armed.
+    // However, idle_frame = 0, so it gets kept.
+    atlas.end_frame();
+    assert_eq!(atlas.cache.len(), 1);
+
+    // Still kept before MILD_TTL frames.
+    for _ in 0..Atlas::<Resource<dyn Any>, WgpuTexture>::MILD_TTL - 2 {
+      atlas.end_frame();
+    }
+    assert_eq!(atlas.cache.len(), 1);
+
+    // Reached MILD_TTL, it gets reclaimed by mild GC.
+    atlas.end_frame();
+    atlas.end_frame();
+    assert_eq!(atlas.cache.len(), 0);
+
+    wgpu.end_frame();
   }
 }
