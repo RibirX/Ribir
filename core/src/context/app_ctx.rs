@@ -214,7 +214,10 @@ impl AppCtx {
     // After init the tree is dirty; request the platform to schedule the first
     // frame directly.  winit coalesces multiple request_redraw() calls
     // automatically, so no extra Scheduler-level bookkeeping is needed here.
-    wnd.shell_wnd().borrow().request_draw(false);
+    wnd
+      .shell_wnd()
+      .borrow()
+      .request_draw(crate::window::RedrawDemand::Normal);
 
     wnd
   }
@@ -538,7 +541,10 @@ pub mod test_utils {
       wnd.run_frame_tasks();
       AppCtx::run_until_stalled();
       assert!(
-        AppCtx::send_ui_event(UiEvent::RedrawRequest { wnd_id: wnd.id(), force: false }),
+        AppCtx::send_ui_event(UiEvent::RedrawRequest {
+          wnd_id: wnd.id(),
+          demand: crate::window::RedrawDemand::Normal,
+        }),
         "failed to queue redraw request for test window",
       );
 

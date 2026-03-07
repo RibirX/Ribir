@@ -1024,7 +1024,10 @@ async fn handle_command(cmd: DebugCommand) {
 
     DebugCommand::RequestRedraw { window_id } => {
       if let Some(wnd) = resolve_target_window(window_id) {
-        wnd.shell_wnd().borrow().request_draw(true);
+        wnd
+          .shell_wnd()
+          .borrow()
+          .request_draw(crate::window::RedrawDemand::Force);
       }
     }
 
@@ -1301,7 +1304,10 @@ fn injected_to_ui_events(wnd: &Window, event: InjectedUiEvent) -> Result<Vec<UiE
       vec![UiEvent::ModifiersChanged { wnd_id: window_id, state }]
     }
     InjectedUiEvent::RedrawRequest { force } => {
-      vec![UiEvent::RedrawRequest { wnd_id: window_id, force }]
+      vec![UiEvent::RedrawRequest {
+        wnd_id: window_id,
+        demand: crate::window::RedrawDemand::from_force(force),
+      }]
     }
   };
 

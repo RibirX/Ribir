@@ -2,7 +2,10 @@ use std::{future::Future, sync::Arc};
 
 use ribir_core::{
   prelude::*,
-  window::{BoxShellWindow, Shell, ShellWindow, UiEvent, WindowAttributes, WindowId, WindowLevel},
+  window::{
+    BoxShellWindow, RedrawDemand, Shell, ShellWindow, UiEvent, WindowAttributes, WindowId,
+    WindowLevel,
+  },
 };
 use winit::dpi::{LogicalPosition, LogicalSize};
 
@@ -23,7 +26,7 @@ pub enum ShellCmd {
   Exit,
   RequestDraw {
     id: WindowId,
-    force: bool,
+    demand: RedrawDemand,
   },
   Draw {
     id: WindowId,
@@ -126,9 +129,9 @@ impl WinitShellWnd {
 
   pub(crate) fn deal_cmd(&mut self, cmd: ShellCmd) {
     match cmd {
-      ShellCmd::RequestDraw { force, .. } => {
-        if force {
-          App::send_event(UiEvent::RedrawRequest { wnd_id: self.id(), force: true });
+      ShellCmd::RequestDraw { demand, .. } => {
+        if demand.requires_forced_draw() {
+          App::send_event(UiEvent::RedrawRequest { wnd_id: self.id(), demand });
         } else {
           self.winit_wnd.request_redraw();
         }
@@ -273,10 +276,10 @@ impl ShellWindow for ShellWndHandle {
     });
   }
 
-  fn request_draw(&self, force: bool) {
+  fn request_draw(&self, demand: RedrawDemand) {
     self
       .sender
-      .send(ShellCmd::RequestDraw { id: self.id(), force });
+      .send(ShellCmd::RequestDraw { id: self.id(), demand });
   }
 
   fn position(&self) -> Point {

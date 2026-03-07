@@ -11,7 +11,7 @@ use winit::event::ElementState;
 use crate::{
   context::AppCtx,
   ticker::{FrameMsg, Instant},
-  window::{UiEvent, Window, WindowId},
+  window::{RedrawDemand, UiEvent, Window, WindowId},
 };
 
 #[cfg(debug_assertions)]
@@ -23,7 +23,7 @@ pub enum CoreMsg {
   Platform(UiEvent),
   FrameReady {
     wnd_id: WindowId,
-    force: bool,
+    demand: RedrawDemand,
   },
   /// Wake the scheduler so it can globally flush pending reactive changes.
   DataChanged,
@@ -36,25 +36,48 @@ pub enum CoreMsg {
 impl From<UiEvent> for CoreMsg {
   fn from(event: UiEvent) -> Self {
     match event {
-      UiEvent::RedrawRequest { wnd_id, force } => Self::FrameReady { wnd_id, force },
+      UiEvent::RedrawRequest { wnd_id, demand } => Self::FrameReady { wnd_id, demand },
       event => Self::Platform(event),
     }
   }
 }
 
+/// Core redraw scheduling model.
+///
+/// The event loop tracks each window on two orthogonal axes:
+///
+/// 1. `WindowPhase` describes the handshake with the platform: `Idle ->
+///    PlatformRequested -> Ready -> InFrame`.
+/// 2. `RedrawDemand` describes whether the window still owes another frame, and
+///    whether that frame must be forced.
+///
+/// High-level flow:
+///
+/// - Widget/data changes call `request_redraw`, which promotes the window's
+///   `RedrawDemand` and, if the window is `Idle`, ensures the platform has been
+///   asked for a redraw.
+/// - When the platform delivers `UiEvent::RedrawRequest`, the controller moves
+///   to `Ready`.
+/// - `run_ready_frame` consumes the current demand, runs layout/draw work, and
+///   allows frame hooks to enqueue more demand while the phase is `InFrame`.
+/// - After the frame completes, if the frame did draw, demand is promoted back
+///   to `Normal` so the scheduler can run one follow-up frame to reach a stable
+///   state. If the frame did not draw and no new demand arrived, the window
+///   stays `Idle` and redraws stop.
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum WindowPhase {
   #[default]
   Idle,
-  RedrawPending,
+  PlatformRequested,
+  Ready,
   InFrame,
 }
 
 #[derive(Clone, Debug, Default)]
 struct WindowController {
   phase: WindowPhase,
-  frame_ready: bool,
-  force_redraw: bool,
+  demand: RedrawDemand,
 }
 
 #[derive(Default)]
@@ -117,9 +140,9 @@ impl EventLoop {
       CoreMsg::Platform(event) => {
         self.on_platform_event(event);
       }
-      CoreMsg::FrameReady { wnd_id, force } => {
+      CoreMsg::FrameReady { wnd_id, demand } => {
         if let Some(wnd) = self.scheduler.get_window(wnd_id) {
-          self.scheduler.on_redraw_ready(wnd, force);
+          self.scheduler.on_redraw_ready(wnd, demand);
         }
       }
       CoreMsg::DataChanged => {
@@ -143,8 +166,8 @@ impl EventLoop {
     let Some(wnd) = self.scheduler.get_window(wnd_id) else { return };
 
     match event {
-      UiEvent::RedrawRequest { force, .. } => {
-        self.scheduler.on_redraw_ready(wnd, force);
+      UiEvent::RedrawRequest { demand, .. } => {
+        self.scheduler.on_redraw_ready(wnd, demand);
         return;
       }
       UiEvent::Resize { .. } => {
@@ -212,7 +235,7 @@ impl Scheduler {
       .collect();
     for wnd_id in wnd_ids {
       if let Some(wnd) = self.get_window(wnd_id) {
-        self.schedule_platform_redraw(wnd, false);
+        self.request_redraw(wnd, RedrawDemand::Normal);
       }
     }
 
@@ -222,46 +245,55 @@ impl Scheduler {
   fn finish_window_input(&mut self, wnd: Rc<Window>) {
     self.drain_frame_queue(&wnd);
     if !self.flush_global_changes() {
-      self.schedule_platform_redraw(wnd, false);
+      self.request_redraw(wnd, RedrawDemand::Normal);
     }
   }
 
-  fn on_resize(&mut self, wnd: Rc<Window>) { self.schedule_platform_redraw(wnd, false); }
+  fn on_resize(&mut self, wnd: Rc<Window>) { self.request_redraw(wnd, RedrawDemand::Normal); }
 
-  fn schedule_platform_redraw(&mut self, wnd: Rc<Window>, force: bool) {
+  fn request_redraw(&mut self, wnd: Rc<Window>, demand: RedrawDemand) {
     let wnd_id = wnd.id();
     let controller = self.controller_mut(wnd_id);
-    controller.force_redraw |= force;
+    controller.demand.promote(demand);
 
     if !matches!(controller.phase, WindowPhase::Idle) {
       return;
     }
 
-    wnd.shell_wnd().borrow().request_draw(force);
-    controller.frame_ready = false;
-    controller.phase = WindowPhase::RedrawPending;
+    self.ensure_platform_redraw_requested(wnd);
   }
 
-  fn on_redraw_ready(&mut self, wnd: Rc<Window>, force: bool) {
+  fn ensure_platform_redraw_requested(&mut self, wnd: Rc<Window>) {
     let wnd_id = wnd.id();
     let controller = self.controller_mut(wnd_id);
-    controller.force_redraw |= force;
-
-    if matches!(controller.phase, WindowPhase::InFrame) {
-      // Keep a redraw request that arrives during a frame so it can schedule
-      // the following frame after we return to `Idle`.
-      controller.force_redraw = true;
+    if !matches!(controller.phase, WindowPhase::Idle) || !controller.demand.requires_frame() {
       return;
     }
 
-    controller.phase = WindowPhase::RedrawPending;
-    controller.frame_ready = true;
+    wnd
+      .shell_wnd()
+      .borrow()
+      .request_draw(controller.demand);
+    controller.phase = WindowPhase::PlatformRequested;
+  }
+
+  fn on_redraw_ready(&mut self, wnd: Rc<Window>, demand: RedrawDemand) {
+    let wnd_id = wnd.id();
+    let controller = self.controller_mut(wnd_id);
+    controller.demand.promote(demand);
+
+    if matches!(controller.phase, WindowPhase::InFrame) {
+      return;
+    }
+
+    controller.phase = WindowPhase::Ready;
   }
 
   fn has_ready_frame(&self) -> bool {
-    self.controllers.values().any(|controller| {
-      matches!(controller.phase, WindowPhase::RedrawPending) && controller.frame_ready
-    })
+    self
+      .controllers
+      .values()
+      .any(|controller| matches!(controller.phase, WindowPhase::Ready))
   }
 
   async fn run_ready_frame(&mut self) -> bool {
@@ -269,8 +301,7 @@ impl Scheduler {
       .controllers
       .iter()
       .filter_map(|(wnd_id, controller)| {
-        (matches!(controller.phase, WindowPhase::RedrawPending) && controller.frame_ready)
-          .then_some(*wnd_id)
+        matches!(controller.phase, WindowPhase::Ready).then_some(*wnd_id)
       })
       .collect();
 
@@ -282,7 +313,6 @@ impl Scheduler {
       {
         let controller = self.controller_mut(wnd_id);
         controller.phase = WindowPhase::InFrame;
-        controller.frame_ready = false;
       }
 
       self.active_frame = Some(wnd_id);
@@ -295,7 +325,8 @@ impl Scheduler {
 
   async fn run_window_frame(&mut self, wnd: Rc<Window>) {
     let wnd_id = wnd.id();
-    let mut need_redraw = std::mem::take(&mut self.controller_mut(wnd_id).force_redraw);
+    let frame_demand = std::mem::take(&mut self.controller_mut(wnd_id).demand);
+    let mut need_redraw = frame_demand.requires_forced_draw();
 
     Scheduler::tick(&wnd, FrameMsg::NewFrame(Instant::now()));
     self.drain_frame_work(&wnd).await;
@@ -343,9 +374,7 @@ impl Scheduler {
 
     assert!(layout_converged, "Layout failed to converge within {MAX_LAYOUT_ITERS} iterations");
 
-    if need_redraw || wnd.need_draw() {
-      wnd.draw_frame(Some(wnd.size()));
-    }
+    let did_draw_frame = (need_redraw || wnd.need_draw()) && wnd.draw_frame(Some(wnd.size()));
 
     Scheduler::tick(&wnd, FrameMsg::Finish(Instant::now()));
     self.drain_frame_work(&wnd).await;
@@ -357,8 +386,15 @@ impl Scheduler {
       return;
     }
 
-    self.controller_mut(wnd_id).phase = WindowPhase::Idle;
-    self.schedule_platform_redraw(wnd, false);
+    {
+      let controller = self.controller_mut(wnd_id);
+      if did_draw_frame {
+        controller.demand.promote(RedrawDemand::Normal);
+      }
+      controller.phase = WindowPhase::Idle;
+    }
+
+    self.ensure_platform_redraw_requested(wnd);
   }
 
   async fn drain_frame_work(&mut self, wnd: &Window) {
@@ -380,7 +416,7 @@ impl Scheduler {
 
 #[cfg(test)]
 mod tests {
-  use super::{Scheduler, WindowPhase};
+  use super::{RedrawDemand, Scheduler, WindowPhase};
   use crate::{prelude::*, reset_test_env, test_helper::TestWindow};
 
   #[test]
@@ -390,15 +426,14 @@ mod tests {
     let mut scheduler = Scheduler::default();
 
     let wnd_ref = AppCtx::get_window(wnd.id()).unwrap();
-    scheduler.schedule_platform_redraw(wnd_ref.clone(), false);
-    scheduler.schedule_platform_redraw(wnd_ref, true);
+    scheduler.request_redraw(wnd_ref.clone(), RedrawDemand::Normal);
+    scheduler.request_redraw(wnd_ref, RedrawDemand::Force);
 
     assert_eq!(wnd.request_draw_count(), 1);
 
     let controller = scheduler.controllers.get(&wnd.id()).unwrap();
-    assert_eq!(controller.phase, WindowPhase::RedrawPending);
-    assert!(!controller.frame_ready);
-    assert!(controller.force_redraw);
+    assert_eq!(controller.phase, WindowPhase::PlatformRequested);
+    assert_eq!(controller.demand, RedrawDemand::Force);
   }
 
   #[test]
@@ -409,21 +444,74 @@ mod tests {
     let wnd_ref = AppCtx::get_window(wnd.id()).unwrap();
 
     scheduler.controller_mut(wnd.id()).phase = WindowPhase::InFrame;
-    scheduler.on_redraw_ready(wnd_ref.clone(), false);
-    assert!(
+    scheduler.on_redraw_ready(wnd_ref.clone(), RedrawDemand::Normal);
+    assert_eq!(
       scheduler
         .controllers
         .get(&wnd.id())
         .unwrap()
-        .force_redraw
+        .demand,
+      RedrawDemand::Normal
     );
 
     scheduler.controller_mut(wnd.id()).phase = WindowPhase::Idle;
-    scheduler.schedule_platform_redraw(wnd_ref, false);
+    scheduler.ensure_platform_redraw_requested(wnd_ref);
 
     assert_eq!(wnd.request_draw_count(), 1);
     let controller = scheduler.controllers.get(&wnd.id()).unwrap();
-    assert_eq!(controller.phase, WindowPhase::RedrawPending);
-    assert!(!controller.frame_ready);
+    assert_eq!(controller.phase, WindowPhase::PlatformRequested);
+    assert_eq!(controller.demand, RedrawDemand::Normal);
+  }
+
+  #[test]
+  fn drawn_frame_only_requests_one_followup_redraw() {
+    reset_test_env!();
+    let wnd = TestWindow::from_widget(fn_widget! { @Void {} });
+    let mut scheduler = Scheduler::default();
+    let wnd_ref = AppCtx::get_window(wnd.id()).unwrap();
+
+    scheduler.on_redraw_ready(wnd_ref.clone(), RedrawDemand::Normal);
+    assert!(AppCtx::run_until(scheduler.run_ready_frame()));
+    assert_eq!(wnd.request_draw_count(), 1);
+
+    let controller = scheduler.controllers.get(&wnd.id()).unwrap();
+    assert_eq!(controller.phase, WindowPhase::PlatformRequested);
+    assert_eq!(controller.demand, RedrawDemand::Normal);
+
+    scheduler.on_redraw_ready(wnd_ref, RedrawDemand::Normal);
+    assert!(AppCtx::run_until(scheduler.run_ready_frame()));
+    assert_eq!(wnd.request_draw_count(), 1);
+
+    let controller = scheduler.controllers.get(&wnd.id()).unwrap();
+    assert_eq!(controller.phase, WindowPhase::Idle);
+    assert_eq!(controller.demand, RedrawDemand::None);
+  }
+
+  #[test]
+  fn non_force_redraw_requested_during_frame_is_rescheduled_after_frame() {
+    reset_test_env!();
+    let wnd = TestWindow::from_widget(fn_widget! { @Void {} });
+    let mut scheduler = Scheduler::default();
+    let wnd_ref = AppCtx::get_window(wnd.id()).unwrap();
+
+    scheduler.controller_mut(wnd.id()).phase = WindowPhase::InFrame;
+    scheduler.request_redraw(wnd_ref.clone(), RedrawDemand::Normal);
+    assert_eq!(wnd.request_draw_count(), 0);
+    assert_eq!(
+      scheduler
+        .controllers
+        .get(&wnd.id())
+        .unwrap()
+        .demand,
+      RedrawDemand::Normal
+    );
+
+    scheduler.controller_mut(wnd.id()).phase = WindowPhase::Idle;
+    scheduler.ensure_platform_redraw_requested(wnd_ref);
+    assert_eq!(wnd.request_draw_count(), 1);
+
+    let controller = scheduler.controllers.get(&wnd.id()).unwrap();
+    assert_eq!(controller.phase, WindowPhase::PlatformRequested);
+    assert_eq!(controller.demand, RedrawDemand::Normal);
   }
 }

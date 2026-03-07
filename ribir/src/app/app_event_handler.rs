@@ -1,4 +1,4 @@
-use ribir_core::window::UiEvent;
+use ribir_core::window::{RedrawDemand, UiEvent};
 use winit::{
   application::*,
   event::{ElementState, MouseScrollDelta, WindowEvent},
@@ -37,11 +37,11 @@ impl ApplicationHandler<RibirAppEvent> for AppHandler {
         // for example, in something like i3 window manager,
         // when you switch back to the workspace that the app is in
         // in such cases, we need to re-enter the view otherwise the window stays empty
-        App::send_event(UiEvent::RedrawRequest { wnd_id, force: true });
+        App::send_event(UiEvent::RedrawRequest { wnd_id, demand: RedrawDemand::Force });
       }
       WindowEvent::RedrawRequested => {
         // if the window is not visible, don't draw it./
-        App::send_event(UiEvent::RedrawRequest { wnd_id, force: false });
+        App::send_event(UiEvent::RedrawRequest { wnd_id, demand: RedrawDemand::Normal });
       }
       WindowEvent::Resized(size) => {
         if let Some(shell_wnd) = App::shell_window(wnd_id) {

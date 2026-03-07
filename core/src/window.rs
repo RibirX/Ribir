@@ -106,7 +106,7 @@ impl WindowAttributes {
 pub enum UiEvent {
   RedrawRequest {
     wnd_id: WindowId,
-    force: bool,
+    demand: RedrawDemand,
   },
   Resize {
     wnd_id: WindowId,
@@ -153,6 +153,24 @@ pub enum UiEvent {
   CloseRequest {
     wnd_id: WindowId,
   },
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub enum RedrawDemand {
+  #[default]
+  None,
+  Normal,
+  Force,
+}
+
+impl RedrawDemand {
+  pub fn from_force(force: bool) -> Self { if force { Self::Force } else { Self::Normal } }
+
+  pub fn promote(&mut self, to: Self) { *self = (*self).max(to); }
+
+  pub fn requires_forced_draw(self) -> bool { matches!(self, Self::Force) }
+
+  pub fn requires_frame(self) -> bool { !matches!(self, Self::None) }
 }
 
 impl UiEvent {
@@ -258,9 +276,12 @@ pub trait ShellWindow {
 
   fn close(&self);
 
-  /// Request a redraw. If `force` is true, the window will be redrawn even
-  /// if nothing has changed.
-  fn request_draw(&self, force: bool);
+  /// Request a redraw for the given demand level.
+  ///
+  /// [`RedrawDemand::Normal`] asks the platform for the next redraw
+  /// opportunity, while [`RedrawDemand::Force`] requires a frame even if the
+  /// framework did not detect new dirty content.
+  fn request_draw(&self, demand: RedrawDemand);
 
   fn draw_commands(
     &mut self, wnd_size: Size, viewport: Rect, surface_color: Color, commands: &[PaintCommand],
