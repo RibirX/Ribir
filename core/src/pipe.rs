@@ -707,8 +707,6 @@ where
 #[cfg(test)]
 mod tests {
 
-  use ahash::HashSet;
-
   use crate::{prelude::*, reset_test_env, test_helper::*};
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -1146,12 +1144,11 @@ mod tests {
     let wnd = TestWindow::from_widget(widget);
     wnd.draw_frame();
     assert_eq!(w2.read()[0], 0);
-    // The children order is not fixed
-    assert_eq!(w2.read().iter().collect::<HashSet<_>>().len(), 11);
+    assert_eq!(*w2.read(), (0..=10).collect::<Vec<_>>());
     w2.write().clear();
     wnd.draw_frame();
     assert_eq!(w2.read()[0], 0);
-    assert_eq!(w2.read().iter().collect::<HashSet<_>>().len(), 11);
+    assert_eq!(*w2.read(), (0..=10).collect::<Vec<_>>());
   }
 
   #[test]

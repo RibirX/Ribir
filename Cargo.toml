@@ -123,7 +123,6 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter", "fmt", "reg
 tokio-stream = { version = "0.1.17", features = ["sync", "time"] }
 dirs = "5.0"
 
-priority-queue = "2.1.1"
 web-sys = { version = "0.3.69", features = ["HtmlCollection"] }
 heck = "0.5.0"
 url = "2.5.4"
