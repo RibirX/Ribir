@@ -13,7 +13,7 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
 use crate::{
   prelude::*,
-  window::{BoxShellWindow, Shell, ShellWindow, WindowFlags, WindowId},
+  window::{BoxShellWindow, RedrawDemand, Shell, ShellWindow, WindowFlags, WindowId},
 };
 
 pub struct Frame {
@@ -217,7 +217,7 @@ impl ShellWindow for TestShellWindow {
       Some(Frame { commands: commands.to_owned(), viewport, surface: surface_color });
   }
 
-  fn request_draw(&self, _force: bool) {
+  fn request_draw(&self, _demand: RedrawDemand) {
     self
       .request_draw_count
       .set(self.request_draw_count.get() + 1);
