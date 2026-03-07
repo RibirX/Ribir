@@ -31,7 +31,6 @@ image-webp.workspace = true
 rxrust.workspace = true
 smallvec.workspace = true
 winit.workspace = true
-priority-queue = { workspace = true }
 url.workspace = true
 futures-timer = { version = "3.0.3", optional = true }
 cfg-if.workspace = true

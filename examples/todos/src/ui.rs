@@ -53,7 +53,7 @@ fn task_lists(
 
     @Scrollbar {
       on_mounted: move |e| {
-        e.window().once_next_frame(move || c_stagger.run());
+        e.window().once_layout_ready(move || c_stagger.run());
       },
       @ {
         pipe!($read(this);)
@@ -61,46 +61,46 @@ fn task_lists(
           let mut items = vec![];
           for id in $read(this).all_tasks() {
             if $read(this).get_task(id).map_or(false, cond) {
-              let task = $writer(this).part_writer(
-                format!("task {id:?}").into(),
-                // task will always exist, if the task is removed,
-                // sthe widgets list will be rebuild.
-                move |todos| PartMut::new(todos.get_task_mut(id).unwrap()),
-              );
-              let item = distinct_pipe!(*$read(editing) == Some(id))
-                .map(move |b| fn_widget!{
-                  if b {
-                    @Container {
-                      clamp: BoxClamp::EXPAND_X.with_fixed_height(64.),
-                      @{
-                        let input = input(Some($read(task).label.clone()), move |text|{
-                          $write(task).label = text.to_string();
-                          *$write(editing) = None;
-                        });
-                        let mut input = FatObj::new(input);
-                        @(input) {
-                          y: AnchorY::center(),
-                          on_key_down: move |e| {
-                            if e.key_code() == &PhysicalKey::Code(KeyCode::Escape) {
-                              *$write(editing) = None;
-                            }
+            let task = $writer(this).part_writer(
+              format!("task {id:?}").into(),
+              // task will always exist, if the task is removed,
+              // sthe widgets list will be rebuild.
+              move |todos| PartMut::new(todos.get_task_mut(id).unwrap()),
+            );
+            let item = distinct_pipe!(*$read(editing) == Some(id))
+              .map(move |b| fn_widget!{
+                if b {
+                  @Container {
+                    clamp: BoxClamp::EXPAND_X.with_fixed_height(64.),
+                    @{
+                      let input = input(Some($read(task).label.clone()), move |text|{
+                        $write(task).label = text.to_string();
+                        *$write(editing) = None;
+                      });
+                      let mut input = FatObj::new(input);
+                      @(input) {
+                        y: AnchorY::center(),
+                        on_key_down: move |e| {
+                          if e.key_code() == &PhysicalKey::Code(KeyCode::Escape) {
+                            *$write(editing) = None;
                           }
                         }
                       }
-                    }.into_widget()
-                  } else {
-                    let item = task_item_widget($writer(task), $writer(stagger));
-                    let mut item = FatObj::new(item);
-                    @(item) {
-                      on_double_tap: move |_| *$write(editing) = Some(id)
-                    }.into_widget()
-                  }
-                });
-              items.push(@ListCustomItem {
-                interactive: false,
-                @{ item }
+                    }
+                  }.into_widget()
+                } else {
+                  let item = task_item_widget($writer(task), $writer(stagger));
+                  let mut item = FatObj::new(item);
+                  @(item) {
+                    on_double_tap: move |_| *$write(editing) = Some(id)
+                  }.into_widget()
+                }
               });
-            }
+            items.push(@ListCustomItem {
+              interactive: false,
+              @{ item }
+            });
+          }
           }
           @List {
             select_mode: ListSelectMode::None,
@@ -148,9 +148,10 @@ where
 {
   fn_widget! {
     let id = $read(task).id();
+    let label = $read(task).label.clone();
     let item = @ListItemChildren {
       @Checkbox { checked: TwoWay::new(part_writer!(&mut task.complete)) }
-      @ListItemHeadline { @ { $read(task).label.clone() } }
+      @ListItemHeadline { @ { label.clone() } }
       @Trailing {
         @Icon {
           cursor: CursorIcon::Pointer,
@@ -169,7 +170,6 @@ where
         animate_state_pack!(item.transform(), item.opacity()),
         animate_state_pack!(Transform::translation(0., 64.), 0.),
       );
-      // items not displayed until the stagger animation is started.
       watch!($read(fly_in).is_running()).filter(|v| *v).take(1).subscribe(move |_| {
         *$write(item.opacity()) = 1.;
       });

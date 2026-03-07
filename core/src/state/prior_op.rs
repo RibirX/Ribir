@@ -1,6 +1,9 @@
-use std::cell::RefCell;
+use std::{
+  cell::{Cell, RefCell},
+  cmp::Ordering,
+  collections::BinaryHeap,
+};
 
-use priority_queue::PriorityQueue;
 use rxrust::prelude::*;
 
 use super::AppCtx;
@@ -9,7 +12,35 @@ use crate::window::WindowId;
 /// A priority queue of tasks. So that tasks with higher priority will be
 /// executed first.
 #[derive(Default)]
-pub struct PriorityTaskQueue(RefCell<PriorityQueue<PriorityTask, i64, ahash::RandomState>>);
+pub struct PriorityTaskQueue {
+  queue: RefCell<BinaryHeap<QueueEntry>>,
+  next_seq: Cell<u64>,
+}
+
+pub struct QueueEntry {
+  priority: i64,
+  seq: u64,
+  task: PriorityTask,
+}
+
+impl PartialEq for QueueEntry {
+  fn eq(&self, other: &Self) -> bool { self.priority == other.priority && self.seq == other.seq }
+}
+
+impl Eq for QueueEntry {}
+
+impl Ord for QueueEntry {
+  fn cmp(&self, other: &Self) -> Ordering {
+    other
+      .priority
+      .cmp(&self.priority)
+      .then_with(|| other.seq.cmp(&self.seq))
+  }
+}
+
+impl PartialOrd for QueueEntry {
+  fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
+}
 
 pub struct PriorOp<S, P> {
   source: S,
@@ -188,27 +219,25 @@ where
   fn is_closed(&self) -> bool { self.0.rc_deref().is_none() }
 }
 
-impl PartialEq for PriorityTask {
-  fn eq(&self, _: &Self) -> bool {
-    // Three isn't two task that are equal.
-    false
-  }
-}
-
-impl Eq for PriorityTask {}
-
-impl std::hash::Hash for PriorityTask {
-  fn hash<H: std::hash::Hasher>(&self, state: &mut H) { std::ptr::hash(&*self.0, state) }
-}
-
 impl PriorityTaskQueue {
-  pub fn is_empty(&self) -> bool { self.0.borrow().is_empty() }
+  pub fn is_empty(&self) -> bool { self.queue.borrow().is_empty() }
 
-  pub fn pop(&self) -> Option<(PriorityTask, i64)> { self.0.borrow_mut().pop() }
+  pub fn pop(&self) -> Option<(PriorityTask, i64)> {
+    self
+      .queue
+      .borrow_mut()
+      .pop()
+      .map(|entry| (entry.task, entry.priority))
+  }
 
   /// Add a task to the queue with a priority.
   pub fn add(&self, task: PriorityTask, priority: i64) {
-    self.0.borrow_mut().push(task, -priority);
+    let seq = self.next_seq.get();
+    self.next_seq.set(seq + 1);
+    self
+      .queue
+      .borrow_mut()
+      .push(QueueEntry { priority, seq, task });
   }
 }
 
@@ -277,6 +306,26 @@ mod tests {
     Local::of(3)
       .fn_priority(|| 3, wnd_id)
       .subscribe(move |v| result.write().push(v));
+
+    wnd.draw_frame();
+    assert_eq!(*r.read(), vec![1, 2, 3]);
+  }
+
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+  #[test]
+  fn same_priority_keeps_insertion_order() {
+    reset_test_env!();
+
+    let r = Stateful::new(Vec::new());
+    let wnd = TestWindow::from_widget(fn_widget!(Void::default()));
+    let wnd_id = wnd.id();
+
+    for value in [1, 2, 3] {
+      let result = r.clone_writer();
+      Local::of(value)
+        .value_priority(1, wnd_id)
+        .subscribe(move |v| result.write().push(v));
+    }
 
     wnd.draw_frame();
     assert_eq!(*r.read(), vec![1, 2, 3]);
