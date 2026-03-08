@@ -135,10 +135,10 @@ pub enum Event {
   /// Event fired when the widget is performed layout. This event may fire
   /// multiple times in same frame if a widget modified after performed layout.
   PerformedLayout(LifecycleEvent),
-  /// Fired when a widget is permanently removed from the tree.
+  /// Fired when a widget enters the disposal pipeline.
   ///
-  /// Occurs exactly once per widget lifetime.
-  Disposed(LifecycleEvent),
+  /// Widgets intercepted by `preserve()` may later re-enter this lifecycle.
+  Disposed(DisposedEvent),
   PointerDown(PointerEvent),
   PointerDownCapture(PointerEvent),
   PointerUp(PointerEvent),
@@ -201,7 +201,8 @@ impl std::ops::Deref for Event {
 
   fn deref(&self) -> &Self::Target {
     match self {
-      Event::Mounted(e) | Event::PerformedLayout(e) | Event::Disposed(e) => e,
+      Event::Mounted(e) | Event::PerformedLayout(e) => e,
+      Event::Disposed(e) => e,
       Event::Focus(e)
       | Event::Blur(e)
       | Event::FocusIn(e)
@@ -232,7 +233,8 @@ impl std::ops::Deref for Event {
 impl std::ops::DerefMut for Event {
   fn deref_mut(&mut self) -> &mut Self::Target {
     match self {
-      Event::Mounted(e) | Event::PerformedLayout(e) | Event::Disposed(e) => e,
+      Event::Mounted(e) | Event::PerformedLayout(e) => e,
+      Event::Disposed(e) => e,
       Event::Focus(e)
       | Event::Blur(e)
       | Event::FocusIn(e)

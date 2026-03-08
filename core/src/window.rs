@@ -594,20 +594,40 @@ impl Window {
           self.emit_from_inside(id, &mut e);
         }
         DelayEvent::Disposed(root_id) => {
+          let mut root_preserved = false;
           let mut stack = vec![root_id];
           while let Some(id) = stack.pop() {
-            stack.extend(id.children(self.tree()));
-            if Some(id) == self.focusing() {
+            let mut e = Event::Disposed(DisposedEvent::new(id, self.tree));
+            self.emit_from_outside(id, &mut e);
+
+            let Event::Disposed(inner) = &e else {
+              unreachable!("disposed delay event must emit a disposed event")
+            };
+
+            // Only the disposal root needs an explicit flag. Any preserved
+            // descendant is detached immediately, so the later
+            // `RemoveSubtree(root_id)` no longer reaches it.
+            if id == root_id {
+              root_preserved = inner.is_preserved();
+            }
+
+            if inner.is_preserved() {
+              continue;
+            }
+
+            if self.focusing() == Some(id) {
               self
                 .focus_mgr
                 .borrow_mut()
                 .blur(FocusReason::Other);
             }
-            let mut e = Event::Disposed(LifecycleEvent::new(id, self.tree));
-            self.emit_from_outside(id, &mut e);
+
+            stack.extend(id.children(self.tree()));
           }
 
-          self.add_delay_event(DelayEvent::RemoveSubtree(root_id));
+          if !root_preserved {
+            self.add_delay_event(DelayEvent::RemoveSubtree(root_id));
+          }
         }
         DelayEvent::RemoveSubtree(id) => {
           let tree = self.tree_mut();

@@ -214,7 +214,7 @@ impl MixBuiltin {
     impl_event_callback!(self, Lifecycle, PerformedLayout, LifecycleEvent, handler)
   }
 
-  pub fn on_disposed(&self, handler: impl FnOnce(&mut LifecycleEvent) + 'static) -> &Self {
+  pub fn on_disposed(&self, handler: impl FnOnce(&mut DisposedEvent) + 'static) -> &Self {
     self.silent_mark(MixFlags::Lifecycle);
 
     let mut handler = life_fn_once_to_fn_mut(handler);
@@ -494,9 +494,7 @@ impl MixBuiltin {
   }
 }
 
-fn life_fn_once_to_fn_mut(
-  handler: impl FnOnce(&mut LifecycleEvent),
-) -> impl FnMut(&mut LifecycleEvent) {
+fn life_fn_once_to_fn_mut<E>(handler: impl FnOnce(&mut E)) -> impl FnMut(&mut E) {
   let mut handler = Some(handler);
   move |e| {
     if let Some(h) = handler.take() {

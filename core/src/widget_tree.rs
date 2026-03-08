@@ -284,6 +284,26 @@ impl WidgetTree {
     id.0.detach(&mut self.arena);
   }
 
+  pub(crate) fn prepare_subtree_for_dispose(
+    &mut self, id: WidgetId, allow_live_root: bool,
+  ) -> Option<WidgetId> {
+    let parent = id.tree_parent(self).or_else(|| {
+      if id == self.root() {
+        None
+      } else {
+        self
+          .detached_parent(id)
+          .filter(|parent| !parent.is_dropped(self))
+      }
+    });
+    let should_detach = id.tree_parent(self).is_some() || (allow_live_root && id == self.root());
+    if should_detach {
+      self.detach(id);
+    }
+    self.set_detached_parent(id, parent);
+    parent
+  }
+
   pub(crate) fn set_detached_parent(&mut self, id: WidgetId, parent: Option<WidgetId>) {
     if let Some(parent) = parent {
       self.detached_parent.insert(id, parent);

@@ -1,13 +1,6 @@
-use std::cell::{RefCell, UnsafeCell};
+use std::cell::RefCell;
 
-use smallvec::SmallVec;
-
-use crate::{
-  prelude::*,
-  render_helper::{PureRender, RenderProxy},
-  widget::widget_id::RenderQueryable,
-  window::WindowId,
-};
+use crate::prelude::*;
 
 /// A container that enables efficient reuse of widget instances across multiple
 /// placements.
@@ -36,7 +29,7 @@ use crate::{
 /// - Calling `get_widget()` in Dropped state
 /// - Window disposal before widget release
 #[derive(Clone)]
-pub struct Reusable(Rc<RefCell<ReusableState>>);
+pub struct Reusable(Rc<RefCell<ReusableInner>>);
 
 impl Reusable {
   /// Creates a new Reusable container from a widget.
@@ -46,14 +39,15 @@ impl Reusable {
   pub fn new<'a, K>(w: impl IntoWidget<'a, K>) -> (Widget<'a>, Self) {
     let mut obj = FatObj::new(w);
     let track_id = obj.track_id();
-    let this = Self(Rc::new(RefCell::new(ReusableState::WaitToUse { track_id })));
+    let this =
+      Self(Rc::new(RefCell::new(ReusableInner { track_id, phase: ReusablePhase::Pending })));
 
-    (this.handle_reusable_wrapper(obj.into_widget()), this)
+    (this.attach_reusable_host(obj.into_widget()), this)
   }
 
   pub fn is_in_used(&self) -> bool {
     let inner_state = self.0.borrow();
-    matches!(*inner_state, ReusableState::Using { .. })
+    matches!(inner_state.phase, ReusablePhase::Active { .. })
   }
 
   /// Retrieves a widget instance for placement in the UI.
@@ -78,39 +72,34 @@ impl Reusable {
   // instantiation deferred until needed via `gen_widget`.
   fn gen_widget(&mut self) -> Widget<'static> {
     let mut inner_state = self.0.borrow_mut();
-    let w = match &mut *inner_state {
-      ReusableState::WaitToUse { .. } => {
+    let track_id = inner_state.track_id.clone();
+    let w = match &mut inner_state.phase {
+      ReusablePhase::Pending => {
         panic!("Reusable must be used before it can be retrieved")
       }
-      ReusableState::Using { render, track_id } => {
-        let render = render.clone();
+      ReusablePhase::Active { host } => {
+        let host = host.clone();
         let track_id = track_id.clone();
         Widget::from_fn(move |ctx| {
-          move_inner_render_to_new(render.take(), track_id.get().unwrap(), ctx.tree_mut())
+          host
+            .clone()
+            .rehost(track_id.get().unwrap(), ctx.tree_mut())
         })
       }
-      ReusableState::Recycled { track_id, wnd_id } => {
-        let wnd_id = *wnd_id;
-        Widget::from_fn({
-          let track_id = track_id.clone();
-          move |ctx| {
-            let current_wnd_id = ctx.window().id();
-            assert_eq!(
-              wnd_id, current_wnd_id,
-              "Reusable widget must be used in the same window it was recycled in."
-            );
-            track_id
-              .get()
-              .expect("reusable has no be used yet")
-          }
-        })
+      ReusablePhase::Cached { host, preserve } => {
+        let host = host.clone();
+        let preserve = preserve
+          .take()
+          .expect("recycled widget already taken for reuse");
+        inner_state.phase = ReusablePhase::Active { host };
+        preserve.into_widget()
       }
-      ReusableState::Dropped => {
+      ReusablePhase::Dropped => {
         panic!("Widget in invalid state for reuse. Expected Init/Recycled")
       }
     };
 
-    self.handle_reusable_wrapper(w)
+    self.attach_reusable_host(w)
   }
 
   /// Permanently disposes of the managed widget and associated resources.
@@ -119,40 +108,31 @@ impl Reusable {
   /// `Reusable` instance unless manual cleanup timing is critical.
   pub fn release(&mut self) {
     let mut inner_state = self.0.borrow_mut();
-    if let ReusableState::Recycled { track_id, wnd_id } = &*inner_state {
-      let wid = track_id.get().unwrap();
-      if let Some(wnd) = AppCtx::get_window(*wnd_id) {
-        wid.dispose_subtree(wnd.tree_mut());
-      }
-    }
-    *inner_state = ReusableState::Dropped;
+    inner_state.phase = ReusablePhase::Dropped;
   }
 
-  fn handle_reusable_wrapper<'a>(&self, widget: Widget<'a>) -> Widget<'a> {
+  /// Attach a stable host wrapper around the reusable instance.
+  ///
+  /// The host implementation lives in the preserve lifecycle layer, but
+  /// `Reusable` still decides when to attach that host and when to recycle the
+  /// preserved subtree.
+  fn attach_reusable_host<'a>(&self, widget: Widget<'a>) -> Widget<'a> {
     let mut fat = FatObj::new(widget);
     let this = self.clone();
     fat.on_disposed(move |e| {
-      if matches!(*this.0.borrow(), ReusableState::Using { .. }) {
-        // We will recycle the original widget, so we prevent to continue emitting
-        // the `Disposed` event to the original widget.
-        let (render_cell, track_id) = match &*this.0.borrow() {
-          ReusableState::Using { render, track_id, .. } => (render.clone(), track_id.clone()),
-          _ => panic!("Widget in invalid state for reuse. Expected Using"),
+      if matches!(this.0.borrow().phase, ReusablePhase::Active { .. }) {
+        let (render, track_id) = match &*this.0.borrow() {
+          ReusableInner { track_id, phase: ReusablePhase::Active { host }, .. } => {
+            (host.clone(), track_id.clone())
+          }
+          _ => panic!("Widget in invalid state for reuse. Expected Active"),
         };
         if track_id.get() != Some(e.current_target()) {
           return;
         }
-
-        e.prevent_default();
-
-        let wnd = e.window();
-        let tree = wnd.tree_mut();
-        let id = e.current_target();
-
-        move_inner_render_to_new(render_cell.take(), id, tree);
-
-        *this.0.borrow_mut() =
-          ReusableState::Recycled { track_id: track_id.clone(), wnd_id: wnd.id() };
+        let preserve = e.preserve();
+        this.0.borrow_mut().phase =
+          ReusablePhase::Cached { host: render, preserve: Some(preserve) };
       }
     });
     let this = self.clone();
@@ -162,94 +142,29 @@ impl Reusable {
   }
 
   fn on_build(&self, id: WidgetId) {
-    let track_id = match &*self.0.borrow() {
-      ReusableState::Using { track_id, .. }
-      | ReusableState::Recycled { track_id, .. }
-      | ReusableState::WaitToUse { track_id } => track_id.clone(),
-      _ => panic!("Widget in invalid state for reuse. Expected Init/Recycled"),
-    };
+    let host = PreserveHost::install(id, BuildCtx::get_mut().tree_mut());
 
-    let render = ReusableRenderWrapper::default();
-    id.wrap_node(BuildCtx::get_mut().tree_mut(), |render_node| {
-      render.set(render_node);
-      Box::new(render.clone())
-    });
-
-    *self.0.borrow_mut() = ReusableState::Using { track_id, render };
+    let mut state = self.0.borrow_mut();
+    state.phase = ReusablePhase::Active { host };
   }
 }
 
-fn move_inner_render_to_new(
-  inner: Box<dyn RenderQueryable>, origin: WidgetId, tree: &mut WidgetTree,
-) -> WidgetId {
-  let new_id = tree.alloc_node(inner);
-  origin
-    .children(tree)
-    .collect::<SmallVec<[WidgetId; 1]>>()
-    .into_iter()
-    .for_each(|child| new_id.append(child, tree));
-
-  new_id
-    .get_node_mut(tree)
-    .unwrap()
-    .update_track_id(new_id);
-
-  new_id
+/// Internal state of a [`Reusable`] container.
+struct ReusableInner {
+  track_id: TrackId,
+  phase: ReusablePhase,
 }
 
-/// A wrapper around a render node that is used to split the original render
-/// node and its outer wrapper, so we can take the original render node out to
-/// be recycled and return the wrapper to be disposed.
-#[derive(Clone)]
-struct ReusableRenderWrapper(Rc<UnsafeCell<Box<dyn RenderQueryable>>>);
-
-enum ReusableState {
-  WaitToUse { track_id: TrackId },
-  Using { track_id: TrackId, render: ReusableRenderWrapper },
-  Recycled { track_id: TrackId, wnd_id: WindowId },
+/// The lifecycle phase of a reusable widget.
+enum ReusablePhase {
+  /// Initial state before the widget is used.
+  Pending,
+  /// Widget is currently mounted in the tree.
+  Active { host: PreserveHost },
+  /// Widget is detached and preserved for future use.
+  Cached { host: PreserveHost, preserve: Option<Preserve> },
+  /// Widget has been permanently released.
   Dropped,
-}
-
-impl RenderProxy for ReusableRenderWrapper {
-  fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self.as_render_node() }
-}
-
-impl Query for ReusableRenderWrapper {
-  fn query_all<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
-    self.as_render_node().query_all(query_id, out);
-  }
-
-  fn query_all_write<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
-    self
-      .as_render_node()
-      .query_all_write(query_id, out);
-  }
-
-  fn query<'q>(&'q self, query_id: &QueryId) -> Option<QueryHandle<'q>> {
-    self.as_render_node().query(query_id)
-  }
-
-  fn query_write<'q>(&'q self, query_id: &QueryId) -> Option<QueryHandle<'q>> {
-    self.as_render_node().query_write(query_id)
-  }
-
-  fn queryable(&self) -> bool { true }
-}
-
-impl ReusableRenderWrapper {
-  fn as_render_node(&self) -> &dyn RenderQueryable { unsafe { &*self.0.get() }.as_ref() }
-
-  fn set(&self, new_node: Box<dyn RenderQueryable>) -> Box<dyn RenderQueryable> {
-    unsafe { std::mem::replace(&mut *self.0.get(), new_node) }
-  }
-
-  fn take(&self) -> Box<dyn RenderQueryable> {
-    unsafe { std::mem::replace(&mut *self.0.get(), Box::new(PureRender(Void::default()))) }
-  }
-}
-
-impl Default for ReusableRenderWrapper {
-  fn default() -> Self { Self(Rc::new(UnsafeCell::new(Box::new(PureRender(Void::default()))))) }
 }
 
 impl Drop for Reusable {
