@@ -110,6 +110,11 @@ impl FocusManager {
     AppCtx::get_window(self.wnd_id).expect("The window of `FocusManager` has already dropped.")
   }
 
+  pub(crate) fn is_dropped(&self, wid: WidgetId) -> bool {
+    let wnd = self.window();
+    wid.is_dropped(wnd.tree())
+  }
+
   pub(crate) fn add_focus_node(&mut self, wid: WidgetId, auto_focus: bool, focus_type: FocusType) {
     if let Some(id) = self.node_ids.get(&wid) {
       let node = self.arena[*id].get_mut();
@@ -147,6 +152,10 @@ impl FocusManager {
   }
 
   fn find_real_focus_widget(&mut self, focus: WidgetId) -> Option<WidgetId> {
+    if self.is_dropped(focus) {
+      return None;
+    }
+
     if self.ignore_scope_id(focus).is_some() {
       return None;
     }
@@ -170,12 +179,12 @@ impl FocusManager {
   }
 
   fn focus_move_circle(&mut self, backward: bool) -> Option<WidgetId> {
-    let has_focus = self.focusing.is_some();
-    let mut wid = self.focus_step(self.focusing, backward);
+    let focusing = self.focusing.filter(|wid| !self.is_dropped(*wid));
+    let has_focus = focusing.is_some();
+    let mut wid = self.focus_step(focusing, backward);
     if wid.is_none() && has_focus {
       wid = self.focus_step(wid, backward);
     }
-
     wid
   }
 
@@ -304,16 +313,26 @@ impl FocusManager {
 
   fn scope_id(&self, node_id: NodeId) -> Option<NodeId> { self.scope_list(node_id).next() }
 
+  fn live_parent(&self, node_id: NodeId) -> Option<NodeId> {
+    self
+      .arena
+      .get(node_id)
+      .and_then(|_| self.arena[node_id].parent())
+  }
+
   fn scope_list(&self, node_id: NodeId) -> impl Iterator<Item = NodeId> + '_ {
-    node_id
-      .ancestors(&self.arena)
-      .skip(1)
-      .filter(|n| self.assert_get(*n).has_focus_scope())
+    std::iter::successors(self.live_parent(node_id), move |id| self.live_parent(*id)).filter(|id| {
+      self
+        .get(*id)
+        .is_some_and(FocusNodeInfo::has_focus_scope)
+    })
   }
 
   fn ignore_scope_id(&self, wid: WidgetId) -> Option<NodeId> {
+    if self.is_dropped(wid) {
+      return None;
+    }
     let wnd = self.window();
-
     let tree = wnd.tree();
     let node_id = wid
       .ancestors(tree)
@@ -503,6 +522,20 @@ impl FocusManager {
   pub fn focusing(&self) -> Option<WidgetId> { self.focusing }
 
   pub fn on_widget_tree_update(&mut self, tree: &WidgetTree) {
+    self
+      .frame_auto_focus
+      .retain(|wid| !wid.is_dropped(tree));
+    self
+      .focus_widgets
+      .retain(|wid| !wid.is_dropped(tree));
+    if self
+      .focusing
+      .is_some_and(|wid| wid.is_dropped(tree))
+    {
+      self.focusing = None;
+      self.focus_widgets.clear();
+    }
+
     let autos = self
       .frame_auto_focus
       .drain(..)
@@ -519,16 +552,17 @@ impl FocusManager {
   ) -> Option<WidgetId> {
     let wnd = self.window();
     let tree = wnd.tree();
+    let focusing = self.focusing.filter(|wid| !self.is_dropped(*wid));
 
     // dispatch blur event
-    if let Some(wid) = self.focusing() {
+    if let Some(wid) = focusing {
       wnd.add_delay_event(DelayEvent::Blur { id: wid, reason });
     };
 
     let old = self
       .focus_widgets
       .iter()
-      .find(|wid| !(*wid).is_dropped(tree))
+      .find(|wid| !self.is_dropped(**wid))
       .copied();
 
     // bubble focus out
@@ -864,6 +898,35 @@ mod tests {
     wnd.process_receive_chars(" ribir".into());
     wnd.draw_frame();
     assert_eq!(*input.read(), "hello ribir");
+  }
+
+  #[test]
+  fn remove_focused_widget_emit_blur() {
+    reset_test_env!();
+    let (log, log_writer) = split_value(vec![]);
+    let (focused, focused_writer) = split_value(true);
+    let w = fn_widget! {
+      @MockBox{
+        size: Size::new(20., 20.),
+        @ {
+          pipe!(*$read(focused)).map(move |v| v.then(move || fn_widget!{
+            @MockBox {
+              auto_focus: true,
+              size: Size::new(10., 10.),
+              on_blur: move |_| $write(log_writer).push("blur"),
+            }
+          }))
+        }
+      }
+    };
+    let wnd = TestWindow::from_widget(w);
+    wnd.draw_frame();
+    assert!(log.read().is_empty());
+
+    *focused_writer.write() = false;
+    wnd.draw_frame();
+    assert_eq!(&*log.read(), &["blur"]);
+    assert_eq!(wnd.focus_mgr.borrow().focusing(), None);
   }
 
   #[test]

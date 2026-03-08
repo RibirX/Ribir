@@ -1,5 +1,8 @@
 use criterion::{Bencher, Criterion, criterion_group, criterion_main};
-use ribir::{core::test_helper::*, prelude::*};
+use ribir::{
+  core::{reset_test_env, test_helper::*},
+  prelude::*,
+};
 
 fn widget_bench(b: &mut Bencher, w: GenWidget) {
   let wnd = TestWindow::from_widget(w);
@@ -8,6 +11,8 @@ fn widget_bench(b: &mut Bencher, w: GenWidget) {
 }
 
 fn widgets_bench_one_by_one(c: &mut Criterion) {
+  reset_test_env!();
+
   c.bench_function("checkbox", |b| {
     widget_bench(b, fn_widget!(@Checkbox { checked: true, indeterminate: true }).r_into());
   });
