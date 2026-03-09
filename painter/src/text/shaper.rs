@@ -343,7 +343,7 @@ impl<'a> FallBackFaceHelper<'a> {
     Self { ids, font_db, face_idx: 0 }
   }
 
-  fn next_fallback_face(&mut self, text: &str) -> Option<Face> {
+  fn next_fallback_face(&mut self, text: &str) -> Option<std::sync::Arc<Face>> {
     let mut font_db = self.font_db.borrow_mut();
     loop {
       if self.face_idx >= self.ids.len() {
@@ -353,8 +353,7 @@ impl<'a> FallBackFaceHelper<'a> {
       let face = self
         .ids
         .get(self.face_idx)
-        .and_then(|id| font_db.face_data_or_insert(*id))
-        .cloned();
+        .and_then(|id| font_db.face_data_or_insert(*id));
 
       self.face_idx += 1;
       if self.face_idx == self.ids.len() {

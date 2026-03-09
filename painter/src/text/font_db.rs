@@ -1,22 +1,24 @@
-use std::{cell::RefCell, sync::Arc};
+use std::sync::{Arc, RwLock};
 
 use ahash::HashMap;
 use fontdb::{Database, Query};
 pub use fontdb::{FaceInfo, Family, ID};
-use ribir_algo::{Rc, Resource};
+use ribir_algo::Resource;
 use ribir_geom::{Point, Rect, rect};
 use swash::FontRef;
 
 use crate::{
-  Path, PixelImage, Svg,
+  GlyphProvider, Path, PixelImage, Svg,
   path_builder::PathBuilder,
   text::{FontFace, FontFamily, GlyphId, svg_glyph_cache::SvgGlyphCache},
 };
+type FaceCache = Arc<RwLock<HashMap<ID, Option<Arc<Face>>>>>;
+
 /// A wrapper of fontdb and cache font data.
 pub struct FontDB {
   default_fonts: Vec<ID>,
   data_base: fontdb::Database,
-  cache: HashMap<ID, Option<Face>>,
+  cache: FaceCache,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
@@ -30,19 +32,38 @@ pub enum GlyphBaseline {
   Middle,
 }
 
-type FontGlyphCache<K, V> = Rc<RefCell<HashMap<K, Option<V>>>>;
 #[derive(Clone)]
 pub struct Face {
   pub face_id: ID,
   pub source_data: Arc<dyn AsRef<[u8]> + Sync + Send>,
   pub face_data_index: u32,
-  raster_image_glyphs: FontGlyphCache<(u16, u16), (Resource<PixelImage>, Point)>,
-  outline_glyphs: FontGlyphCache<u16, Resource<Path>>,
-  svg_glyphs: Rc<RefCell<SvgGlyphCache>>,
   x_height: u16,
   cap_height: i16,
   ascender: i16,
   descender: i16,
+}
+
+/// A thread-safe snapshot of font faces that can rasterize glyphs outside the
+/// `AppCtx` thread.
+#[derive(Clone, Default)]
+pub struct FontDBGlyphProvider {
+  faces: Arc<RwLock<HashMap<ID, Option<Arc<Face>>>>>,
+}
+
+impl FontDBGlyphProvider {
+  fn new(faces: Arc<RwLock<HashMap<ID, Option<Arc<Face>>>>>) -> Self { Self { faces } }
+}
+
+impl GlyphProvider for FontDBGlyphProvider {
+  fn get_face(&self, face_id: ID) -> Option<Arc<Face>> {
+    self
+      .faces
+      .read()
+      .unwrap()
+      .get(&face_id)
+      .cloned()
+      .flatten()
+  }
 }
 
 impl FontDB {
@@ -56,12 +77,18 @@ impl FontDB {
 
   pub fn default_fonts(&self) -> &[ID] { &self.default_fonts }
 
-  pub fn try_get_face_data(&self, face_id: ID) -> Option<&Face> {
-    self.cache.get(&face_id)?.as_ref()
+  pub fn try_get_face_data(&self, face_id: ID) -> Option<Arc<Face>> {
+    self
+      .cache
+      .read()
+      .unwrap()
+      .get(&face_id)
+      .cloned()
+      .flatten()
   }
 
-  pub fn face_data_or_insert(&mut self, face_id: ID) -> Option<&Face> {
-    get_or_insert_face(&mut self.cache, &self.data_base, face_id).as_ref()
+  pub fn face_data_or_insert(&mut self, face_id: ID) -> Option<Arc<Face>> {
+    get_or_insert_face(&self.cache, &self.data_base, face_id).clone()
   }
 
   /// Selects a `FaceInfo` by `id`.
@@ -77,12 +104,16 @@ impl FontDB {
   #[inline]
   pub fn faces_info_iter(&self) -> impl Iterator<Item = &FaceInfo> + '_ { self.data_base.faces() }
 
-  pub fn faces_data_iter(&mut self) -> impl Iterator<Item = Face> + '_ {
+  pub fn faces_data_iter(&mut self) -> impl Iterator<Item = Arc<Face>> + '_ {
     FaceIter {
       face_id_iter: self.data_base.faces(),
       data_base: &self.data_base,
-      cache: &mut self.cache,
+      cache: self.cache.clone(),
     }
+  }
+
+  pub fn glyph_provider(&self) -> FontDBGlyphProvider {
+    FontDBGlyphProvider::new(self.cache.clone())
   }
 
   #[inline]
@@ -291,9 +322,6 @@ impl Face {
       source_data,
       face_data_index: face_index,
       face_id,
-      outline_glyphs: <_>::default(),
-      raster_image_glyphs: <_>::default(),
-      svg_glyphs: <_>::default(),
       x_height,
       ascender,
       descender,
@@ -328,112 +356,91 @@ impl Face {
     FontRef::from_index(slice, self.face_data_index as usize).unwrap()
   }
 
+  #[inline]
+  pub fn units_per_em(&self) -> u16 { self.as_font_ref().metrics(&[]).units_per_em }
+
   pub fn outline_glyph(&self, glyph_id: u16) -> Option<Resource<Path>> {
-    self
-      .outline_glyphs
-      .borrow_mut()
-      .entry(glyph_id)
-      .or_insert_with(|| {
-        let swash_font = self.as_font_ref();
-        let mut scaler = swash::scale::ScaleContext::new();
-        let mut builder = GlyphOutlineBuilder::default();
-        if let Some(outline) = scaler
-          .builder(swash_font)
-          .size(self.units_per_em() as f32)
-          .build()
-          .scale_outline(glyph_id)
-        {
-          let mut points = outline.points().iter();
-          for verb in outline.verbs() {
-            match verb {
-              swash::zeno::Verb::MoveTo => {
-                let p = points.next().unwrap();
-                builder.move_to(p.x, p.y);
-              }
-              swash::zeno::Verb::LineTo => {
-                let p = points.next().unwrap();
-                builder.line_to(p.x, p.y);
-              }
-              swash::zeno::Verb::QuadTo => {
-                let p1 = points.next().unwrap();
-                let p = points.next().unwrap();
-                builder.quad_to(p1.x, p1.y, p.x, p.y);
-              }
-              swash::zeno::Verb::CurveTo => {
-                let p1 = points.next().unwrap();
-                let p2 = points.next().unwrap();
-                let p = points.next().unwrap();
-                builder.curve_to(p1.x, p1.y, p2.x, p2.y, p.x, p.y);
-              }
-              swash::zeno::Verb::Close => {
-                builder.close();
-              }
+    let swash_font = self.as_font_ref();
+    let mut scaler = swash::scale::ScaleContext::new();
+    let mut builder = GlyphOutlineBuilder::default();
+    scaler
+      .builder(swash_font)
+      .size(self.units_per_em() as f32)
+      .build()
+      .scale_outline(glyph_id)
+      .map(|outline| {
+        let mut points = outline.points().iter();
+        for verb in outline.verbs() {
+          match verb {
+            swash::zeno::Verb::MoveTo => {
+              let p = points.next().unwrap();
+              builder.move_to(p.x, p.y);
+            }
+            swash::zeno::Verb::LineTo => {
+              let p = points.next().unwrap();
+              builder.line_to(p.x, p.y);
+            }
+            swash::zeno::Verb::QuadTo => {
+              let p1 = points.next().unwrap();
+              let p = points.next().unwrap();
+              builder.quad_to(p1.x, p1.y, p.x, p.y);
+            }
+            swash::zeno::Verb::CurveTo => {
+              let p1 = points.next().unwrap();
+              let p2 = points.next().unwrap();
+              let p = points.next().unwrap();
+              builder.curve_to(p1.x, p1.y, p2.x, p2.y, p.x, p.y);
+            }
+            swash::zeno::Verb::Close => {
+              builder.close();
             }
           }
-          let path = builder.build(rect(0., 0., 0., 0.));
-          Some(Resource::new(path))
-        } else {
-          None
         }
+        Resource::new(builder.build(rect(0., 0., 0., 0.)))
       })
-      .as_ref()
-      .cloned()
   }
 
   pub fn glyph_raster_image(
     &self, glyph_id: u16, img_size: u16,
   ) -> Option<(Resource<PixelImage>, ribir_geom::Point)> {
-    self
-      .raster_image_glyphs
-      .borrow_mut()
-      .entry((glyph_id, img_size))
-      .or_insert_with(|| {
-        let swash_font = self.as_font_ref();
-        let mut scaler = swash::scale::ScaleContext::new();
-        let mut scaler = scaler
-          .builder(swash_font)
-          .size(img_size as f32)
-          .hint(true)
-          .build();
-        let image = swash::scale::Render::new(&[
-          swash::scale::Source::ColorBitmap(swash::scale::StrikeWith::BestFit),
-          swash::scale::Source::Bitmap(swash::scale::StrikeWith::BestFit),
-          swash::scale::Source::Outline,
-        ])
-        .render(&mut scaler, glyph_id);
+    let swash_font = self.as_font_ref();
+    let mut scaler = swash::scale::ScaleContext::new();
+    let mut scaler = scaler
+      .builder(swash_font)
+      .size(img_size as f32)
+      .hint(true)
+      .build();
+    let image = swash::scale::Render::new(&[
+      swash::scale::Source::ColorBitmap(swash::scale::StrikeWith::BestFit),
+      swash::scale::Source::Bitmap(swash::scale::StrikeWith::BestFit),
+      swash::scale::Source::Outline,
+    ])
+    .render(&mut scaler, glyph_id);
 
-        image.map(|img| {
-          let format = match img.content {
-            swash::scale::image::Content::Color => crate::ColorFormat::Rgba8,
-            _ => crate::ColorFormat::Alpha8,
-          };
-          let pixel_img = PixelImage::new(
-            std::borrow::Cow::Owned(img.data),
-            img.placement.width,
-            img.placement.height,
-            format,
-          );
-          (
-            Resource::new(pixel_img),
-            ribir_geom::Point::new(img.placement.left as f32, -img.placement.top as f32),
-          )
-        })
-      })
-      .clone()
+    image.map(|img| {
+      let format = match img.content {
+        swash::scale::image::Content::Color => crate::ColorFormat::Rgba8,
+        _ => crate::ColorFormat::Alpha8,
+      };
+      let pixel_img = PixelImage::new(
+        std::borrow::Cow::Owned(img.data),
+        img.placement.width,
+        img.placement.height,
+        format,
+      );
+      (
+        Resource::new(pixel_img),
+        ribir_geom::Point::new(img.placement.left as f32, -img.placement.top as f32),
+      )
+    })
   }
 
-  // Used to map a GlyphId back to its primary char.
-
   pub fn glyph_svg_image(&self, glyph_id: u16) -> Option<Svg> {
-    self
-      .svg_glyphs
-      .borrow_mut()
+    let mut cache = SvgGlyphCache::default();
+    cache
       .svg_or_insert(GlyphId(glyph_id), &self.as_font_ref(), self.face_data_index)
       .clone()
   }
-
-  #[inline]
-  pub fn units_per_em(&self) -> u16 { self.as_font_ref().metrics(&[]).units_per_em }
 }
 
 fn to_db_family(f: &FontFamily) -> Family<'_> {
@@ -508,20 +515,18 @@ where
 {
   face_id_iter: T,
   data_base: &'a Database,
-  cache: &'a mut HashMap<ID, Option<Face>>,
+  cache: Arc<RwLock<HashMap<ID, Option<Arc<Face>>>>>,
 }
 
 impl<'a, T> Iterator for FaceIter<'a, T>
 where
   T: Iterator<Item = &'a FaceInfo>,
 {
-  type Item = Face;
+  type Item = Arc<Face>;
   fn next(&mut self) -> Option<Self::Item> {
     loop {
       let info = self.face_id_iter.next()?;
-      let face = get_or_insert_face(self.cache, self.data_base, info.id)
-        .as_ref()
-        .cloned();
+      let face = get_or_insert_face(&self.cache, self.data_base, info.id).clone();
       if face.is_some() {
         return face;
       }
@@ -529,29 +534,32 @@ where
   }
 }
 
-fn get_or_insert_face<'a>(
-  cache: &'a mut HashMap<ID, Option<Face>>, data_base: &'a Database, id: ID,
-) -> &'a Option<Face> {
-  cache.entry(id).or_insert_with(|| {
-    data_base
-      .face_source(id)
-      .and_then(|(src, face_index)| {
-        let source_data = match src {
-          fontdb::Source::Binary(data) => Some(data),
-          fontdb::Source::File(_) => {
-            let mut source_data = None;
-            data_base.with_face_data(id, |data, index| {
-              assert_eq!(face_index, index);
-              let data: Arc<dyn AsRef<[u8]> + Sync + Send> = Arc::new(data.to_owned());
-              source_data = Some(data);
-            });
-            source_data
-          }
-          fontdb::Source::SharedFile(_, data) => Some(data),
-        }?;
-        Face::from_data(id, source_data, face_index)
-      })
-  })
+fn get_or_insert_face(cache: &FaceCache, data_base: &Database, id: ID) -> Option<Arc<Face>> {
+  if let Some(face) = cache.read().unwrap().get(&id) {
+    return face.clone();
+  }
+
+  let face = data_base
+    .face_source(id)
+    .and_then(|(src, face_index)| {
+      let source_data = match src {
+        fontdb::Source::Binary(data) => Some(data),
+        fontdb::Source::File(_) => {
+          let mut source_data = None;
+          data_base.with_face_data(id, |data, index| {
+            assert_eq!(face_index, index);
+            let data: Arc<dyn AsRef<[u8]> + Sync + Send> = Arc::new(data.to_owned());
+            source_data = Some(data);
+          });
+          source_data
+        }
+        fontdb::Source::SharedFile(_, data) => Some(data),
+      }?;
+      Face::from_data(id, source_data, face_index).map(Arc::new)
+    });
+
+  let mut writer = cache.write().unwrap();
+  writer.entry(id).or_insert(face.clone()).clone()
 }
 
 #[cfg(test)]

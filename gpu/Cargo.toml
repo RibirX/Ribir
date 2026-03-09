@@ -28,6 +28,7 @@ zerocopy = {workspace=true, features = ["derive"]}
 [dev-dependencies]
 paste.workspace = true
 ribir_dev_helper = {path = "../dev-helper"}
+ribir_core = {workspace = true}
 futures.workspace = true
 
 [features]

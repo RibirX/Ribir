@@ -71,8 +71,7 @@ pub fn paint_text(
       painter.set_style(PathStyle::Fill);
     }
 
-    let font_db = AppCtx::font_db().clone();
-    painter.draw_glyphs_in_rect(glyphs, rect, &font_db.borrow());
+    painter.draw_glyphs_in_rect(glyphs, rect);
   }
 }
 

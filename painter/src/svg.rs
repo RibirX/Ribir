@@ -281,6 +281,7 @@ fn fallback_color_check(cmds: &[PaintCommand]) -> (bool, bool) {
         stroke_fallback |= s;
       }
       PaintCommand::Filter { .. } => {}
+      PaintCommand::Text(_) => {}
     }
   }
   (fill_fallback, stroke_fallback)
@@ -315,6 +316,7 @@ fn brush_replace(cmds: &[PaintCommand], fill: &Brush, stroke: &Brush) -> Box<[Pa
         }
       }
       PaintCommand::Filter { .. } => c.clone(),
+      PaintCommand::Text(_) => c.clone(),
     })
     .collect()
 }
@@ -379,5 +381,14 @@ impl Clone for Svg {
       inherited_stroke: self.inherited_stroke,
       last: RefCell::new(self.last.borrow().clone()),
     }
+  }
+}
+
+impl std::fmt::Debug for Svg {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_struct("Svg")
+      .field("size", &self.size)
+      .field("commands_len", &self.commands.len())
+      .finish()
   }
 }

@@ -1,7 +1,7 @@
 use std::{future::Future, sync::Arc};
 
 use ribir_core::{
-  prelude::*,
+  prelude::{font_db::FontDBGlyphProvider, *},
   window::{
     BoxShellWindow, RedrawDemand, Shell, ShellWindow, UiEvent, WindowAttributes, WindowId,
     WindowLevel,
@@ -34,6 +34,7 @@ pub enum ShellCmd {
     viewport: Rect,
     surface_color: Color,
     commands: Vec<PaintCommand>,
+    glyph_provider: FontDBGlyphProvider,
   },
   Close {
     id: WindowId,
@@ -103,6 +104,7 @@ pub trait WinitBackend<'a>: Sized {
 
   fn draw_commands(
     &mut self, viewport: DeviceRect, global_matrix: &Transform, commands: &[PaintCommand],
+    glyph_provider: &dyn GlyphProvider,
   );
 
   fn end_frame(&mut self);
@@ -136,7 +138,7 @@ impl WinitShellWnd {
           self.winit_wnd.request_redraw();
         }
       }
-      ShellCmd::Draw { viewport, surface_color, commands, wnd_size, .. } => {
+      ShellCmd::Draw { viewport, surface_color, commands, glyph_provider, wnd_size, .. } => {
         if wnd_size == window_size(&self.winit_wnd) {
           self.backend.begin_frame(surface_color);
           let scale_factor = self.winit_wnd.scale_factor() as f32;
@@ -151,6 +153,7 @@ impl WinitShellWnd {
             viewport,
             &Transform::scale(scale_factor, scale_factor),
             &commands,
+            &glyph_provider,
           );
 
           #[cfg(feature = "debug")]
@@ -267,12 +270,15 @@ impl ShellWindow for ShellWndHandle {
   fn draw_commands(
     &mut self, wnd_size: Size, viewport: Rect, surface_color: Color, commands: &[PaintCommand],
   ) {
+    let font_db = AppCtx::font_db();
+    let glyph_provider = font_db.borrow_mut().glyph_provider();
     self.sender.send(ShellCmd::Draw {
       id: self.id(),
       wnd_size,
       viewport,
       surface_color,
       commands: commands.to_vec(),
+      glyph_provider,
     });
   }
 
