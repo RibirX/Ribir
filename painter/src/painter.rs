@@ -1,5 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
+pub use fontdb::ID as FaceId;
 use ribir_algo::Resource;
 use ribir_geom::{Angle, DeviceRect, Point, Rect, Size, Transform, Vector};
 use serde::{Deserialize, Serialize};
@@ -9,7 +10,7 @@ use crate::{
   Brush, Color, Glyph, PixelImage, Svg, VisualGlyphs,
   color::{ColorFilterMatrix, LinearGradient, RadialGradient},
   filter::{Filter, FilterLayer, FilterOp},
-  font_db::FontDB,
+  font_db::{Face, FontDB},
   path::*,
   path_builder::PathBuilder,
 };
@@ -56,10 +57,36 @@ pub trait PainterBackend {
   /// it may cause undefined behavior.
   fn draw_commands(
     &mut self, viewport: DeviceRect, commands: &[PaintCommand], global_matrix: &Transform,
-    output: &mut Self::Texture,
+    output: &mut Self::Texture, glyph_provider: &dyn GlyphProvider,
   );
   /// A frame end.
   fn end_frame(&mut self);
+}
+
+/// A provider that the backend uses to access immutable font face data.
+///
+/// Glyph rasterization and render caching are backend responsibilities.
+pub trait GlyphProvider {
+  fn get_face(&self, face_id: FaceId) -> Option<std::sync::Arc<Face>>;
+}
+
+/// A text drawing command carrying deferred glyph data.
+///
+/// The actual rasterization of glyphs is deferred to the rendering backend,
+/// which can determine the optimal physical pixel size based on the display
+/// scale factor and the current transform.
+#[derive(Debug, Clone)]
+pub struct TextCommand {
+  /// The font size in logical pixels.
+  pub font_size: f32,
+  /// The bounding box for visibility culling.
+  pub paint_bounds: Rect,
+  /// The transform at time of emission.
+  pub transform: Transform,
+  /// The brush (color/gradient) used to fill the text.
+  pub brush: CommandBrush,
+  /// The glyphs to render. Each glyph carries its own `face_id`.
+  pub glyphs: Resource<Box<[Glyph]>>,
 }
 
 /// The enum of path types, which can be either shared or owned. This suggests
@@ -162,6 +189,14 @@ pub enum PaintCommand {
     /// the filter primitive to apply.
     filters: Vec<FilterLayer>,
   },
+
+  /// A deferred text drawing command. The backend resolves the physical pixel
+  /// size and rasterizes glyphs via the injected [`GlyphProvider`].
+  ///
+  /// This variant is skipped during serialization because `Glyph` and
+  /// `fontdb::ID` do not implement serde.
+  #[serde(skip)]
+  Text(TextCommand),
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -820,6 +855,13 @@ impl Painter {
             PaintCommand::Bundle { transform: transform.then(&b_ts), color_filter, bounds, cmds }
           }
           PaintCommand::Filter { .. } => cmd.clone(),
+          PaintCommand::Text(mut text_cmd) => {
+            text_cmd.transform = text_cmd.transform.then(&transform);
+            text_cmd
+              .brush
+              .apply_color_filter(self.color_filter());
+            PaintCommand::Text(text_cmd)
+          }
         };
         self.commands.push(cmd);
       }
@@ -864,87 +906,41 @@ impl Painter {
     self
   }
 
-  pub fn draw_glyph(&mut self, g: &Glyph, font_size: f32, font_db: &FontDB) -> &mut Self {
-    #[inline]
-    fn prefer_glyph_img_size(font_size: f32, matrix: &Transform) -> u16 {
-      let scale = matrix.m11.max(matrix.m22);
-      // We always prefer a larger image to has better quality for font.
-      (font_size * scale * 2.) as u16
-    }
-
-    let Some(face) = font_db.try_get_face_data(g.face_id) else { return self };
-
-    let unit = face.units_per_em() as f32;
-    let matrix = *self.transform();
-
-    let bounds = g.bounds();
-    if let Some((img, offset)) =
-      face.glyph_raster_image(g.glyph_id.0, prefer_glyph_img_size(font_size, &matrix))
+  pub fn draw_glyph(&mut self, g: &Glyph, font_size: f32, _font_db: &FontDB) -> &mut Self {
+    invisible_return!(self);
+    let paint_bounds = g.bounds();
+    if paint_bounds.is_empty()
+      || self
+        .intersection_paint_bounds(&paint_bounds)
+        .is_none()
     {
-      let img_h = img.height() as f32;
-      let img_w = img.width() as f32;
-
-      if img.color_format() == crate::ColorFormat::Rgba8 {
-        // Color bitmap emoji: use the same scale as outline-rasterized glyphs.
-        let img_size_px = prefer_glyph_img_size(font_size, &matrix) as f32;
-        let scale = font_size / img_size_px;
-
-        // Emoji fonts typically have (ascender + |descender|) > 1em, so
-        // baseline-relative placement makes the emoji visually lower than
-        // adjacent text.  Center the image vertically within the em box.
-        let dst_h = img_h * scale;
-        let draw_x = bounds.min_x() + offset.x * scale;
-        let draw_y = bounds.min_y() + (font_size - dst_h) / 2.0;
-
-        let dst_size = Size::new(img_w * scale, dst_h);
-        let dst_rect = Rect::new(Point::new(draw_x, draw_y), dst_size);
-        self.draw_img(img, &dst_rect, &None);
-      } else {
-        // Outline-rasterized glyphs: swash renders at exactly the requested
-        // img_size, so placement values are in the img_size coordinate system.
-        let img_size_px = prefer_glyph_img_size(font_size, &matrix) as f32;
-        let scale = font_size / img_size_px;
-
-        let baseline_y = bounds.min_y() + font_size;
-        let draw_x = bounds.min_x() + offset.x * scale;
-        let draw_y = baseline_y + offset.y * scale;
-
-        self
-          .translate(draw_x, draw_y)
-          .scale(scale, scale)
-          .draw_path(PaintPath::PixelImage(img));
-      }
-    } else if let Some(svg) = face.glyph_svg_image(g.glyph_id.0) {
-      let grid_scale = face
-        .vertical_height()
-        .map(|h| h as f32 / face.units_per_em() as f32)
-        .unwrap_or(1.)
-        .max(1.);
-      let size = svg.size();
-      let bound_size = bounds.size;
-      let scale = (bound_size.width / size.width).min(bound_size.height / size.height) / grid_scale;
-      self
-        .translate(bounds.min_x(), bounds.min_y())
-        .scale(scale, scale)
-        .draw_svg(&svg);
-    } else if let Some(path) = face.outline_glyph(g.glyph_id.0) {
-      let scale = font_size / unit;
-      self
-        .translate(bounds.min_x(), bounds.min_y())
-        .scale(scale, -scale)
-        .translate(0., -unit)
-        .draw_path(path.into());
+      return self;
     }
 
-    self.set_transform(matrix);
+    let brush = self.fill_brush().clone();
+    if !brush.is_visible() {
+      return self;
+    }
+    let mut cmd_brush = CommandBrush::from(brush);
+    cmd_brush.apply_color_filter(self.color_filter());
+
+    self
+      .commands
+      .push(PaintCommand::Text(TextCommand {
+        font_size,
+        paint_bounds,
+        transform: *self.transform(),
+        brush: cmd_brush,
+        glyphs: Resource::new(vec![g.clone()].into_boxed_slice()),
+      }));
 
     self
   }
 
-  /// draw the text glyphs within the box_rect
   pub fn draw_glyphs_in_rect(
-    self: &mut Painter, visual_glyphs: &VisualGlyphs, box_rect: Rect, font_db: &FontDB,
+    self: &mut Painter, visual_glyphs: &VisualGlyphs, box_rect: Rect,
   ) -> &mut Self {
+    invisible_return!(self);
     let visual_rect = visual_glyphs.visual_rect();
     let Some(paint_rect) = self.intersection_paint_bounds(&box_rect) else {
       return self;
@@ -953,11 +949,26 @@ impl Painter {
       return self;
     };
 
-    self.translate(visual_rect.origin.x, visual_rect.origin.y);
-
-    for g in glyphs {
-      self.draw_glyph(&g, visual_glyphs.font_size(), font_db);
+    let brush = self.fill_brush().clone();
+    if !brush.is_visible() {
+      return self;
     }
+    let mut cmd_brush = CommandBrush::from(brush);
+    cmd_brush.apply_color_filter(self.color_filter());
+
+    let transform = self
+      .transform()
+      .pre_translate(ribir_geom::Vector::new(visual_rect.origin.x, visual_rect.origin.y));
+
+    let text_cmd = TextCommand {
+      font_size: visual_glyphs.font_size(),
+      paint_bounds: box_rect,
+      transform,
+      brush: cmd_brush,
+      glyphs: Resource::new(glyphs.collect::<Vec<_>>().into_boxed_slice()),
+    };
+
+    self.commands.push(PaintCommand::Text(text_cmd));
 
     self
   }
@@ -1179,6 +1190,9 @@ impl Painter {
         PaintCommand::Path(path_cmd) => path_cmd.paint_bounds,
         PaintCommand::Bundle { bounds: b, transform, .. } => transform.outer_transformed_rect(b),
         PaintCommand::Filter { filter_bounds, .. } => *filter_bounds,
+        PaintCommand::Text(text_cmd) => text_cmd
+          .transform
+          .outer_transformed_rect(&text_cmd.paint_bounds),
         PaintCommand::PopClip => continue,
       };
       bounds = Some(bounds.map_or(cmd_bounds, |b| b.union(&cmd_bounds)));

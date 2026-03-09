@@ -1,6 +1,8 @@
 #[cfg(feature = "debug")]
 use ribir_core::prelude::{BoxFuture, PixelImage};
-use ribir_core::prelude::{Color, DeviceRect, DeviceSize, PaintCommand, PainterBackend, Transform};
+use ribir_core::prelude::{
+  Color, DeviceRect, DeviceSize, GlyphProvider, PaintCommand, PainterBackend, Transform,
+};
 use ribir_gpu::Surface;
 #[cfg(feature = "debug")]
 use ribir_gpu::Texture;
@@ -34,12 +36,14 @@ impl<'a> WinitBackend<'a> for WgpuBackend<'a> {
 
   fn draw_commands(
     &mut self, viewport: DeviceRect, global_matrix: &Transform, commands: &[PaintCommand],
+    glyph_provider: &dyn GlyphProvider,
   ) {
     self.backend.draw_commands(
       viewport,
       commands,
       global_matrix,
       self.surface.get_current_texture(),
+      glyph_provider,
     );
   }
 
