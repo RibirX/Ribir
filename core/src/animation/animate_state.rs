@@ -9,6 +9,10 @@ use crate::prelude::*;
 pub trait AnimateState {
   type Value: Clone;
 
+  fn clone_animate_state(&self) -> Self
+  where
+    Self: Sized;
+
   fn get(&self) -> Self::Value;
   fn set(&self, v: Self::Value);
   fn revert(&self, v: Self::Value);
@@ -146,6 +150,9 @@ impl<S: AnimateState + 'static> AnimateState for TransitionUncountedState<S> {
   type Value = S::Value;
 
   #[inline]
+  fn clone_animate_state(&self) -> Self { Self::new(self.state.clone_animate_state()) }
+
+  #[inline]
   fn get(&self) -> Self::Value { self.state.get() }
 
   #[inline]
@@ -177,6 +184,9 @@ where
   S::Value: Clone + Lerp,
 {
   type Value = S::Value;
+
+  #[inline]
+  fn clone_animate_state(&self) -> Self { self.clone_writer() }
 
   #[inline]
   fn get(&self) -> Self::Value { self.read().clone() }
@@ -212,9 +222,14 @@ where
 impl<S, F> AnimateState for CustomLerpState<S, F>
 where
   S: AnimateState,
-  F: FnMut(&S::Value, &S::Value, f32) -> S::Value,
+  F: FnMut(&S::Value, &S::Value, f32) -> S::Value + Clone,
 {
   type Value = S::Value;
+
+  #[inline]
+  fn clone_animate_state(&self) -> Self {
+    Self { lerp_fn: self.lerp_fn.clone(), state: self.state.clone_animate_state() }
+  }
 
   #[inline]
   fn get(&self) -> Self::Value { self.state.get() }
@@ -255,7 +270,7 @@ impl<S, F> CustomLerpState<S, F>
 where
   S: StateWriter,
   S::Value: Clone,
-  F: FnMut(&S::Value, &S::Value, f32) -> S::Value + 'static,
+  F: FnMut(&S::Value, &S::Value, f32) -> S::Value + Clone + 'static,
 {
   #[inline]
   pub fn from_writer(state: S, lerp_fn: F) -> impl AnimateState<Value = S::Value> {
@@ -269,6 +284,9 @@ where
   S::Value: Clone,
 {
   type Value = S::Value;
+
+  #[inline]
+  fn clone_animate_state(&self) -> Self { Self(self.0.clone_writer()) }
 
   #[inline]
   fn get(&self) -> Self::Value { self.0.read().clone() }
@@ -322,6 +340,9 @@ impl AnimateState for AnimateStatePackEnd {
   type Value = AnimateStatePackEnd;
 
   #[inline]
+  fn clone_animate_state(&self) -> Self { AnimateStatePackEnd }
+
+  #[inline]
   fn get(&self) -> Self::Value { AnimateStatePackEnd }
 
   #[inline]
@@ -355,6 +376,11 @@ where
   T: AnimateState,
 {
   type Value = AnimateStatePack<H::Value, T::Value>;
+
+  #[inline]
+  fn clone_animate_state(&self) -> Self {
+    AnimateStatePack::new(self.head.clone_animate_state(), self.tail.clone_animate_state())
+  }
 
   #[inline]
   fn get(&self) -> Self::Value { AnimateStatePack::new(self.head.get(), self.tail.get()) }

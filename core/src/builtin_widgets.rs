@@ -18,8 +18,6 @@ pub mod image;
 
 pub use image::{DecodedFrame, FrameIterator, Image, LoopCount};
 
-pub mod animate_presence;
-pub use animate_presence::*;
 pub mod backdrop_filter;
 pub use backdrop_filter::*;
 pub mod box_shadow;

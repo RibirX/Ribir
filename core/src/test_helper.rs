@@ -152,6 +152,18 @@ impl TestWindow {
       .mark(root, DirtyPhase::Layout);
     self.0.request_resize(size);
   }
+
+  pub fn root(&self) -> WidgetId { self.0.tree().root() }
+
+  pub fn children_count(&self, id: WidgetId) -> usize { id.children(self.0.tree()).count() }
+
+  pub fn children(&self, id: WidgetId) -> impl DoubleEndedIterator<Item = WidgetId> + '_ {
+    id.children(self.0.tree())
+  }
+
+  pub fn dispose(&self) { self.0.dispose(); }
+
+  pub fn dispose_widget(&self, id: WidgetId) { id.dispose_subtree(self.0.tree_mut()); }
 }
 
 impl std::ops::Deref for TestWindow {

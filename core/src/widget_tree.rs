@@ -7,7 +7,7 @@ mod layout_info;
 pub use layout_info::*;
 
 use self::widget::widget_id::new_node;
-use crate::{overlay::ShowingOverlays, prelude::*, render_helper::PureRender, window::WindowId};
+use crate::{prelude::*, render_helper::PureRender, window::WindowId};
 
 /// This enum defines the dirty phases of the widget.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -64,15 +64,16 @@ impl WidgetTree {
     let _guard = BuildCtx::init(BuildCtx::empty(wnd.tree));
 
     let theme = AppCtx::app_theme().clone_writer();
+    let wnd_id = wnd.id();
     let child = GenWidget::new(move || {
-      let overlays = Provider::of::<ShowingOverlays>(BuildCtx::get()).unwrap();
-      overlays.rebuild();
+      AppCtx::get_window(wnd_id)
+        .expect("Window should stay alive while rebuilding the root.")
+        .rebuild_mounts();
       Root.with_child(content.gen_widget())
     });
 
     let (mut providers, child) = Theme::preprocess_before_compose(theme, child);
     let location = Location::stateful();
-    providers.push(Provider::new(ShowingOverlays::default()));
     providers.push(Provider::writer(location.clone_writer(), None));
     providers.push(Provider::writer(Stateful::new(GlobalWidgets::default()), None));
 

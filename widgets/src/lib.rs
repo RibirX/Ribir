@@ -1,3 +1,4 @@
+pub mod animation;
 pub mod avatar;
 pub mod badge;
 pub mod buttons;
@@ -24,8 +25,29 @@ pub mod tabs;
 pub mod transform_box;
 pub mod prelude {
   pub use super::{
-    avatar::*, badge::*, buttons::*, checkbox::*, common_widget::*, divider::*, grid_view::*,
-    icon::*, input::*, label::*, layout::*, list::*, menu::*, path::*, progress::*, radio::*,
-    router::*, scrollbar::*, select_region::*, slider::*, switch::*, tabs::*, transform_box::*,
+    animation::{animated_presence::*, animated_visibility::*},
+    avatar::*,
+    badge::*,
+    buttons::*,
+    checkbox::*,
+    common_widget::*,
+    divider::*,
+    grid_view::*,
+    icon::*,
+    input::*,
+    label::*,
+    layout::*,
+    list::*,
+    menu::*,
+    path::*,
+    progress::*,
+    radio::*,
+    router::*,
+    scrollbar::*,
+    select_region::*,
+    slider::*,
+    switch::*,
+    tabs::*,
+    transform_box::*,
   };
 }

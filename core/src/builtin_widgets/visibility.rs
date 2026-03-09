@@ -1,5 +1,10 @@
 use crate::{prelude::*, wrap_render::*};
 
+/// Allows hidden descendants to continue painting while an outer wrapper keeps
+/// a leave animation alive.
+#[derive(Clone, Copy, Default)]
+pub struct AllowHiddenPaint(pub bool);
+
 /// A wrapper that controls whether its child is visible and participates in
 /// layout, painting, and hit testing.
 ///
@@ -61,8 +66,14 @@ impl WrapRender for VisibilityRender {
     if self.display { host.measure(clamp, ctx) } else { clamp.min }
   }
 
+  #[inline]
+  fn size_affected_by_child(&self, host: &dyn Render) -> bool {
+    if self.display { host.size_affected_by_child() } else { false }
+  }
+
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
-    if self.display {
+    let allow_hidden_paint = Provider::of::<AllowHiddenPaint>(ctx).is_some_and(|v| v.0);
+    if self.display || allow_hidden_paint {
       host.paint(ctx)
     } else {
       ctx.painter().apply_alpha(0.);

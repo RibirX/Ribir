@@ -22,6 +22,7 @@ ribir_geom = { workspace = true }
 unicode-segmentation.workspace = true
 thiserror.workspace = true
 ahash.workspace = true
+serde_json = { workspace = true, optional = true }
 
 [dev-dependencies]
 paste.workspace = true
@@ -34,4 +35,4 @@ ribir = { path = "../ribir", features = ["material"] }
 
 [features]
 default = []
-debug = ["ribir_core/debug"]
+debug = ["ribir_core/debug", "serde_json"]

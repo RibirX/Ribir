@@ -1,15 +1,34 @@
-//! Animate widgets when they appear or disappear.
+//! Animate widgets when they are structurally mounted or disposed.
 //!
-//! `AnimatePresence` wraps dynamic content and plays **enter** and **leave**
-//! animations automatically when the child is mounted or disposed.
+//! `AnimatedPresence` wraps dynamic content and plays **enter** and **leave**
+//! animations automatically when the child is added to or removed from the
+//! widget tree.
 //!
 //! Use it whenever you need to fade in, slide in, or otherwise animate the
-//! structural presence of a widget — for example, showing/hiding a toast,
-//! toggling a panel, or swapping list items.
+//! lifecycle of a widget — for example, showing/hiding a toast notification,
+//! conditionally rendering a panel, or swapping list items.
 //!
 //! Unlike [`Animate`], which animates *property value* changes over time,
-//! `AnimatePresence` is scoped to the *structural event* (mount / dispose)
+//! `AnimatedPresence` is scoped to the *structural event* (mount / dispose)
 //! and does **not** affect normal property changes.
+//!
+//! # `AnimatedPresence` vs `AnimatedVisibility`
+//!
+//! Both widgets can provide enter/leave animations, but they work fundamentally
+//! differently:
+//!
+//! * **Lifecycle**: `AnimatedPresence` animates the **actual creation and
+//!   destruction** of widgets (Mount/Dispose). The widget is fully destroyed
+//!   from memory after leaving. `AnimatedVisibility` keeps the widget
+//!   permanently in the tree and only toggles its render/layout visibility via
+//!   property.
+//! * **Use Cases**:
+//!   * Use **`AnimatedPresence`** for dynamically generated content (like list
+//!     items, route pages, or `if condition { @Widget }` blocks) to save memory
+//!     by destroying invisible widgets.
+//!   * Use **`AnimatedVisibility`** for static UI components (like a persistent
+//!     dropdown menu or collapsible panel) that toggle frequently, saving CPU
+//!     by avoiding the cost of repeatedly building/disposing the subtree.
 //!
 //! # How it works
 //!
@@ -17,7 +36,7 @@
 //!   immediately, animating the target state from the given `from` value to the
 //!   widget's real value.
 //!
-//! * **Leave** — When the child is disposed, `AnimatePresence` detaches the
+//! * **Leave** — When the child is disposed, `AnimatedPresence` detaches the
 //!   widget subtree from its original location and re-attaches it to the root
 //!   as an overlay, anchored at its original global position. The `leave`
 //!   animation then plays, and the subtree is removed once it finishes.
@@ -33,7 +52,7 @@
 //!   // Grab the opacity writer *before* moving `item` into the tree.
 //!   let opacity = item.opacity();
 //!
-//!   @AnimatePresence {
+//!   @AnimatedPresence {
 //!     // Fade in over 200 ms when mounted.
 //!     enter: EnterAction {
 //!       state: opacity,
@@ -57,21 +76,19 @@
 //! }
 //! ```
 
-use std::cell::{Cell, RefCell};
-
-use ribir_algo::Rc;
-
-use crate::{animation::Animation, prelude::*, render_helper::PureRender, window::WindowId};
+use ribir_core::{animation::Animation, prelude::*, window::WindowId};
 
 /// Type-erased presence animation action.
 ///
 /// Both [`EnterAction`] and [`LeaveAction`] implement this trait, allowing
-/// `AnimatePresence` to store them without generics.
+/// `AnimatedPresence` to store them without generics.
 pub trait PresenceAction {
-  /// Start the one-shot animation. Can only be called once.
+  /// Start the animation.
   fn fire(&self, window_id: WindowId);
   /// Whether the animation is still running.
   fn is_running(&self) -> bool;
+  /// A watchable running state for reacting to animation completion.
+  fn running(&self) -> Box<dyn StateWatcher<Value = bool>>;
 }
 
 /// Describes a leave animation that fires on widget disposal.
@@ -100,16 +117,16 @@ pub struct EnterAction<S: AnimateState + 'static, T: Transition + 'static = Box<
 /// mounted or disposed.
 #[derive(Default)]
 #[declare(simple)]
-pub struct AnimatePresence {
+pub struct AnimatedPresence {
   /// Enter (mount) animation.
   #[declare(default)]
-  pub enter: Option<Box<dyn PresenceAction>>,
+  enter: Option<Box<dyn PresenceAction>>,
   /// Leave (dispose) animation.
   #[declare(default)]
-  pub leave: Option<Box<dyn PresenceAction>>,
+  leave: Option<Box<dyn PresenceAction>>,
 }
 
-impl<'c> ComposeChild<'c> for AnimatePresence {
+impl<'c> ComposeChild<'c> for AnimatedPresence {
   type Child = Widget<'c>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
@@ -118,83 +135,52 @@ impl<'c> ComposeChild<'c> for AnimatePresence {
       (w.enter.take(), w.leave.take())
     };
 
-    let enter = enter.map(Rc::new);
-    let leave = leave.map(Rc::new);
-
     let mut obj = FatObj::new(child);
     let wnd_id = BuildCtx::get().window().id();
 
     // --- Enter animation ---
     if let Some(enter) = enter {
-      obj.on_mounted(move |_| {
-        enter.fire(wnd_id);
-      });
+      obj.on_mounted(move |_| enter.fire(wnd_id));
     }
 
     // --- Leave animation ---
     //
-    // On disposal the widget is wrapped in a `GhostHost` container pinned at
-    // the widget's original global position.  The container is allocated as a
-    // new tree node and re-attached to the tree root so the ghost keeps
-    // rendering in place while the leave animation plays.  Because `GhostHost`
-    // is a separate Render node, the child's own anchor / transform properties
-    // remain free for the leave animation (e.g. a slide-out via Transform).
+    // On disposal the subtree is preserved, wrapped in a `GhostHost`
+    // container pinned at its original global position, then mounted into the
+    // window overlay layer. Because `GhostHost` is a separate Render node, the
+    // child's own anchor / transform properties remain free for the leave
+    // animation (e.g. a slide-out via Transform).
     if let Some(leave) = leave {
-      let leave_fired = Rc::new(Cell::new(false));
       obj.on_disposed(move |e| {
         let id = e.current_target();
-        if id.tree_parent(e.tree()).is_some() || leave_fired.replace(true) {
-          return;
-        }
-
         let wnd = e.window();
 
         // If the widget was never laid out (e.g. mounted and disposed within the
         // same frame before any layout ran), there is nothing visible to animate.
-        if wnd.tree().store.layout_info(id).is_none() {
+        if wnd.widget_size(id).is_none() {
           return;
         }
 
         // Capture the widget's original global position before mutating the
         // tree.  Must be done before any `tree_mut()` borrow.
         let pos = e.map_to_global(Point::zero());
-
-        let ghost_id;
-        {
-          let tree = wnd.tree_mut();
-          ghost_id = tree.alloc_node(Box::new(PureRender(GhostHost { pos })));
-          ghost_id.append(id, tree);
-          let root = tree.root();
-          root.append(ghost_id, tree);
-          tree.dirty_marker().mark(root, DirtyPhase::Layout);
+        let preserve = e.preserve();
+        let ghost = fn_widget! {
+          @GhostHost {
+            pos,
+            @ { preserve.into_widget() }
+          }
         }
+        .into_widget();
 
         // Start the animation.
         leave.fire(wnd_id);
-
-        dispose_ghost_when_leave_done(wnd_id, ghost_id, leave.clone());
+        wnd.mount(ghost).retain_until(leave.running());
       });
     }
 
     obj.into_widget()
   }
-}
-
-fn dispose_ghost_when_leave_done(
-  window_id: WindowId, id: WidgetId, leave: Rc<Box<dyn PresenceAction>>,
-) {
-  let Some(wnd) = AppCtx::get_window(window_id) else { return };
-  wnd.once_layout_ready(move || {
-    let Some(wnd) = AppCtx::get_window(window_id) else { return };
-    if id.is_dropped(wnd.tree()) {
-      return;
-    }
-    if !leave.is_running() {
-      id.dispose_subtree(wnd.tree_mut());
-      return;
-    }
-    dispose_ghost_when_leave_done(window_id, id, leave);
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -209,6 +195,7 @@ fn dispose_ghost_when_leave_done(
 /// `adjust_position` always returns the stored position, keeping the ghost
 /// fixed during `perform_place(root)`.  `size_affected_by_child` returns
 /// `false` so that layout changes inside the ghost never propagate upward.
+#[derive(Declare, MultiChild)]
 struct GhostHost {
   pos: Point,
 }
@@ -239,81 +226,63 @@ impl Render for GhostHost {
 // ---------------------------------------------------------------------------
 
 struct LeaveInner<S: AnimateState + 'static> {
-  pending: Option<(S, Box<dyn Transition>, S::Value)>,
-  animate: Option<Stateful<Animate<S>>>,
+  to: S::Value,
+  animate: Stateful<Animate<S>>,
 }
 
-impl<S> PresenceAction for RefCell<LeaveInner<S>>
+impl<S> PresenceAction for LeaveInner<S>
 where
   S: AnimateState + 'static,
   S::Value: Clone + 'static,
 {
   fn fire(&self, window_id: WindowId) {
-    let inner = &mut *self.borrow_mut();
-    let Some((state, transition, to)) = inner.pending.take() else { return };
+    let mut animate = self.animate.write();
+    animate.window_id = Some(window_id);
+    animate.from = animate.state.get();
+    animate.state.set(self.to.clone());
+    animate.forget_modifies();
+    drop(animate);
 
-    let from = state.get();
-    state.set(to);
-
-    let animate = {
-      let mut d = Animate::declarer();
-      d.with_state(state)
-        .with_from(from)
-        .with_transition(transition)
-        .with_window_id(window_id);
-      d.finish()
-    };
-    animate.run();
-    inner.animate = Some(animate);
+    self.animate.run();
   }
 
-  fn is_running(&self) -> bool {
-    self
-      .borrow()
-      .animate
-      .as_ref()
-      .is_some_and(|a| a.read().is_running())
+  fn is_running(&self) -> bool { self.animate.read().is_running() }
+
+  fn running(&self) -> Box<dyn StateWatcher<Value = bool>> {
+    Box::new(
+      self
+        .animate
+        .part_watcher(|a| PartRef::from_value(a.is_running())),
+    )
   }
 }
 
 struct EnterInner<S: AnimateState + 'static> {
-  pending: Option<(S, Box<dyn Transition>, S::Value)>,
-  animate: Option<Stateful<Animate<S>>>,
+  animate: Stateful<Animate<S>>,
 }
 
-impl<S> PresenceAction for RefCell<EnterInner<S>>
+impl<S> PresenceAction for EnterInner<S>
 where
   S: AnimateState + 'static,
   S::Value: Clone + 'static,
 {
   fn fire(&self, window_id: WindowId) {
-    let inner = &mut *self.borrow_mut();
-    let Some((state, transition, from)) = inner.pending.take() else { return };
+    let mut animate = self.animate.write();
+    animate.window_id = Some(window_id);
+    animate.forget_modifies();
+    drop(animate);
 
-    let real_value = state.get();
-    state.set(from.clone());
-
-    let animate = {
-      let mut d = Animate::declarer();
-      d.with_state(state)
-        .with_from(from)
-        .with_transition(transition)
-        .with_window_id(window_id);
-      d.finish()
-    };
-    // Set the state to the real target value so that when run() is called,
-    // the animation will animate from `from` to `real_value`.
-    animate.write().state.set(real_value);
-    animate.run();
-    inner.animate = Some(animate);
+    self.animate.run();
   }
 
-  fn is_running(&self) -> bool {
-    self
-      .borrow()
-      .animate
-      .as_ref()
-      .is_some_and(|a| a.read().is_running())
+  fn is_running(&self) -> bool { self.animate.read().is_running() }
+
+  fn running(&self) -> Box<dyn StateWatcher<Value = bool>> {
+    Box::new(
+      self
+        .animate
+        .part_watcher(|a| PartRef::from_value(a.is_running())),
+    )
   }
 }
 
@@ -328,10 +297,14 @@ where
   T: Transition + 'static,
 {
   fn from(action: LeaveAction<S, T>) -> Self {
-    Box::new(RefCell::new(LeaveInner {
-      pending: Some((action.state, action.transition.into_box(), action.to)),
-      animate: None,
-    }))
+    let animate = {
+      let mut d = Animate::declarer();
+      d.with_state(action.state)
+        .with_transition(action.transition.into_box())
+        .with_from(action.to.clone());
+      d.finish()
+    };
+    Box::new(LeaveInner { to: action.to, animate })
   }
 }
 
@@ -351,10 +324,14 @@ where
   T: Transition + 'static,
 {
   fn from(action: EnterAction<S, T>) -> Self {
-    Box::new(RefCell::new(EnterInner {
-      pending: Some((action.state, action.transition.into_box(), action.from)),
-      animate: None,
-    }))
+    let animate = {
+      let mut d = Animate::declarer();
+      d.with_state(action.state)
+        .with_transition(action.transition.into_box())
+        .with_from(action.from);
+      d.finish()
+    };
+    Box::new(EnterInner { animate })
   }
 }
 
@@ -369,8 +346,9 @@ where
 
 #[cfg(test)]
 mod tests {
+  use ribir_core::{reset_test_env, test_helper::*, window::WindowFlags};
+
   use super::*;
-  use crate::{reset_test_env, test_helper::*, window::WindowFlags};
 
   #[test]
   fn leave_animation_keeps_widget_alive() {
@@ -383,7 +361,7 @@ mod tests {
 
     let w = fn_widget! {
       pipe!(*$read(show)).map(move |visible| {
-        if visible {
+        visible.then(move || {
           let mut item = @MockBox {
             margin: EdgeInsets { left: 24., top: 18., ..EdgeInsets::ZERO },
             size: Size::new(100., 30.),
@@ -391,22 +369,18 @@ mod tests {
           };
           let opacity = item.opacity();
 
-          let presence = Stateful::new(AnimatePresence {
-            enter: None,
-            leave: Some(LeaveAction {
+          @AnimatedPresence {
+            leave: LeaveAction {
               state: opacity,
               transition: EasingTransition {
                 easing: easing::LINEAR,
                 duration: Duration::from_millis(100),
               },
               to: 0.0,
-            }.into()),
-          });
-
-          AnimatePresence::compose_child(presence, item.into_widget())
-        } else {
-          @Void {}.into_widget()
-        }
+            },
+            @ { item }
+          }
+        })
       })
     };
 
@@ -418,8 +392,8 @@ mod tests {
     let original_pos = wnd.map_to_global(Point::zero(), mounted_id);
 
     // Remember how many children root had before hiding.
-    let root = wnd.tree().root();
-    let children_before = root.children(wnd.tree()).count();
+    let root = wnd.root();
+    let children_before = wnd.children_count(root);
 
     // Hide the widget — leave animation should fire and ghost should be
     // re-parented to root.
@@ -428,14 +402,14 @@ mod tests {
 
     // After disposal the ghost subtree is appended to root, so root should
     // have at least one more child than before.
-    let children_after = root.children(wnd.tree()).count();
+    let children_after = wnd.children_count(root);
     assert!(
       children_after > children_before,
       "expected ghost widget appended to root (before={children_before}, after={children_after})"
     );
 
-    let ghost_id = root
-      .children(wnd.tree())
+    let ghost_id = wnd
+      .children(wnd.root())
       .last()
       .expect("ghost widget should be appended to root");
     assert_eq!(wnd.widget_pos(ghost_id), Some(original_pos));
@@ -449,19 +423,17 @@ mod tests {
       let mut item = @MockBox { size: Size::new(100., 30.) };
       let opacity = item.opacity();
 
-      let presence = Stateful::new(AnimatePresence {
-        enter: Some(EnterAction {
+      @AnimatedPresence {
+        enter: EnterAction {
           state: opacity,
           transition: EasingTransition {
             easing: easing::LINEAR,
             duration: Duration::from_millis(100),
           },
           from: 0.0,
-        }.into()),
-        leave: None,
-      });
-
-      AnimatePresence::compose_child(presence, item.into_widget())
+        },
+        @ { item }
+      }
     };
 
     let wnd = TestWindow::new(w, Size::new(200., 200.), WindowFlags::ANIMATIONS);
@@ -477,26 +449,22 @@ mod tests {
 
     let w = fn_widget! {
       pipe!(*$read(show)).map(move |visible| {
-        if visible {
+        visible.then(move || {
           let mut item = @MockBox { size: Size::new(100., 30.) };
           let opacity = item.opacity();
 
-          let presence = Stateful::new(AnimatePresence {
-            enter: None,
-            leave: Some(LeaveAction {
+          @AnimatedPresence {
+            leave: LeaveAction {
               state: opacity,
               transition: EasingTransition {
                 easing: easing::LINEAR,
                 duration: Duration::from_millis(100),
               },
               to: 0.0,
-            }.into()),
-          });
-
-          AnimatePresence::compose_child(presence, item.into_widget())
-        } else {
-          @Void {}.into_widget()
-        }
+            },
+            @ { item }
+          }
+        })
       })
     };
 
@@ -506,5 +474,56 @@ mod tests {
     *c_show.write() = false;
     wnd.draw_frame();
     wnd.dispose();
+  }
+
+  #[test]
+  fn double_dispose_loop() {
+    reset_test_env!();
+
+    let show = Stateful::new(true);
+    let c_show = show.clone_writer();
+    let mounted_id = Stateful::new(None::<WidgetId>);
+    let c_mounted_id = mounted_id.clone_reader();
+
+    let w = fn_widget! {
+      pipe!(*$read(show)).map(move |visible| {
+        visible.then(move || {
+          let mut item = @MockBox {
+            margin: EdgeInsets { left: 24., top: 18., ..EdgeInsets::ZERO },
+            size: Size::new(100., 30.),
+            on_mounted: move |e| *$write(mounted_id) = Some(e.current_target()),
+          };
+          let opacity = item.opacity();
+
+          @AnimatedPresence {
+            leave: LeaveAction {
+              state: opacity,
+              transition: EasingTransition {
+                easing: easing::LINEAR,
+                duration: Duration::from_millis(100),
+              },
+              to: 0.0,
+            },
+            @ { item }
+          }
+        })
+      })
+    };
+
+    let wnd = TestWindow::new(w, Size::new(200., 200.), WindowFlags::ANIMATIONS);
+    wnd.draw_frame();
+    let mounted_id = c_mounted_id
+      .read()
+      .expect("child should be mounted before triggering leave");
+
+    *c_show.write() = false;
+    wnd.draw_frame(); // Leave animation starts, id is in GhostHost
+
+    // Manually dispose the id while it's in GhostHost!
+    wnd.dispose_widget(mounted_id);
+    wnd.draw_frame(); // Process disposal
+
+    let children_count = wnd.children_count(wnd.root());
+    assert!(children_count <= 2, "Should not create multiple ghosts");
   }
 }

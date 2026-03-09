@@ -104,7 +104,7 @@ impl<S: AnimateState> KeyFrames<S> {
   /// animations.
   pub fn into_lerp_fn_state(
     self,
-  ) -> CustomLerpState<S, impl FnMut(&S::Value, &S::Value, f32) -> S::Value>
+  ) -> CustomLerpState<S, impl FnMut(&S::Value, &S::Value, f32) -> S::Value + Clone>
   where
     S::Value: Lerp,
   {

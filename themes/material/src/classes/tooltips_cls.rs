@@ -1,4 +1,5 @@
 use ribir_core::prelude::*;
+use ribir_widgets::prelude::*;
 
 use crate::md;
 
@@ -19,8 +20,7 @@ pub(super) fn init(classes: &mut Classes) {
       };
       let opacity = w.opacity();
 
-      AnimatePresence {
-        enter: None,
+      @AnimatedPresence {
         leave: Some(LeaveAction {
           state: opacity,
           transition: EasingTransition {
@@ -29,7 +29,8 @@ pub(super) fn init(classes: &mut Classes) {
           },
           to: 0.,
         }.into()),
-      }.with_child(w)
+        @ { w }
+      }
     }
     .into_widget()
   });
