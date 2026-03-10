@@ -1,3 +1,4 @@
+pub mod animation;
 pub mod avatar;
 pub mod badge;
 pub mod buttons;
@@ -22,10 +23,16 @@ pub mod switch;
 pub mod tabs;
 
 pub mod transform_box;
+
+#[doc(hidden)]
+pub use ribir_core as core;
+
 pub mod prelude {
   pub use super::{
-    avatar::*, badge::*, buttons::*, checkbox::*, common_widget::*, divider::*, grid_view::*,
-    icon::*, input::*, label::*, layout::*, list::*, menu::*, path::*, progress::*, radio::*,
-    router::*, scrollbar::*, select_region::*, slider::*, switch::*, tabs::*, transform_box::*,
+    animation::*, avatar::*, badge::*, buttons::*, checkbox::*, common_widget::*, divider::*,
+    grid_view::*, icon::*, input::*, label::*, layout::*, list::*, menu::*, path::*, progress::*,
+    radio::*, router::*, scrollbar::*, select_region::*, slider::*, switch::*, tabs::*,
+    transform_box::*,
   };
+  pub use crate::{cases, transitions};
 }

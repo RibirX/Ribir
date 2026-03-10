@@ -4,36 +4,78 @@ sidebar_position: 2
 
 # 动画
 
-Ribir 提供了一个强大的动画系统，让您能够创建流畅、交互式的 UI。动画系统建立在 `@Animate` Widget 和各种过渡机制之上，这些机制使您能够动画化应用程序中的任何状态。
+Ribir 提供了一个强大且全面的动画系统，助您构建流畅响应的交互体验。系统以底层的 `@Animate` 组件为核心，通过提供多维度的抽象工具，以极低的性能开销实现了界面状态的弹性动画，并且巧妙地避免了数据流触发意外的全局重建。
 
-## Animate
+我们不会强迫您用单一的底层 API 解决所有复杂的动画需求。针对不同的逻辑场景，Ribir 提供了一套丰富的动画工具箱：从底层的属性插值引擎，一直到完全基于业务状态枚举的高级组合编排机制。
 
-创建动画的主要方式是通过 `@Animate` 创建，您能指定动画的持续时间、缓动函数和状态变化。
+## 基本概念：`@Animate` 原语
 
-### 基本动画
+在探索高级动画机制之前，我们需要先了解整个动画系统的核心基石：`@Animate` 原语。
 
-`@Animate` 需要三个主要属性:
-- `state`: 您想要动画化的状态，必须实现 `AnimateState` trait，基本类型的 `impl StateWriter<T: Clone>` 已经实现，所以使用中只要获取相应属性的 `StateWriter` 即可。
-- `from`: 动画的起始值
-- `transition`: 动画应如何随时间推移进行
+`@Animate` 提供了推动变量随时间运行的核心机制，它需要至少配置以下内容：
+- `state`: 要被动画驱动的目标，必须实现 `AnimateState` trait。您组件中的各种属性可以通过调用其专属的 writer（如 `widget.margin()`）自动满足此要求。
+- `from`: 本次动画的起点值。
+- `transition`: 描述这次动画的时长和缓动方式（例如 `EasingTransition`）。
 
-创建了动画后，只需调用 `run` 方法即可开始动画的运行。
+Ribir 已经在 `easing` 模块里预制了诸多物理函数，比如 `LINEAR`, `EASE_IN_OUT`, 或 `CubicBezierEasing` 可供使用。
 
+### 需要理解的重要生命周期和渲染行为
 
-Ribir 中已经预定义了一些动画 Transition
+理解动画和渲染管线的交互是避免意外错误的第一步：
 
-- `easing::LINEAR`: 以恒定速度动画化
-- `easing::EASE_IN`: 开始缓慢，加速到结束
-- `easing::EASE_OUT`: 开始快速，减速到结束
-- `easing::EASE_IN_OUT`: 开始缓慢，中间加速，然后减速
-- `easing::CubicBezierEasing`: 三次贝塞尔缓动
+1. **逐帧插值**：在每一帧渲染期间，动画会根据当前时间和缓动函数计算出插值进度，并将其临时写入（浅覆盖）至目标状态中。
+2. **渲染后恢复**：当前帧绘制完成后，临时插值会被立刻恢复。这保证了底层数据模型在动画期间不会被污染，保持了数据流的纯洁性。
+3. **浅更新隔离**：动画产生的插值是通过 `shallow()` 方法写入的。这意味着它只会触发当前绑定 Widget 的重绘，而绝不会向下游广播，避免了触发挂载在 `pipe!` 上的全量响应式刷新。
 
-下例中，`Container` 会在首次加载时实现一个跳动的动画。
+> ⚠️ **关键准则**：`Animate` **必须**直接绑定在 Widget 属性的 Writer 上！如果将其绑定到一个游离的独立 `Stateful` 变量上，由于 `shallow()` 的隔离特性，它产生的变化将无法被下游响应，导致动画“看起来失效”。
+
+```rust ignore
+// ❌ 错误做法：不要向独立的下游数据插值，这将无法驱动 pipe 刷新界面
+fn_widget! {
+    let opacity_state = Stateful::new(0.0);
+    let animate = @Animate {
+        state: opacity_state.clone_writer(), // 不会引发 pipe! 的深入通知
+        // ...
+    };
+
+    @Container {
+        opacity: pipe!(*$read(opacity_state)), // 此处将在动画运行中看起来失效
+        on_tap: move |_| animate.run(),
+    }
+}
+```
+
+```rust ignore
+// ✅ 正确做法：直接捕捉要运行的界面组件对象，对它的属性调用 Writer
+fn_widget! {
+    let w = @Container { opacity: 1., /* ... */ };
+    let animate = @Animate {
+        state: w.opacity(),
+        // ...
+    };
+
+    @(w) { on_tap: move |_| animate.run() }
+}
+```
+
+此设计可以大幅节约响应成本负担，确保即便是全屏动画也能以令人舒适的高帧率流畅运行。
+
+---
+
+## 动画开发工具箱
+
+对于复杂的交互，纯命令式地调用 `Animate.run()` 并非长久之计。Ribir 因此为您设计了面向不同维度的动画封装工具。
+
+选对工具，代码会很短，状态模型也会很干净；如果没有选对，往往就会需要手写一堆的监听或重置逻辑。
+
+### 用 `@Animate` 手动驱动属性动画
+
+也就是我们上方演示过的能力，当你确实需要代码中的显式按钮来控制动画何时开始时，它是最好的工具。
 
 ```rust no_run
 use ribir::prelude::*;
 
-fn custom_easing_example() -> Widget<'static> {
+fn manual_animation() -> Widget<'static> {
     fn_widget! {
         let mut moving_box = @Container {
             size: Size::new(50., 50.),
@@ -46,235 +88,161 @@ fn custom_easing_example() -> Widget<'static> {
             from: EdgeInsets::horizontal(0.),
             transition: EasingTransition {
                 duration: Duration::from_millis(1000),
-                easing: easing::CubicBezierEasing::new(0.68, -0.55, 0.265, 1.55), // 弹跳效果
+                easing: easing::CubicBezierEasing::new(0.68, -0.55, 0.265, 1.55),
             }
         };
 
         @Container {
             size: Size::new(250., 100.),
             @(moving_box) {
+                // 手动启动
                 on_mounted: move |_| animate.run(),
             }
         }
-    }.into_widget()
-}
-```
-
-### 动画生命周期和运行时行为
-
-理解动画生命周期对于有效的动画实现至关重要。Ribir 动画系统遵循动画与状态和渲染管道交互的特定模式：
-
-1. **每帧绘制**: 在渲染期间，动画修改状态值以反映动画的当前进度。在每一帧中，动画系统根据当前时间和过渡函数计算插值，并用该值临时更新状态。
-
-2. **绘制结束**: 渲染帧后，动画系统恢复原始状态值。这确保了动画完成后基础数据模型保持不变。
-
-3. **状态传播**: 在动画期间，状态更改通过 `StateWriter` 的 `shallow()` 方法在反应系统中进行修改。此方法更新状态并通知 Widget 系统进行高效重绘，但它**不会**触发所有监听器（如 `pipe!` 块中）的完整反应通知，以避免性能开销和潜在的无限循环。
-
-   这就是为什么将 `Animate` 直接绑定到 **Widget 属性的 Writer**（例如 `widget.map_writer(...)`）而非独立的 `Stateful` 变量至关重要的原因。当绑定到 Widget 属性的 Writer 时，`shallow()` 更新正确通知 Widget 使用新的插值重绘，而其他绑定到该状态的数据则不会收到更新通知。
-
-此行为确保了:
-- 动画以高帧率流畅运行
-- 动画期间的状态更改不会导致 UI 重排或不必要的重建
- - 插值状态值仅在每帧绘制期间被应用；绘制完成后会恢复原始状态，因此这些插值更改不会在动画的绘制步骤之外持续存在
-- 通过避免冗余的响应式更新优化动画性能
-
-> **重要**: 将动画绑定到 Widget 的状态（例如使用 `map_writer` 或属性写入器如 `.opacity()`）。因为 `Animate` 使用 `shallow()` 更新，这些更新不会触发联动的更新。
-
-一个常见错误是创建一个独立的 `Stateful` 变量，动画化它，并使用 `pipe!` 将其绑定到 Widget。
-
-```rust ignore
-// ❌ 错误：不要动画化中间状态
-fn_widget! {
-    let opacity_state = Stateful::new(0.0);
-    let animate = @Animate {
-        state: opacity_state.clone_writer(),
-        ...
-    };
-
-    @Container {
-        opacity: pipe!(*$read(opacity_state)),
-        on_tap: move |_| animate.run(),
     }
+    .into_widget()
 }
 ```
 
-这会失败，因为动画过程中 `opacity_state` 的值会被修改，但不会扩散，所以 `pipe!` 不会感知到并触发更新。
+### 用 `transition(...)` 自动补间属性变化
 
-正确的做法是直接对 Widget 的状态进行动画的绑定，如下：
-
-```rust ignore
-// ✅ 正确：动画化 Widget 的状态
-fn_widget! {
-    let w = @Container {
-        opacity: 1.,
-        ...
-    };
-    let animate = @Animate {
-        state: w.opacity(),
-        ...
-    };
-
-    @(w) { on_tap: move |_| animate.run() }
-}
-
-```
-
-### 自动绑定动画
-
-`Animate` 提供了最基础的能力，允许您手动控制动画的开始与停止。此外，Ribir 还提供一种便捷方式，可将动画绑定到属性本身，当属性值通过 `StateWriter` 更改时自动触发过渡动画。
+如果您不想手动管理动画实例，而是希望在**数据发生改变的瞬间**，界面能平滑地过渡到新状态。
 
 ```rust no_run
-use ribir::prelude::*;
 use ribir::material::md;
-fn writer_animate() -> Widget<'static> {
+use ribir::prelude::*;
+
+fn writer_bound_animation() -> Widget<'static> {
     fn_widget! {
         let mut w = @Container { size: Size::new(40., 20.) };
-        w.opacity()
-            .transition(EasingTransition{
-                easing: md::easing::STANDARD_ACCELERATE,
-                duration: md::easing::duration::SHORT2
-            });
+        
+        // 挂载过渡效果
+        w.opacity().transition(EasingTransition {
+            easing: md::easing::STANDARD_ACCELERATE,
+            duration: md::easing::duration::SHORT2,
+        });
 
         let cnt = Stateful::new(0);
 
         @(w) {
+            background: Color::RED,
             on_tap: move |_| {
                 *$write(cnt) += 1;
-                if (*$read(cnt) % 2 == 0) {
-                    *$write(w.opacity()) = 1.;
-                } else {
-                    *$write(w.opacity()) = 0.5;
-                }
+                // 每次赋值操作都将受到自动的补间计算
+                *$write(w.opacity()) = if *$read(cnt) % 2 == 0 { 1.0 } else { 0.5 };
             },
-            background: Color::RED,
         }
-
-    }.into_widget()
-}
-```
-
-这里，`w.opacity()` 返回的 `StateWriter` 实现了 `AnimateState` trait。通过 `transition()` 方法设置动画属性后，当通过该 `StateWriter` 修改值时，动画会自动触发。
-
-### `transition_with` 与 `transition_with_init` 怎么选
-
-Ribir 当前公开 API 是 `transition(...)` 与 `transition_with_init(...)`。
-你可能会在讨论里看到 `transition_with`，其语义可理解为“使用当前值作为初始值”，对应现在的 `transition(...)`。
-
-`transition(...)`（可理解为 `transition_with(self.get(), ...)`）和
-`transition_with_init(init, ...)` 的区别只在“第一次动画的起点”：
-
-- `transition(...)`：第一次从“当前属性值”开始动画。
-- `transition_with_init(init, ...)`：第一次从你指定的 `init` 开始动画。
-
-何时使用：
-
-- 属性当前值已经是正确起点，用 `transition(...)`。
-- 你希望第一次同步就从一个虚拟起点过渡（例如 `opacity: 0. -> 1.`），用 `transition_with_init(...)`。
-
-关键顺序（非常重要）：
-
-1. 先安装 transition（`transition` / `transition_with_init`）。
-2. 再绑定或写入目标值（`with_opacity`、`with_foreground`、`*$write(...) = ...`）。
-
-如果顺序反过来，第一次写入发生在 transition 安装前，首次动画不会执行。
-
-示例 1（类似 `RAIL_ITEM_LABEL`）：
-
-```rust no_run
-use ribir::prelude::*;
-use ribir::material::md;
-
-fn label_fade(visible: PipeValue<bool>, w: Widget<'static>) -> Widget<'static> {
-  fn_widget! {
-    let mut label = @FatObj { @ { w } };
-    label.opacity().transition_with_init(
-      0.,
-      EasingTransition {
-        easing: md::easing::EMPHASIZED,
-        duration: md::easing::duration::SHORT3,
-      }
-    );
-    label.with_opacity(visible.map(|v| if v { 1. } else { 0. }));
-    label
-  }
-  .into_widget()
-}
-```
-
-示例 2（类似 `RAIL_ITEM_SELECTED/UNSELECTED`）：
-
-```rust no_run
-use ribir::prelude::*;
-use ribir::material::md;
-
-fn selected_item(w: Widget<'static>) -> Widget<'static> {
-  let mut item = FatObj::new(w);
-  let palette = Palette::of(BuildCtx::get());
-  item.foreground().transition_with_init(
-    palette.on_surface_variant().into(),
-    EasingTransition {
-      easing: md::easing::EMPHASIZED,
-      duration: md::easing::duration::SHORT3,
     }
-  );
-  item.with_foreground(palette.secondary());
-  item.into_widget()
+    .into_widget()
 }
 ```
 
-## 高级动画
+**何时使用 `transition` 和 `transition_with_init`**
+- `transition(...)`：状态改变时，从当前界面上的实际值开始平滑过渡。
+- `transition_with_init(init, ...)`：有时您希望第一次进场时从一个虚拟的起点开始（例如 `opacity: 0.0 -> 1.0`），请使用此方法。
 
-### 关键帧动画
+💡 **经验法则**：过渡规则必须在状态被写入新值**之前**声明绑定。
 
-关键帧允许您在动画中指定中间步骤，提供对复杂动画的细粒度控制。
+### 用 `@AnimateMatch` 把业务状态编排成视觉状态
+
+面对 `Idle`, `Hover`, `Active` 这种多状态业务组件，每个状态都对应着 `尺寸`、`透明度`、`颜色` 等多属性的视觉差异。`@AnimateMatch` 能直接将“业务状态枚举”声明式地映射为“最终视觉目标集”。
+
+**例如：**
 
 ```rust no_run
 use ribir::prelude::*;
 
-fn keyframes_example() -> Widget<'static> {
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CardStatus {
+    Idle,
+    Hover,
+    Active,
+}
+
+fn card_demo() -> Widget<'static> {
     fn_widget! {
-        let mut box_widget = @Container {
-            size: Size::new(50., 50.),
-            background: Color::GREEN,
+        let card_status = Stateful::new(CardStatus::Idle);
+
+        let mut card = @Container {
+            size: Size::new(120., 80.),
+            background: Color::from_rgb(0x33, 0x66, 0xFF),
+            on_pointer_enter: move |_| *$write(card_status) = CardStatus::Hover,
+            on_pointer_leave: move |_| *$write(card_status) = CardStatus::Idle,
+            on_pointer_down: move |_| *$write(card_status) = CardStatus::Active,
+            on_pointer_up: move |_| *$write(card_status) = CardStatus::Hover,
         };
 
-        let animate = @Animate {
-            state: keyframes! {
-                state: box_widget.size(),
-                0.25 => DimensionSize::new(100., 50.),  // 在 25% 进度时水平拉伸
-                0.5 => DimensionSize::new(100., 100.),  // 在 50% 进度时垂直拉伸
-                0.75 => DimensionSize::new(50., 100.),  // 在 75% 进度时水平缩小
-                1.0 => DimensionSize::new(50., 50.),    // 在 100% 进度时返回原始
+        let opacity = card.opacity();
+        let transform = card.transform();
+
+        let _am = @AnimateMatch {
+            value: card_status.clone_watcher(),
+            cases: cases! {
+                state: (opacity, transform),
+                CardStatus::Idle => (1.0, Transform::identity()),
+                CardStatus::Hover => (0.92, Transform::scale(1.04, 1.04)),
+                CardStatus::Active => (0.72, Transform::scale(0.96, 0.96)),
             },
-            from: DimensionSize::new(50., 50.),
-            transition: EasingTransition {
-                duration: Duration::from_millis(1000),
-                easing: easing::EASE_IN_OUT,
-            }
+            transitions: transitions! {
+                (_, CardStatus::Active) => EasingTransition {
+                    easing: easing::LINEAR,
+                    duration: Duration::ZERO,
+                },
+                _ => EasingTransition {
+                    easing: easing::EASE_IN_OUT,
+                    duration: Duration::from_millis(180),
+                },
+            },
+            interruption: Interruption::Fluid,
         };
 
-        @(box_widget) { 
-            on_tap: move |_| animate.run(),
-        }
-    }.into_widget()
+        card
+    }
+    .into_widget()
 }
 ```
 
-关键帧可以使用十进制值（0.0 到 1.0）或百分比定义：
+- **`cases!`**：您只需声明最终的绝对视觉目标，无需编写繁琐的回调。底层不仅提供了完善的穷举编译检查，还会自动将多个属性打包进同一个动画时钟，确保多属性动画进度绝对同步且性能最优。
+- **`transitions!`**：基于 `(从何处, 到何处)` 的路由匹配，自顶向下寻找并应用指定的缓动过渡函数。
+
+如果你更喜欢写纯粹的原生函数进行计算而不是依靠宏路由，你可以在该属性上向它传入裸闭包：
 
 ```rust ignore
-// 使用百分比语法
-let keyframe_state = keyframes! {
-    state: opacity_writer,
-    20% => 0.2,
-    50% => 0.5,
-    80% => 0.8,
+transitions: |from, to| {
+    if to == &CardStatus::Active {
+        EasingTransition { easing: easing::LINEAR, duration: Duration::ZERO }
+    } else {
+        EasingTransition { easing: easing::EASE_IN_OUT, duration: Duration::from_millis(180) }
+    }
+},
+```
+
+### 用 `keyframes!` 编排单体元素的时间轴曲线
+
+`keyframes!` 允许您使用百分比（或 0.0 到 1.0 的小数）定义一条连续动画中的多个中间停顿点（关键帧）。
+
+```rust ignore
+let animate = @Animate {
+    state: keyframes! {
+        state: box_widget.size(),
+        0.25 => DimensionSize::new(100., 50.),
+        0.5 => DimensionSize::new(100., 100.),
+        0.75 => DimensionSize::new(50., 100.),
+        1.0 => DimensionSize::new(50., 50.),
+    },
+    from: DimensionSize::new(50., 50.),
+    transition: EasingTransition {
+        duration: Duration::from_millis(1000),
+        easing: easing::EASE_IN_OUT,
+    }
 };
 ```
 
-### 使用 Stagger 编排动画
+💡 **何时使用**：当您的思考方式是“动画进行到 50% 时它该长什么样？”时，请使用关键帧；如果是“当用户悬停时它该长什么样？”，请退回使用 `@AnimateMatch`。
 
-为了协调多个动画，Ribir 提供了 `Stagger` 动画控制器。这允许您创建动画在定时间隔开始的序列，创建复杂的视觉效果：
+### 用 `Stagger` 实现多元素的错峰级联动画
+
+`Stagger` 提供了强大的群体动画控制能力，非常适合为列表项、瀑布流或批量登场的大量视觉元素设置规律的错峰入场时间（延迟级联）。
 
 ```rust no_run
 use ribir::prelude::*;
@@ -282,7 +250,7 @@ use ribir::prelude::*;
 fn stagger_example() -> Widget<'static> {
     fn_widget! {
         let stagger = Stagger::new(
-            Duration::from_millis(200), // 每个动画开始之间 200ms
+            Duration::from_millis(200), // 每个开始的序列动画将间隔 200 ms
             EasingTransition {
                 duration: Duration::from_millis(500),
                 easing: easing::EASE_IN_OUT,
@@ -293,7 +261,6 @@ fn stagger_example() -> Widget<'static> {
         let mut text2 = @Text { text: "Two", opacity: 0. };
         let mut text3 = @Text { text: "Three", opacity: 0. };
 
-        // 向 stagger 添加动画
         stagger.write().push_state(text1.opacity(), 0.);
         stagger.write().push_state(text2.opacity(), 0.);
         stagger.write().push_state(text3.opacity(), 0.);
@@ -302,176 +269,23 @@ fn stagger_example() -> Widget<'static> {
             on_mounted: move |_| stagger.run(),
             @{ [text1, text2, text3] }
         }
-    }.into_widget()
+    }
+    .into_widget()
 }
 ```
 
-#### 高级 Stagger 功能
+### 生命周期专属层：`AnimatedVisibility` 和 `AnimatedPresence`
 
-Stagger 动画提供额外的控制选项：
+最后，控制物体的出现和退散是极其高频的需求。我们设计了由两个 Widget 提供专属帮助：
 
-- **不同 stagger**: 使用 `push_animation_with()` 为每个动画指定不同的时间间隔
-- **混合动画**: 在同一序列中组合基于状态的动画与完整的 `@Animate` Widget
-- **运行时控制**: 使用 `is_running()`、`run_times()` 和 `has_ever_run()` 等方法访问 stagger 状态
+| 需求 | 选择 | 解释与说明 |
+| --- | --- | --- |
+| 同一颗子树需要极度频繁地切换显隐 | `AnimatedVisibility` | 对象仍在内存和节点树中保留。适合需要极速响应或自带折叠动效的浮窗、菜单、抽屉等组件。 |
+| 需要真实动态挂载/卸载的生命周期组件 | `AnimatedPresence` | 依附于动态数据流，在真正挂载前播放入场动画，在彻底销毁前播放退场动画，视觉结束后精准释放内存。适合列表数据的增删、条件渲染和路由页面切换。 |
 
-```rust no_run
-use ribir::prelude::*;
+## 高级过渡修饰
 
-fn advanced_stagger_example() -> Widget<'static> {
-    fn_widget! {
-        let stagger = Stagger::new(
-            Duration::from_millis(100),
-            EasingTransition {
-                duration: Duration::from_millis(300),
-                easing: easing::EASE_IN_OUT,
-            }
-        );
-
-        let mut box1 = @Container { size: Size::new(50., 50.), background: Color::RED, opacity: 0. };
-        let mut box2 = @Container { size: Size::new(50., 50.), background: Color::GREEN, opacity: 0. };
-        let mut box3 = @Container { size: Size::new(50., 50.), background: Color::BLUE, opacity: 0. };
-
-        // 以不同的 stagger 间隔添加框
-        stagger.write().push_state(box1.opacity(), 0.);
-        stagger.write().push_state_with(Duration::from_millis(200), box2.opacity(), 0.); // 等待 200ms
-        stagger.write().push_animation({
-            let animate = @Animate {
-                state: box3.opacity(),
-                from: 0.,
-                transition: EasingTransition {
-                    duration: Duration::from_millis(300),
-                    easing: easing::EASE_IN_OUT,
-                }
-            };
-            animate
-        });
-
-        @Row {
-            on_mounted: move |_| stagger.run(),
-            @{ [box1, box2, box3] }
-        }
-    }.into_widget()
-}
-```
-
-### 动画控制
-
-动画可以通过动画实例进行编程控制：
-
-- `run()`: 开始或重新开始动画
-- `stop()`: 停止动画并恢复状态到最终值
-- `is_running()`: 检查动画是否正在运行
-
-```rust no_run
-use ribir::prelude::*;
-
-fn animation_control_example() -> Widget<'static> {
-    fn_widget! {
-        let mut box_widget = @Container {
-            size: Size::new(100., 100.),
-            background: Color::PURPLE,
-            opacity: 0.0,
-        };
-
-        let tap_animation = @Animate {
-            state: box_widget.opacity(),
-            from: 0.,
-            transition: EasingTransition {
-                duration: Duration::from_millis(2000),
-                easing: easing::EASE_IN_OUT,
-            }
-        };
-
-        let animation = @Animate {
-            state: box_widget.opacity(),
-            from: 0.,  // 开始从当前值动态完成
-            transition: EasingTransition {
-                duration: Duration::from_millis(2000),
-                easing: easing::EASE_IN_OUT,
-            }
-        };
-
-        @Column {
-            @Row {
-                @Button {
-                    on_tap: move |_| {
-                        let val = *$read(box_widget.opacity());
-                        *$write(box_widget.opacity()) = 1.0 - val;
-                        // on_tap 处理程序将获取 animation 的所有权，这里使用 $writer 自动克隆
-                        $writer(animation).run(); 
-                    },
-                    @Text { text: "Start" }
-                }
-                @Button {
-                    on_tap: move |_| {
-                        animation.stop();
-                    },
-                    @Text { text: "Stop" }
-                }
-            }
-            @ { box_widget }
-        }
-    }.into_widget()
-}
-```
-
-### 动画组合
-
-动画可以组合和分层以创建复杂效果。您可以：
-- 并行运行多个动画
-- 单次动画同时修改多个属性
-
-```rust no_run
-use ribir::prelude::*;
-
-fn composition_example() -> Widget<'static> {
-    fn_widget! {
-        let mut box_widget = @Container {
-            size: Size::new(50., 50.),
-            background: Color::BLUE,
-            opacity: 0.,
-            transform: Transform::identity(),
-        };
-
-        let opacity_size_anim = @Animate {
-            state: animate_state_pack!(
-                box_widget.opacity(),
-                box_widget.width(),
-            ),
-            from: animate_state_pack!(0., 20_f32.into()),
-            transition: EasingTransition {
-                duration: Duration::from_millis(1000),
-                easing: easing::EASE_IN_OUT,
-            }
-        };
-
-        let rotation_anim = @Animate {
-            state: box_widget.transform(),
-            from: Transform::identity(),
-            transition: EasingTransition {
-                duration: Duration::from_millis(2000),
-                easing: easing::LINEAR,
-            }
-        };
-
-        @(box_widget) {
-            on_tap: move |_| {
-                opacity_size_anim.run();
-                rotation_anim.run();
-            },
-        }
-    }.into_widget()
-}
-```
-
-
-### 高级过渡修饰符
-
-动画可以使用各种过渡修饰符增强以提供额外功能。两个常见的修饰符是 `repeat` 和 `delay`。
-
-#### 重复与延迟动画
-
-动画可以同时使用 `repeat` 和 `delay` 过渡修饰符。下面的示例展示了一个动画：它在开始前等待 1000ms，然后重复三次，通过将不透明度从 0 动画到 1 来实现闪烁效果。
+过渡函数总是可以任意叠加像 `repeat(...)` 及 `delay(...)` 之类的灵活操作用于更自由的时间延展。
 
 ```rust no_run
 use ribir::prelude::*;
@@ -491,15 +305,29 @@ fn transition_modifiers_example() -> Widget<'static> {
                 duration: Duration::from_millis(100),
                 easing: easing::steps(2, easing::StepsJump::JumpNone),
             }
-            .repeat(3.) // 重复3次
-            .delay(Duration::from_millis(1000)) // 延迟1000ms 再执行
+            .repeat(3.) // 播放完成后重复 3 回
+            .delay(Duration::from_millis(1000)) // 等待整整 1 秒再出场
         };
 
         @(box_widget) {
-            on_mounted: move |_| animate.run(), // Start the animation after delay with repetitions
+            on_mounted: move |_| animate.run(),
         }
-    }.into_widget()
+    }
+    .into_widget()
 }
 ```
 
-动画是创建引人入胜、直观的用户体验的强大工具。通过掌握 Ribir 中的动画系统，您可以创建流畅、响应式的应用程序，使其感觉生动和交互式。
+## 总结：我到底该选哪一个？
+
+为了避免您陷入选择困难，我们在开始前为您准备了一份“首选决策自问清单”：
+
+1. **您的动画核心焦点是为了某一片内容出现或消失吗？**
+     - 是的 → 马上采用 `AnimatedPresence` (或 `AnimatedVisibility` 对付常驻元素)
+2. **您的交互中是否有某个单独业务状态导致了很多样式产生联动切换？**
+     - 是的 → 使用强大的 `@AnimateMatch`
+3. **我仅仅是想要当一个参数或样式修改时，能够看起来自然吗？**
+     - 是的 → 一把梭使用 `transition(...)` 安装挂接组件
+4. **我在处理由鼠标按下的回调和某段倒计时去手动跑马灯吗？**
+     - 是的 → 写一个游标状态再跑 `@Animate`
+5. **我在为时间点设计一长串定制连续帧或批量卡片吗？**
+     - 是的 → `keyframes!` 与 `Stagger` 会节省您几百行的代码
