@@ -10,6 +10,53 @@ For older versions:
 
 <!-- next-header -->
 
+## [0.4.0-alpha.60](https://github.com/RibirX/Ribir/releases/tag/v0.4.0-alpha.60) - 2026-03-10
+
+### 🎨 Features
+
+- **core**: support widget preservation during disposal via DisposedEvent::preserve() (\#913 @M-Adoo)
+- **widgets**: introduce AnimateMatch for declarative state-driven animations (\#916 @M-Adoo)
+
+### 🐛 Fixed
+
+- **core**: only schedule follow-up redraw when a frame was actually drawn (\#911 @M-Adoo)
+- **widgets**: improve stagger animation reliability in todos example (\#910 @M-Adoo)
+
+### 🔄 Changed
+
+- **core**: ensure PriorityTaskQueue preserves insertion order for same-priority tasks (\#910 @M-Adoo)
+- **core**: introduce Scheduler for centralized frame management in the EventLoop (\#909 @M-Adoo)
+- **core**: refactor Reusable widgets to use the new preservation mechanism (\#913 @M-Adoo)
+- **core**: refactor SmoothLayout to drive animations via the paint phase (\#909 @M-Adoo)
+- **core**: use unique IDs for Resource comparison instead of pointer equality (\#908 @wjian23)
+- **painter**: delegate text rasterization to the GPU backend and defer glyph drawing (\#914 @wjian23)
+- **text**: make font face allocation thread-safe in FontDB (\#914 @wjian23)
+- **text**: migrate text shaping and metrics to swash and ttf-parser (\#908 @wjian23)
+
+### ⚡ Performance
+
+- **gpu**: implement multi-tier atlas cache eviction and deferred pixel writes (\#908 @wjian23)
+- **painter**: switch text rendering from path tessellation to rasterization using swash (\#908 @wjian23)
+
+### 📚 Documentation
+
+- comprehensive update to animation documentation and guides (\#916 @M-Adoo)
+
+### 💥 Breaking
+
+- **core**: AnimateState trait now requires clone\_animate\_state and lerp functions must be Clone (\#916 @M-Adoo)
+- **core**: on\_disposed and Event::Disposed now use DisposedEvent instead of LifecycleEvent (\#913 @M-Adoo)
+- **core**: rename LayoutImpact to SizeMode and remove smooth\_layout\! macro (\#909 @M-Adoo)
+- **core**: replace boolean force redraw with RedrawDemand enum in ShellWindow and UiEvent (\#911 @M-Adoo)
+- **core**: update AppCtx::run and AppCtx::init signatures and replace FrameworkEvent with CoreMsg (\#909 @M-Adoo)
+
+<details>
+<summary>🔧 Internal</summary>
+
+- ci: 🎡 ensure coverage job runs even if upstream checks are skipped (#912 @M-Adoo)
+
+</details>
+
 ## [0.4.0-alpha.59](https://github.com/RibirX/Ribir/releases/tag/v0.4.0-alpha.59) - 2026-03-03
 
 ### 🎨 Features
