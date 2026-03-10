@@ -126,6 +126,14 @@ pub struct PathSampler {
   measurements: PathMeasurements,
 }
 
+impl Clone for PathSampler {
+  fn clone(&self) -> Self {
+    let path = self.path.clone();
+    let measurements = PathMeasurements::from_path(&path, 1e-3);
+    Self { path, measurements }
+  }
+}
+
 impl Path {
   #[allow(dead_code)]
   pub(crate) fn new(lyon_path: LyonPath, bounds: Rect) -> Self {
