@@ -14,18 +14,28 @@ use crate::{
 /// The event fired when the widget is mounted or performed layout.
 pub type LifecycleEvent = CommonEvent;
 
-/// The event fired when a widget enters the disposal pipeline.
+/// The event fired when a widget has entered the disposal pipeline but has not
+/// yet been finally cleaned up.
 ///
-/// Unlike [`LifecycleEvent`], this event can be intercepted by calling
-/// [`DisposedEvent::preserve`] to detach the current subtree and keep it alive.
-pub struct DisposedEvent {
+/// This stage is asynchronous: the widget may already be detached from the live
+/// tree, but its subtree is still available for interception. This is the only
+/// phase where [`preserve`](Self::preserve) is allowed.
+pub struct DisposingEvent {
   common: CommonEvent,
   preserved: bool,
 }
 
+/// The event fired when a widget is being finally disposed.
+///
+/// Cleanup handlers should use this phase. Preservation is not available here.
+pub struct DisposedEvent {
+  common: CommonEvent,
+}
+
+impl_common_event_deref!(DisposingEvent);
 impl_common_event_deref!(DisposedEvent);
 
-impl DisposedEvent {
+impl DisposingEvent {
   pub(crate) fn new(target: WidgetId, tree: NonNull<WidgetTree>) -> Self {
     Self { common: CommonEvent::new(target, tree), preserved: false }
   }
@@ -36,7 +46,7 @@ impl DisposedEvent {
   /// This is useful for animations (like fade-out) where a widget needs to stay
   /// in the tree even after its logical removal.
   pub fn preserve(&mut self) -> Preserve {
-    assert!(!self.preserved, "preserve() called twice in one disposed event");
+    assert!(!self.preserved, "preserve() called twice in one disposing event");
 
     self.common.prevent_default();
     self.preserved = true;
@@ -53,6 +63,12 @@ impl DisposedEvent {
   /// Returns `true` if this event's target has been preserved via
   /// [`preserve`](Self::preserve).
   pub fn is_preserved(&self) -> bool { self.preserved }
+}
+
+impl DisposedEvent {
+  pub(crate) fn new(target: WidgetId, tree: NonNull<WidgetTree>) -> Self {
+    Self { common: CommonEvent::new(target, tree) }
+  }
 }
 
 /// A handle that keeps a detached widget subtree alive.
@@ -379,11 +395,11 @@ mod tests {
           size: Size::zero(),
           on_mounted: move |e| *$write(mounted_id) = Some(e.current_target()),
           on_event: move |e| {
-            if matches!(e, Event::Disposed(_)) {
+            if matches!(e, Event::Disposing(_)) {
               $write(lifecycle).push(format!("dispose {:?}", e.current_target()));
             }
           },
-          on_disposed: move |e| {
+          on_disposing: move |e| {
             let preserve = e.preserve();
             *$write(keep) = Some(preserve);
           },
@@ -433,7 +449,7 @@ mod tests {
                   @MockBox {
                     size: Size::zero(),
                     on_mounted: move |e| *$write(kept_id) = Some(e.current_target()),
-                    on_disposed: move |e| *$write(keep) = Some(e.preserve()),
+                    on_disposing: move |e| *$write(keep) = Some(e.preserve()),
                   }
                 }
               })

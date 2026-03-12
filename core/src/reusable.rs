@@ -119,7 +119,7 @@ impl Reusable {
   fn attach_reusable_host<'a>(&self, widget: Widget<'a>) -> Widget<'a> {
     let mut fat = FatObj::new(widget);
     let this = self.clone();
-    fat.on_disposed(move |e| {
+    fat.on_disposing(move |e| {
       if matches!(this.0.borrow().phase, ReusablePhase::Active { .. }) {
         let (render, track_id) = match &*this.0.borrow() {
           ReusableInner { track_id, phase: ReusablePhase::Active { host }, .. } => {

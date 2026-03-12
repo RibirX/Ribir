@@ -597,11 +597,11 @@ impl Window {
           let mut root_preserved = false;
           let mut stack = vec![root_id];
           while let Some(id) = stack.pop() {
-            let mut e = Event::Disposed(DisposedEvent::new(id, self.tree));
-            self.emit_from_outside(id, &mut e);
+            let mut disposing = Event::Disposing(DisposingEvent::new(id, self.tree));
+            self.emit_from_outside(id, &mut disposing);
 
-            let Event::Disposed(inner) = &e else {
-              unreachable!("disposed delay event must emit a disposed event")
+            let Event::Disposing(inner) = &disposing else {
+              unreachable!("disposed delay event must emit a disposing event")
             };
 
             // Only the disposal root needs an explicit flag. Any preserved
@@ -614,6 +614,9 @@ impl Window {
             if inner.is_preserved() {
               continue;
             }
+
+            let mut disposed = Event::Disposed(DisposedEvent::new(id, self.tree));
+            self.emit_from_outside(id, &mut disposed);
 
             if self.focusing() == Some(id) {
               self

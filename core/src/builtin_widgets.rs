@@ -306,6 +306,12 @@ impl<T> FatObj<T> {
     on_mixin!(self, on_performed_layout, f)
   }
 
+  /// Attaches an event handler that runs when the widget has entered the
+  /// disposal pipeline but may still be preserved.
+  pub fn on_disposing(&mut self, f: impl FnOnce(&mut DisposingEvent) + 'static) -> &mut Self {
+    on_mixin!(self, on_disposing, f)
+  }
+
   /// Attaches an event handler that runs when the widget is disposed.
   pub fn on_disposed(&mut self, f: impl FnOnce(&mut DisposedEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_disposed, f)
