@@ -135,9 +135,10 @@ pub enum Event {
   /// Event fired when the widget is performed layout. This event may fire
   /// multiple times in same frame if a widget modified after performed layout.
   PerformedLayout(LifecycleEvent),
-  /// Fired when a widget enters the disposal pipeline.
-  ///
-  /// Widgets intercepted by `preserve()` may later re-enter this lifecycle.
+  /// Fired when a widget enters the disposal pipeline and may still be
+  /// preserved.
+  Disposing(DisposingEvent),
+  /// Fired when a widget is finally disposed.
   Disposed(DisposedEvent),
   PointerDown(PointerEvent),
   PointerDownCapture(PointerEvent),
@@ -202,6 +203,7 @@ impl std::ops::Deref for Event {
   fn deref(&self) -> &Self::Target {
     match self {
       Event::Mounted(e) | Event::PerformedLayout(e) => e,
+      Event::Disposing(e) => e,
       Event::Disposed(e) => e,
       Event::Focus(e)
       | Event::Blur(e)
@@ -234,6 +236,7 @@ impl std::ops::DerefMut for Event {
   fn deref_mut(&mut self) -> &mut Self::Target {
     match self {
       Event::Mounted(e) | Event::PerformedLayout(e) => e,
+      Event::Disposing(e) => e,
       Event::Disposed(e) => e,
       Event::Focus(e)
       | Event::Blur(e)
@@ -265,7 +268,9 @@ impl std::ops::DerefMut for Event {
 impl Event {
   pub(crate) fn flags(&self) -> MixFlags {
     match self {
-      Event::Mounted(_) | Event::PerformedLayout(_) | Event::Disposed(_) => MixFlags::Lifecycle,
+      Event::Mounted(_) | Event::PerformedLayout(_) | Event::Disposing(_) | Event::Disposed(_) => {
+        MixFlags::Lifecycle
+      }
       Event::PointerDown(_)
       | Event::PointerDownCapture(_)
       | Event::PointerUp(_)

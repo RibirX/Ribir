@@ -219,7 +219,7 @@ fn wrap_dispose_recycled<'a>(
   let mut w = FatObj::new(w);
   let p = scope.clone_writer();
   let key = id.clone();
-  w.on_disposed(move |_| {
+  w.on_disposing(move |_| {
     AppCtx::spawn_local(async move {
       if !p.read().is_in_used(&key) {
         p.write().remove(&key);
@@ -227,4 +227,59 @@ fn wrap_dispose_recycled<'a>(
     });
   });
   w.into_widget()
+}
+
+#[cfg(test)]
+mod tests {
+  use std::{cell::RefCell, rc::Rc};
+
+  use super::*;
+  use crate::test_helper::*;
+
+  #[test]
+  fn immediate_release_removes_local_cache_after_recycle() {
+    reset_test_env!();
+
+    let (item_cnt, item_w) = split_value(1);
+    let local_scope = Rc::new(RefCell::new(None));
+    let local_scope2 = local_scope.clone();
+
+    let wnd = TestWindow::from_widget(fn_widget! {
+      @LocalWidgets {
+        on_mounted: {
+          let local_scope2 = local_scope2.clone();
+          move |e| {
+            *local_scope2.borrow_mut() = Some(
+              Provider::state_of::<Box<dyn StateWriter<Value = LocalWidgets>>>(e)
+                .unwrap()
+                .clone_writer(),
+            );
+          }
+        },
+        @MockMulti {
+          @pipe! {
+            (0..*$read(item_cnt)).map(move |i| {
+              @Reuse {
+                reuse_id: LocalId::number(i),
+                @ { Void::default() }
+              }
+            })
+          }
+        }
+      }
+    });
+
+    wnd.draw_frame();
+    let local_scope = local_scope.borrow_mut().take().unwrap();
+    assert_eq!(local_scope.read().get_ids().count(), 1);
+
+    *item_w.write() = 4;
+    wnd.draw_frame();
+    assert_eq!(local_scope.read().get_ids().count(), 4);
+
+    *item_w.write() = 2;
+    wnd.draw_frame();
+    wnd.draw_frame();
+    assert_eq!(local_scope.read().get_ids().count(), 2);
+  }
 }

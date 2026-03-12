@@ -214,6 +214,23 @@ impl MixBuiltin {
     impl_event_callback!(self, Lifecycle, PerformedLayout, LifecycleEvent, handler)
   }
 
+  pub fn on_disposing(&self, handler: impl FnOnce(&mut DisposingEvent) + 'static) -> &Self {
+    self.silent_mark(MixFlags::Lifecycle);
+
+    let mut handler = life_fn_once_to_fn_mut(handler);
+    self
+      .subject()
+      .filter(|e| matches!(e, Event::Disposing(_)))
+      .first()
+      .subscribe(move |e: &mut Event| {
+        if let Event::Disposing(inner) = e {
+          handler(inner);
+        }
+      });
+
+    self
+  }
+
   pub fn on_disposed(&self, handler: impl FnOnce(&mut DisposedEvent) + 'static) -> &Self {
     self.silent_mark(MixFlags::Lifecycle);
 
