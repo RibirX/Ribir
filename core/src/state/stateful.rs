@@ -47,7 +47,7 @@ impl ModifyInfo {
 }
 
 impl Notifier {
-  pub(crate) fn unsubscribe(&mut self) { self.0.clone().complete(); }
+  pub(crate) fn complete(&mut self) { self.0.clone().complete(); }
 }
 
 pub(crate) struct WriterInfo {
@@ -84,7 +84,7 @@ impl<W: 'static> StateReader for Stateful<W> {
 
       info.dec_writer();
       let mut notifier = info.notifier.clone();
-      notifier.unsubscribe();
+      notifier.complete();
       drop(info);
 
       match Rc::try_unwrap(data) {
@@ -186,20 +186,19 @@ impl<W> Drop for Stateful<W> {
   fn drop(&mut self) {
     self.info.dec_writer();
     if self.info.writer_count.get() == 0 {
-      let mut notifier = self.info.notifier.clone();
-      // we use an async task to unsubscribe to wait the batched modifies to be
-      // notified, while keeping state data/info alive until cleanup runs.
       let keep_data = Rc::into_raw(self.data.clone()) as *const ();
       let keep_info = Rc::into_raw(self.info.clone()) as *const ();
-      AppCtx::spawn_local(async move {
-        notifier.unsubscribe();
-        // SAFETY: These raw pointers are produced by `Rc::into_raw` above, and
-        // are reconstructed exactly once here to release the keep-alive refs.
-        unsafe {
-          drop_erased_rc::<StateCell<W>>(keep_data);
-          drop_erased_rc::<WriterInfo>(keep_info);
-        }
-      });
+      AppCtx::data_complete(
+        self.info.notifier.clone(),
+        Box::new(move || {
+          // SAFETY: These raw pointers are produced by `Rc::into_raw` above, and
+          // are reconstructed exactly once here to release the keep-alive refs.
+          unsafe {
+            drop_erased_rc::<StateCell<W>>(keep_data);
+            drop_erased_rc::<WriterInfo>(keep_info);
+          }
+        }),
+      );
     }
   }
 }
@@ -392,6 +391,30 @@ mod tests {
 
     AppCtx::run_until_stalled();
     assert_eq!(*drop_cnt.borrow(), 1);
+    assert!(notifier.is_closed());
+  }
+
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+  #[test]
+  fn last_modify_emits_before_complete_when_last_writer_drops() {
+    crate::reset_test_env!();
+
+    let state = Stateful::new(true);
+    let watcher = state.clone_watcher();
+    let watcher_reader = watcher.clone_boxed_watcher();
+    let seen = Rc::new(RefCell::new(vec![]));
+    let seen2 = seen.clone();
+    let notifier = state.info.notifier.0.clone();
+
+    let _sub = watcher.raw_modifies().subscribe(move |_| {
+      seen2.borrow_mut().push(*watcher_reader.read());
+    });
+
+    *state.write() = false;
+    drop(state);
+    AppCtx::run_until_stalled();
+
+    assert_eq!(&*seen.borrow(), &[false]);
     assert!(notifier.is_closed());
   }
 
