@@ -57,14 +57,19 @@ pub struct AppCtx {
 #[derive(Default)]
 struct ChangeDataset(RefCell<ChangeDatasetInner>);
 
+enum ChangeRecord {
+  Modify { path: SmallVec<[PartialId; 1]>, info: Rc<WriterInfo> },
+  Complete { notifier: crate::state::Notifier, finalize: Box<dyn FnOnce()> },
+}
+
 #[derive(Default)]
 struct ChangeDatasetInner {
-  dirty_info: Vec<(SmallVec<[PartialId; 1]>, Rc<WriterInfo>)>,
+  records: Vec<ChangeRecord>,
   in_emit: bool,
 }
 
 impl ChangeDataset {
-  fn has_pending_changes(&self) -> bool { !self.0.borrow().dirty_info.is_empty() }
+  fn has_pending_changes(&self) -> bool { !self.0.borrow().records.is_empty() }
 
   fn emit_change(&self) -> bool {
     let mut changed = false;
@@ -74,26 +79,34 @@ impl ChangeDataset {
 
     self.0.borrow_mut().in_emit = true;
     loop {
-      let writers = std::mem::take(&mut self.0.borrow_mut().dirty_info);
-      if writers.is_empty() {
+      let records = std::mem::take(&mut self.0.borrow_mut().records);
+      if records.is_empty() {
         break;
       }
       changed = true;
-      for (path, info) in writers {
-        let effect = info
-          .batched_modifies
-          .replace(ModifyEffect::empty());
-        info.notifier.next(ModifyInfo { effect, path });
+      for record in records {
+        match record {
+          ChangeRecord::Modify { path, info } => {
+            let effect = info
+              .batched_modifies
+              .replace(ModifyEffect::empty());
+            info.notifier.next(ModifyInfo { effect, path });
+          }
+          ChangeRecord::Complete { mut notifier, finalize } => {
+            notifier.complete();
+            finalize();
+          }
+        }
       }
     }
     self.0.borrow_mut().in_emit = false;
     changed
   }
 
-  fn add_changed(&self, dirty_info: (SmallVec<[PartialId; 1]>, Rc<WriterInfo>)) {
-    self.0.borrow_mut().dirty_info.push(dirty_info);
+  fn add_record(&self, record: ChangeRecord) {
+    self.0.borrow_mut().records.push(record);
     if !self.0.borrow().in_emit
-      && self.0.borrow().dirty_info.len() == 1
+      && self.0.borrow().records.len() == 1
       && !AppCtx::send_event(CoreMsg::DataChanged)
     {
       AppCtx::spawn_local(async move {
@@ -307,7 +320,13 @@ impl AppCtx {
   pub(crate) fn data_changed(path: SmallVec<[PartialId; 1]>, writer: Rc<WriterInfo>) {
     AppCtx::shared()
       .change_dataset
-      .add_changed((path, writer));
+      .add_record(ChangeRecord::Modify { path, info: writer });
+  }
+
+  pub(crate) fn data_complete(notifier: crate::state::Notifier, finalize: Box<dyn FnOnce()>) {
+    AppCtx::shared()
+      .change_dataset
+      .add_record(ChangeRecord::Complete { notifier, finalize });
   }
 
   pub(crate) fn has_pending_changes() -> bool {

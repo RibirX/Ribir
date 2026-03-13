@@ -19,6 +19,11 @@ use crate::{
   ticker::{FrameMsg, FrameTicker},
 };
 
+mod mount;
+
+pub use mount::MountHandle;
+use mount::MountStore;
+
 /// The attributes use to create a window.
 #[derive(Default)]
 pub struct WindowAttributes(pub winit::window::WindowAttributes);
@@ -217,6 +222,7 @@ pub struct Window {
   /// executed first.
   pub(crate) priority_task_queue: PriorityTaskQueue,
   shell_wnd: RefCell<BoxShellWindow>,
+  mounts: RefCell<MountStore>,
 
   flags: Cell<WindowFlags>,
 }
@@ -491,6 +497,7 @@ impl Window {
       running_animates: <_>::default(),
       priority_task_queue: PriorityTaskQueue::default(),
       shell_wnd: RefCell::new(shell_wnd),
+      mounts: <_>::default(),
       flags: Cell::new(flags),
       pre_edit: <_>::default(),
     };
@@ -597,11 +604,11 @@ impl Window {
           let mut root_preserved = false;
           let mut stack = vec![root_id];
           while let Some(id) = stack.pop() {
-            let mut e = Event::Disposed(DisposedEvent::new(id, self.tree));
-            self.emit_from_outside(id, &mut e);
+            let mut disposing = Event::Disposing(DisposingEvent::new(id, self.tree));
+            self.emit_from_outside(id, &mut disposing);
 
-            let Event::Disposed(inner) = &e else {
-              unreachable!("disposed delay event must emit a disposed event")
+            let Event::Disposing(inner) = &disposing else {
+              unreachable!("disposed delay event must emit a disposing event")
             };
 
             // Only the disposal root needs an explicit flag. Any preserved
@@ -614,6 +621,9 @@ impl Window {
             if inner.is_preserved() {
               continue;
             }
+
+            let mut disposed = Event::Disposed(DisposedEvent::new(id, self.tree));
+            self.emit_from_outside(id, &mut disposed);
 
             if self.focusing() == Some(id) {
               self
