@@ -206,6 +206,9 @@ impl WidgetId {
 
   /// Dispose the whole subtree of `id`, include `id` itself.
   pub(crate) fn dispose_subtree(self, tree: &mut WidgetTree) {
+    if self.is_dropped(tree) {
+      return;
+    }
     tree.prepare_subtree_for_dispose(self, true);
     tree
       .window()

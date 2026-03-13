@@ -58,14 +58,8 @@ pub struct AppCtx {
 struct ChangeDataset(RefCell<ChangeDatasetInner>);
 
 enum ChangeRecord {
-  Modify {
-    path: SmallVec<[PartialId; 1]>,
-    info: Rc<WriterInfo>,
-  },
-  Complete {
-    notifier: crate::state::Notifier,
-    finalize: Box<dyn FnOnce()>,
-  },
+  Modify { path: SmallVec<[PartialId; 1]>, info: Rc<WriterInfo> },
+  Complete { notifier: crate::state::Notifier, finalize: Box<dyn FnOnce()> },
 }
 
 #[derive(Default)]

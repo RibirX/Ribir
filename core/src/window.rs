@@ -19,6 +19,11 @@ use crate::{
   ticker::{FrameMsg, FrameTicker},
 };
 
+mod mount;
+
+pub use mount::MountHandle;
+use mount::MountStore;
+
 /// The attributes use to create a window.
 #[derive(Default)]
 pub struct WindowAttributes(pub winit::window::WindowAttributes);
@@ -217,6 +222,7 @@ pub struct Window {
   /// executed first.
   pub(crate) priority_task_queue: PriorityTaskQueue,
   shell_wnd: RefCell<BoxShellWindow>,
+  mounts: RefCell<MountStore>,
 
   flags: Cell<WindowFlags>,
 }
@@ -491,6 +497,7 @@ impl Window {
       running_animates: <_>::default(),
       priority_task_queue: PriorityTaskQueue::default(),
       shell_wnd: RefCell::new(shell_wnd),
+      mounts: <_>::default(),
       flags: Cell::new(flags),
       pre_edit: <_>::default(),
     };

@@ -101,8 +101,7 @@ where
 
               if matches!(last_progress, AnimateProgress::Finish) {
                 drop(w_ref);
-                let animate = animate.clone_writer();
-                AppCtx::spawn_local(async move { animate.stop() });
+                animate.stop();
               }
             }
             _ => {}
@@ -141,22 +140,43 @@ where
 
   fn is_running(&self) -> bool { self.read().is_running() }
 
+  fn running_watcher(&self) -> Box<dyn StateWatcher<Value = bool>> {
+    Box::new(self.part_watcher(|a| PartRef::from_value(a.is_running())))
+  }
+
+  fn init_window(&self, window_id: WindowId) { self.write().window_id = Some(window_id) }
+
   fn stop(&self) {
-    let mut this = self.silent();
+    let mut animate_ref = self.write();
+    let this = &mut *animate_ref;
     if this.is_running() {
       this.dec_running_animate_if_needed();
       this.running_info.take();
     }
   }
 
-  fn box_clone(&self) -> Box<dyn Animation> { Box::new(self.clone_writer()) }
+  fn dyn_clone(&self) -> Box<dyn Animation> { Box::new(self.clone_writer()) }
 }
 
 impl<S> Animate<S>
 where
   S: AnimateState + 'static,
 {
-  pub fn set_window_id(&mut self, window_id: WindowId) -> &mut Self {
+  pub fn interpolated_value(&mut self) -> S::Value {
+    if let Some(AnimateInfo { from, to, last_progress, .. }) = self.running_info.as_mut() {
+      self
+        .state
+        .calc_lerp_value(from, to, last_progress.value())
+    } else {
+      self.state.get()
+    }
+  }
+
+  /// Initialize the target window for animations that need one.
+  ///
+  /// If an animation is created outside of a valid `BuildCtx`, use this
+  /// function to explicitly initialize the window.
+  pub fn init_window(&mut self, window_id: WindowId) -> &mut Self {
     self.window_id = Some(window_id);
     self
   }
@@ -194,7 +214,7 @@ where
       AnimateProgress::Dismissed => from.clone(),
       AnimateProgress::Finish => to.clone(),
     };
-    self.state.set(v);
+    self.state.set_animating(v);
 
     *last_progress = progress;
     *already_lerp = true;
@@ -237,7 +257,7 @@ where
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{reset_test_env, test_helper::TestWindow};
+  use crate::{context::AppCtx, reset_test_env, test_helper::TestWindow};
 
   #[test]
   fn fix_animate_circular_mut_borrow() {
@@ -284,5 +304,46 @@ mod tests {
     wnd.draw_frame();
 
     assert_eq!(*c_state.read(), 1);
+  }
+
+  #[test]
+  fn stop_notifies_running_watcher() {
+    reset_test_env!();
+
+    let events = Stateful::new(vec![]);
+    let c_events = events.clone_reader();
+
+    let w = fn_widget! {
+      let animate = @Animate {
+        transition: EasingTransition {
+          easing: easing::LINEAR,
+          duration: Duration::from_millis(100),
+        },
+        state: Stateful::new(1.),
+        from: 0.,
+      };
+      let mounted_animate = animate.clone_writer();
+      let layout_animate = animate.clone_writer();
+      let running = animate.running_watcher();
+      let running_reader = running.clone_boxed_watcher();
+      let sub = running.raw_modifies().subscribe(move |_| {
+        $write(events).push(*running_reader.read());
+      });
+
+      @Void {
+        on_mounted: move |_| mounted_animate.run(),
+        on_performed_layout: move |_| layout_animate.stop(),
+        on_disposed: move |_| sub.unsubscribe(),
+      }
+    };
+
+    let wnd = TestWindow::from_widget(w);
+    wnd.draw_frame();
+    AppCtx::run_until_stalled();
+
+    assert!(
+      c_events.read().contains(&false),
+      "stopping an animate should notify running watchers with `false`"
+    );
   }
 }

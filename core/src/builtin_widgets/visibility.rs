@@ -1,5 +1,10 @@
 use crate::{prelude::*, wrap_render::*};
 
+/// Allows hidden descendants to continue painting while an outer wrapper keeps
+/// a leave animation alive.
+#[derive(Clone, Copy, Default)]
+pub struct AllowHiddenPaint(pub bool);
+
 /// A wrapper that controls whether its child is visible and participates in
 /// layout, painting, and hit testing.
 ///
@@ -58,11 +63,23 @@ impl_compose_child_for_wrap_render!(VisibilityRender);
 impl WrapRender for VisibilityRender {
   #[inline]
   fn measure(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut MeasureCtx) -> Size {
-    if self.display { host.measure(clamp, ctx) } else { clamp.min }
+    if self.display || Self::allow_hidden_layout(ctx) {
+      host.measure(clamp, ctx)
+    } else {
+      clamp.min
+    }
   }
 
+  #[inline]
+  // `AllowHiddenPaint` can keep a hidden subtree participating in layout.
+  // `size_affected_by_child` has no context parameter, so it cannot branch on
+  // that provider dynamically. Forwarding to the host keeps relayout
+  // propagation consistent with `measure`.
+  fn size_affected_by_child(&self, host: &dyn Render) -> bool { host.size_affected_by_child() }
+
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
-    if self.display {
+    let allow_hidden_paint = Provider::of::<AllowHiddenPaint>(ctx).is_some_and(|v| v.0);
+    if self.display || allow_hidden_paint {
       host.paint(ctx)
     } else {
       ctx.painter().apply_alpha(0.);
@@ -85,6 +102,13 @@ impl WrapRender for VisibilityRender {
   #[cfg(feature = "debug")]
   fn debug_properties(&self) -> Option<serde_json::Value> {
     Some(serde_json::json!({ "display": self.display }))
+  }
+}
+
+impl VisibilityRender {
+  #[inline]
+  fn allow_hidden_layout(ctx: &MeasureCtx) -> bool {
+    Provider::of::<AllowHiddenPaint>(ctx).is_some_and(|v| v.0)
   }
 }
 
@@ -129,5 +153,43 @@ mod tests {
     *w_visible.write() = false;
     wnd.draw_frame();
     assert_eq!(*hit.read(), 1);
+  }
+
+  #[test]
+  fn allow_hidden_paint_keeps_hidden_layout() {
+    reset_test_env!();
+
+    let hidden_id = Stateful::new(None::<WidgetId>);
+    let hidden_id_reader = hidden_id.clone_reader();
+    let tail_id = Stateful::new(None::<WidgetId>);
+    let tail_id_reader = tail_id.clone_reader();
+
+    let wnd = TestWindow::from_widget(providers! {
+      providers: [Provider::new(AllowHiddenPaint(true))],
+      @MockMulti {
+        @MockBox { size: Size::new(10., 10.) }
+        @MockBox {
+          visible: false,
+          size: Size::new(20., 10.),
+          on_mounted: move |e| *$write(hidden_id) = Some(e.current_target()),
+        }
+        @MockBox {
+          size: Size::new(30., 10.),
+          on_mounted: move |e| *$write(tail_id) = Some(e.current_target()),
+        }
+      }
+    });
+
+    wnd.draw_frame();
+
+    let hidden_id = hidden_id_reader
+      .read()
+      .expect("hidden child should mount");
+    let tail_id = tail_id_reader
+      .read()
+      .expect("tail child should mount");
+
+    assert_eq!(wnd.widget_size(hidden_id), Some(Size::new(20., 10.)));
+    assert_eq!(wnd.widget_pos(tail_id), Some(Point::new(30., 0.)));
   }
 }

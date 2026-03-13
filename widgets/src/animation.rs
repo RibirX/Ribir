@@ -1,2 +1,6 @@
 pub mod animate_match;
 pub use animate_match::*;
+pub mod animated_presence;
+pub use animated_presence::*;
+pub mod animated_visibility;
+pub use animated_visibility::*;

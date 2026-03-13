@@ -11,6 +11,8 @@ mod winit_shell_wnd;
 pub use ribir_material as material;
 pub mod prelude {
   pub use ribir_core::prelude::*;
+  #[cfg(feature = "widgets")]
+  pub use ribir_widgets::{cases, transitions};
 
   #[cfg(feature = "material")]
   pub use super::material;
