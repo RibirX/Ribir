@@ -1,15 +1,16 @@
+use std::{cell::RefCell, ops::Deref, rc::Rc};
+
 use ribir_core::prelude::*;
 
 /// High-level animation orchestration driven by pattern matching.
 ///
-/// `AnimateMatch` is **not** a widget — it is a subscription-like handle
-/// returned by [`AnimateMatch::run`] or created via declarative syntax.
-/// It listens to a reactive business state and maps each matched case to an
-/// absolute visual target, driving a single internal [`Animate`] instance so
+/// `AnimateMatch` is **not** a widget — it is a handle returned by
+/// [`AnimateMatch::observe`] or created via declarative syntax. It observes a
+/// trigger watcher, maps each matched case to an absolute visual target, and
+/// drives a single internal [`Animate`] instance so
 /// multiple animated properties stay perfectly in sync.
 ///
-/// The subscription lives as long as the upstream `value` stream. Call
-/// [`stop`](Self::stop) for early termination.
+/// Call [`dispose`](Self::dispose) for early termination.
 ///
 /// For most users the ergonomic entry points are the [`cases!`] and
 /// [`transitions!`] macros.
@@ -35,7 +36,7 @@ use ribir_core::prelude::*;
 ///     let transform = card.transform();
 ///
 ///     let _am = @AnimateMatch {
-///       watcher: card_status.clone_watcher(),
+///       value: card_status.clone_watcher(),
 ///       cases: cases! {
 ///         state: (opacity, transform),
 ///         CardStatus::Idle   => (1.0, Transform::identity()),
@@ -63,99 +64,141 @@ use ribir_core::prelude::*;
 /// # Imperative Usage
 ///
 /// ```rust ignore
-/// let _am = AnimateMatch::run(
+/// let _am = AnimateMatch::observe(
 ///   card_status.clone_watcher(),
 ///   cases! { ... },
 ///   transitions! { ... },
 ///   Interruption::Fluid,
 /// );
 /// ```
-#[must_use = "AnimateMatch does nothing if discarded immediately; bind it to a variable whose \
+#[must_use = "AnimateMatch does nothing if discarded immediately; store it in a variable whose \
               lifetime covers the animation scope"]
-pub struct AnimateMatch {
-  subscription: Option<BoxedSubscription>,
-  animate: Box<dyn Animation>,
+pub struct AnimateMatch<V: 'static, S: AnimateState + 'static> {
+  subscription: Rc<RefCell<Option<BoxedSubscription>>>,
+  value: Box<dyn StateWatcher<Value = V>>,
+  animate: Stateful<Animate<S>>,
 }
 
-impl AnimateMatch {
-  /// Create and start an animation orchestrator.
+impl<V: 'static, S: AnimateState + 'static> AnimateMatch<V, S> {
+  /// Return a watcher for the watched trigger value.
+  pub fn value_watcher(&self) -> Box<dyn StateWatcher<Value = V>> {
+    self.value.clone_boxed_watcher()
+  }
+
+  /// Dispose the orchestrator and unsubscribe from the value stream.
+  pub fn dispose(&self) {
+    self.animate.stop();
+    if let Some(sub) = self.subscription.borrow_mut().take() {
+      sub.unsubscribe();
+    }
+  }
+}
+
+impl<V: Clone + 'static, S: AnimateState + 'static> AnimateMatch<V, S> {
+  /// Return the latest trigger value snapshot.
+  pub fn current_value(&self) -> V { self.value.read().clone() }
+}
+
+impl<V, S> AnimateMatch<V, S>
+where
+  V: Clone + PartialEq + 'static,
+  S: AnimateState<Value: Clone> + 'static,
+{
+  /// Create an animation orchestrator that observes a watched value.
   ///
   /// The returned handle keeps the subscription alive. The subscription ends
   /// naturally when the upstream `value` stream completes (e.g. the driving
-  /// `Stateful` is dropped). Call [`stop`](Self::stop) for early termination.
-  pub fn run<V, S>(
-    value: impl StateWatcher<Value = V>, cases: MatchCases<V, S>,
-    transitions: impl Fn(&V, &V) -> Box<dyn Transition> + 'static, interruption: Interruption,
+  /// `Stateful` is dropped). Call [`dispose`](Self::dispose) for early
+  /// termination.
+  ///
+  /// `transitions` may return `None` to switch directly to the target case
+  /// without creating an animation lifecycle.
+  pub fn observe<TS>(
+    value: impl StateWatcher<Value = V>, cases: MatchCases<V, S>, transitions: TS,
+    interruption: Interruption,
   ) -> Self
   where
-    V: Clone + PartialEq + 'static,
-    S: AnimateState + 'static,
-    S::Value: Clone + 'static,
+    TS: IntoTransitionSelector<V>,
   {
+    let transitions = transitions.into_transition_selector();
+    let value: Box<dyn StateWatcher<Value = V>> = value.clone_boxed_watcher();
     let init_value = value.read().clone();
     let initial_target = cases.resolve(&init_value);
     let animate_state = cases.state.clone_animate_state();
     animate_state.revert(initial_target.clone());
 
     let animate: Stateful<Animate<S>> = {
-      let mut d = Animate::declarer();
-      d.with_state(animate_state)
+      let mut builder = Animate::declarer();
+      builder
+        .with_state(animate_state)
         .with_from(initial_target);
-      d.finish()
+      builder.finish()
     };
 
-    let mut last_value = init_value;
-    let animate_writer = animate.clone_writer();
-
     let subscription = watch!($read(value).clone())
-      .subscribe(move |to| {
-        if last_value != to {
-          let from = std::mem::replace(&mut last_value, to.clone());
+      .merge(Local::of(init_value))
+      .distinct_until_changed()
+      .pairwise()
+      .subscribe({
+        let animate = animate.clone_writer();
+        move |(from, to)| {
+          let target = cases.resolve(&to);
+          let Some(transition) = transitions(&from, &to) else {
+            animate.stop();
+            animate.read().state.set_value(target);
+            return;
+          };
 
           if interruption == Interruption::Snap {
-            animate_writer.stop();
+            animate.stop();
           }
 
-          let target = cases.resolve(&to);
-          let transition = transitions(&from, &to);
-
-          let mut animate_ref = animate_writer.write();
-          animate_ref.transition = transition;
-          animate_ref.from = match interruption {
-            Interruption::Fluid => animate_ref.state.get(),
-            Interruption::Snap => {
-              let snap_from = cases.resolve(&from);
-              animate_ref.state.revert(snap_from.clone());
-              snap_from
-            }
+          let mut animate_ref = animate.write();
+          let restart_from = match interruption {
+            Interruption::Fluid => animate_ref.interpolated_value(),
+            Interruption::Snap => cases.resolve(&from),
           };
-          animate_ref.state.set(target);
+          animate_ref.transition = transition;
+          animate_ref.from = restart_from;
+          animate_ref.state.set_value(target);
           animate_ref.forget_modifies();
           drop(animate_ref);
 
-          animate_writer.run();
+          animate.run();
         }
       })
       .into_boxed();
 
-    Self { subscription: Some(subscription), animate: Box::new(animate) }
+    Self { subscription: Rc::new(RefCell::new(Some(subscription))), value, animate }
   }
+}
 
-  /// Return a declarative builder for `AnimateMatch`.
-  ///
-  /// The builder collects `watcher`, `cases`, `transitions`, and
-  /// `interruption`, then produces an `AnimateMatch` handle when finished.
-  pub fn declarer<V: 'static, S: AnimateState + 'static>() -> AnimateMatchDeclarer<V, S> {
+impl<V: 'static, S: AnimateState + 'static> Declare for AnimateMatch<V, S>
+where
+  V: Clone + PartialEq,
+  S: AnimateState<Value: Clone> + 'static,
+{
+  type Builder = AnimateMatchDeclarer<V, S>;
+
+  fn declarer() -> Self::Builder {
     AnimateMatchDeclarer { value: None, cases: None, transitions: None, interruption: None }
   }
+}
 
-  /// Stop the animation and unsubscribe from the value stream.
-  pub fn stop(&mut self) {
-    self.animate.stop();
-    if let Some(sub) = self.subscription.take() {
-      sub.unsubscribe();
+impl<V: 'static, S: AnimateState + 'static> Clone for AnimateMatch<V, S> {
+  fn clone(&self) -> Self {
+    Self {
+      subscription: self.subscription.clone(),
+      value: self.value.clone_boxed_watcher(),
+      animate: self.animate.clone_writer(),
     }
   }
+}
+
+impl<V: 'static, S: AnimateState + 'static> Deref for AnimateMatch<V, S> {
+  type Target = Stateful<Animate<S>>;
+
+  fn deref(&self) -> &Self::Target { &self.animate }
 }
 
 // ---------------------------------------------------------------------------
@@ -165,7 +208,7 @@ impl AnimateMatch {
 /// A generic builder for [`AnimateMatch`] that enables declarative `@` syntax.
 ///
 /// Created via [`AnimateMatch::declarer()`]. The builder collects configuration
-/// fields and produces a non-generic `AnimateMatch` handle via
+/// fields and produces a typed `AnimateMatch<V, S>` handle via
 /// [`ObjDeclarer::finish`].
 pub struct AnimateMatchDeclarer<V: 'static, S: AnimateState<Value: Clone> + 'static> {
   value: Option<Box<dyn StateWatcher<Value = V>>>,
@@ -187,13 +230,12 @@ impl<V: 'static, S: AnimateState + 'static> AnimateMatchDeclarer<V, S> {
     self
   }
 
-  /// Set the transition routing table. Defaults to a 300 ms linear transition.
-  pub fn with_transitions<F, T>(&mut self, transitions: F) -> &mut Self
+  /// Set the transition routing table.
+  pub fn with_transitions<TS>(&mut self, transitions: TS) -> &mut Self
   where
-    F: Fn(&V, &V) -> T + 'static,
-    T: Transition + 'static,
+    TS: IntoTransitionSelector<V>,
   {
-    self.transitions = Some(Box::new(move |f, t| Box::new(transitions(f, t))));
+    self.transitions = Some(transitions.into_transition_selector());
     self
   }
 
@@ -209,7 +251,7 @@ where
   V: Clone + PartialEq + 'static,
   S: AnimateState<Value: Clone> + 'static,
 {
-  type Target = AnimateMatch;
+  type Target = AnimateMatch<V, S>;
 
   #[track_caller]
   fn finish(self) -> Self::Target {
@@ -217,14 +259,12 @@ where
       .value
       .expect("AnimateMatch requires a `value`");
     let cases = self.cases.expect("AnimateMatch requires `cases`");
-    let transitions = self.transitions.unwrap_or_else(|| {
-      let transition =
-        EasingTransition { easing: easing::LINEAR, duration: Duration::from_millis(300) };
-      Box::new(move |_, _| Box::new(transition.clone()))
-    });
+    let transitions = self
+      .transitions
+      .expect("AnimateMatch requires `transitions`");
     let interruption = self.interruption.unwrap_or_default();
 
-    AnimateMatch::run(value, cases, transitions, interruption)
+    AnimateMatch::observe(value, cases, OptionalTransitionSelector::from(transitions), interruption)
   }
 }
 
@@ -239,7 +279,37 @@ pub struct MatchCases<V, S: AnimateState> {
 }
 
 /// Type alias for the transition builder closure.
-pub type TransitionBuilder<V> = Box<dyn Fn(&V, &V) -> Box<dyn Transition>>;
+pub type TransitionBuilder<V> = Box<dyn Fn(&V, &V) -> Option<Box<dyn Transition>>>;
+
+pub trait IntoTransitionSelector<V>: 'static {
+  fn into_transition_selector(self) -> TransitionBuilder<V>;
+}
+
+pub struct OptionalTransitionSelector<V>(TransitionBuilder<V>);
+
+impl<V> OptionalTransitionSelector<V> {
+  pub fn new(f: impl Fn(&V, &V) -> Option<Box<dyn Transition>> + 'static) -> Self {
+    Self(Box::new(f))
+  }
+}
+
+impl<V> From<TransitionBuilder<V>> for OptionalTransitionSelector<V> {
+  fn from(value: TransitionBuilder<V>) -> Self { Self(value) }
+}
+
+impl<V, F, T> IntoTransitionSelector<V> for F
+where
+  F: Fn(&V, &V) -> T + 'static,
+  T: Transition + 'static,
+{
+  fn into_transition_selector(self) -> TransitionBuilder<V> {
+    Box::new(move |from, to| Some(self(from, to).into_box()))
+  }
+}
+
+impl<V: 'static> IntoTransitionSelector<V> for OptionalTransitionSelector<V> {
+  fn into_transition_selector(self) -> TransitionBuilder<V> { self.0 }
+}
 
 /// Type alias for the case resolver closure.
 pub type CaseResolver<V, S> = Box<dyn Fn(&V) -> <S as AnimateState>::Value>;
@@ -250,7 +320,7 @@ impl<V, S: AnimateState> MatchCases<V, S> {
   }
 
   #[inline]
-  fn resolve(&self, value: &V) -> S::Value { (self.map)(value) }
+  pub(crate) fn resolve(&self, value: &V) -> S::Value { (self.map)(value) }
 }
 
 /// Behavior when a running animation is interrupted by a new matched value.
@@ -357,7 +427,7 @@ mod tests {
     let frames_reader = frames.clone_reader();
 
     let w = fn_widget! {
-      let _am = AnimateMatch::run(
+      let _am = AnimateMatch::observe(
         Stateful::new(Status::Hover).clone_watcher(),
         cases! {
           state: (opacity.clone_writer(), scale.clone_writer()),
@@ -395,7 +465,7 @@ mod tests {
 
     let c_status = status.clone_writer();
     let w = fn_widget! {
-      let _am = AnimateMatch::run(
+      let _am = AnimateMatch::observe(
         c_status.clone_watcher(),
         cases! {
           state: (opacity.clone_writer(), scale.clone_writer()),
@@ -426,6 +496,67 @@ mod tests {
   }
 
   #[test]
+  fn none_transition_switches_immediately_with_notification() {
+    reset_test_env!();
+
+    let status = Stateful::new(Status::Idle);
+    let opacity = Stateful::new(0.0_f32);
+    let scale = Stateful::new(1.0_f32);
+    let frames = Stateful::new(Vec::new());
+    let opacity_reader = opacity.clone_reader();
+    let scale_reader = scale.clone_reader();
+    let modify_hits = Stateful::new(0);
+    let modify_hits_reader = modify_hits.clone_reader();
+    let _subscription = opacity
+      .modifies()
+      .subscribe({
+        let modify_hits = modify_hits.clone_writer();
+        move |_| *modify_hits.write() += 1
+      })
+      .into_boxed();
+
+    let c_status = status.clone_writer();
+    let w = fn_widget! {
+      let _am = AnimateMatch::observe(
+        c_status.clone_watcher(),
+        cases! {
+          state: (opacity.clone_writer(), scale.clone_writer()),
+          Status::Idle => (0.0, 1.0),
+          Status::Hover => (0.6, 1.05),
+          Status::Active => (1.0, 0.95),
+        },
+        OptionalTransitionSelector::new(move |from, to| match (*from, *to) {
+          (Status::Idle, Status::Active) => None,
+          _ => Some(linear(200).into_box()),
+        }),
+        Interruption::default(),
+      );
+      @ValueRecorder {
+        opacity: opacity.clone_writer(),
+        scale: scale.clone_writer(),
+        frames: frames.clone_writer(),
+      }
+    };
+
+    let wnd = TestWindow::new(w, Size::new(100., 100.), WindowFlags::ANIMATIONS);
+    wnd.draw_frame();
+
+    *status.write() = Status::Active;
+    for _ in 0..3 {
+      wnd.draw_frame();
+      if *opacity_reader.read() == 1.0 && *scale_reader.read() == 0.95 {
+        break;
+      }
+    }
+    assert_eq!(*opacity_reader.read(), 1.0);
+    assert_eq!(*scale_reader.read(), 0.95);
+    assert!(
+      *modify_hits_reader.read() > 0,
+      "none-transition direct switch should notify downstream state watchers"
+    );
+  }
+
+  #[test]
   fn fluid_interruption_continues_from_interpolated_value() {
     reset_test_env!();
 
@@ -437,7 +568,7 @@ mod tests {
 
     let c_status = status.clone_writer();
     let host = fn_widget! {
-      let _am = AnimateMatch::run(
+      let _am = AnimateMatch::observe(
         c_status.clone_watcher(),
         cases! {
           state: (opacity.clone_writer(), scale.clone_writer()),
@@ -502,7 +633,7 @@ mod tests {
 
     let c_status = status.clone_writer();
     let w = fn_widget! {
-      let _am = AnimateMatch::run(
+      let _am = AnimateMatch::observe(
         c_status.clone_watcher(),
         cases! {
           state: (opacity.clone_writer(), scale.clone_writer()),
@@ -555,7 +686,7 @@ mod tests {
     let c_status = status.clone_writer();
     let opacity_reader = opacity.clone_reader();
     let w = fn_widget! {
-      let mut am = AnimateMatch::run(
+      let am = AnimateMatch::observe(
         c_status.clone_watcher(),
         cases! {
           state: (opacity.clone_writer(), scale.clone_writer()),
@@ -567,7 +698,7 @@ mod tests {
         Interruption::default(),
       );
       // Stop it immediately
-      am.stop();
+      am.dispose();
 
       @ValueRecorder {
         opacity: opacity.clone_writer(),
@@ -581,10 +712,98 @@ mod tests {
 
     *status.write() = Status::Active;
     wnd.draw_frame();
-    // Since it's stopped, opacity should remain at its initial value from cases!
-    // init Wait, AnimateMatch::run initializes the state once before
-    // subscribing. So it should be 0.0 initially.
+    // Since it's stopped, opacity should remain at its initial value from cases.
+    // AnimateMatch::observe initializes the state once before subscribing, so
+    // it should be 0.0 initially.
     assert_eq!(*opacity_reader.read(), 0.0);
+  }
+
+  #[test]
+  fn cloned_handles_share_controller_and_stop_together() {
+    reset_test_env!();
+
+    let status = Stateful::new(Status::Idle);
+    let opacity = Stateful::new(0.0_f32);
+    let scale = Stateful::new(1.0_f32);
+    let wnd =
+      TestWindow::new(fn_widget! { @Void {} }, Size::new(10., 10.), WindowFlags::ANIMATIONS);
+
+    let am = AnimateMatch::observe(
+      status.clone_watcher(),
+      cases! {
+        state: (opacity.clone_writer(), scale.clone_writer()),
+        Status::Idle => (0.0, 1.0),
+        Status::Hover => (0.5, 1.1),
+        Status::Active => (1.0, 0.95),
+      },
+      transitions! { _ => linear(100), },
+      Interruption::default(),
+    );
+    let clone = am.clone();
+    am.init_window(wnd.id());
+
+    *status.write() = Status::Active;
+    wnd.draw_frame();
+    assert!(clone.is_running() || am.is_running());
+    assert_eq!(am.current_value(), Status::Active);
+    assert_eq!(clone.current_value(), Status::Active);
+    let stopped_value = *opacity.read();
+
+    am.dispose();
+    assert!(!clone.is_running());
+
+    *status.write() = Status::Hover;
+    wnd.draw_frame();
+    assert_eq!(clone.current_value(), Status::Hover);
+    assert_eq!(*opacity.read(), stopped_value);
+  }
+
+  #[test]
+  fn current_value_and_watcher_track_latest_business_state() {
+    reset_test_env!();
+
+    let status = Stateful::new(Status::Idle);
+    let opacity = Stateful::new(0.0_f32);
+    let scale = Stateful::new(1.0_f32);
+    let seen = Stateful::new(Vec::new());
+    let seen_reader = seen.clone_reader();
+    let wnd =
+      TestWindow::new(fn_widget! { @Void {} }, Size::new(10., 10.), WindowFlags::ANIMATIONS);
+
+    let am = AnimateMatch::observe(
+      status.clone_watcher(),
+      cases! {
+        state: (opacity.clone_writer(), scale.clone_writer()),
+        Status::Idle => (0.0, 1.0),
+        Status::Hover => (0.5, 1.1),
+        Status::Active => (1.0, 0.95),
+      },
+      OptionalTransitionSelector::new(move |_, _| None),
+      Interruption::default(),
+    );
+    am.init_window(wnd.id());
+
+    let am_for_watch = am.clone();
+    let _sub = am
+      .value_watcher()
+      .raw_modifies()
+      .subscribe({
+        let seen = seen.clone_writer();
+        move |_| seen.write().push(am_for_watch.current_value())
+      })
+      .into_boxed();
+
+    assert_eq!(am.current_value(), Status::Idle);
+
+    *status.write() = Status::Hover;
+    wnd.draw_frame();
+    assert_eq!(am.current_value(), Status::Hover);
+    assert_eq!(seen_reader.read().as_slice(), &[Status::Hover]);
+
+    *status.write() = Status::Active;
+    wnd.draw_frame();
+    assert_eq!(am.current_value(), Status::Active);
+    assert_eq!(seen_reader.read().as_slice(), &[Status::Hover, Status::Active]);
   }
 
   #[test]
@@ -637,7 +856,8 @@ mod tests {
   }
 
   #[test]
-  fn declarative_with_defaults() {
+  #[should_panic(expected = "AnimateMatch requires `transitions`")]
+  fn declarative_requires_transitions() {
     reset_test_env!();
 
     let opacity = Stateful::new(0.0_f32);
@@ -645,7 +865,6 @@ mod tests {
     let frames = Stateful::new(Vec::new());
 
     let w = fn_widget! {
-      // Declarative with only required fields (transitions and interruption default)
       let _am = @AnimateMatch {
         value: Stateful::new(Status::Hover).clone_watcher(),
         cases: cases! {
@@ -662,8 +881,7 @@ mod tests {
       }
     };
 
-    let wnd = TestWindow::new(w, Size::new(100., 100.), WindowFlags::ANIMATIONS);
-    wnd.draw_frame();
+    let _wnd = TestWindow::new(w, Size::new(100., 100.), WindowFlags::ANIMATIONS);
   }
 
   #[test]

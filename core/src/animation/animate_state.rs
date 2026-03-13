@@ -14,7 +14,8 @@ pub trait AnimateState {
     Self: Sized;
 
   fn get(&self) -> Self::Value;
-  fn set(&self, v: Self::Value);
+  fn set_value(&self, v: Self::Value);
+  fn set_animating(&self, v: Self::Value);
   fn revert(&self, v: Self::Value);
   fn animate_state_modifies(&self) -> LocalBoxedObservable<'static, ModifyInfo, Infallible>;
   fn calc_lerp_value(&mut self, from: &Self::Value, to: &Self::Value, rate: f32) -> Self::Value;
@@ -156,7 +157,10 @@ impl<S: AnimateState + 'static> AnimateState for TransitionUncountedState<S> {
   fn get(&self) -> Self::Value { self.state.get() }
 
   #[inline]
-  fn set(&self, v: Self::Value) { self.state.set(v) }
+  fn set_value(&self, v: Self::Value) { self.state.set_value(v) }
+
+  #[inline]
+  fn set_animating(&self, v: Self::Value) { self.state.set_animating(v) }
 
   #[inline]
   fn revert(&self, v: Self::Value) { self.state.revert(v) }
@@ -192,7 +196,10 @@ where
   fn get(&self) -> Self::Value { self.read().clone() }
 
   #[inline]
-  fn set(&self, v: Self::Value) { *self.shallow() = v; }
+  fn set_value(&self, v: Self::Value) { *self.write() = v; }
+
+  #[inline]
+  fn set_animating(&self, v: Self::Value) { *self.shallow() = v; }
 
   #[inline]
   fn revert(&self, v: Self::Value) {
@@ -235,7 +242,10 @@ where
   fn get(&self) -> Self::Value { self.state.get() }
 
   #[inline]
-  fn set(&self, v: Self::Value) { self.state.set(v) }
+  fn set_value(&self, v: Self::Value) { self.state.set_value(v) }
+
+  #[inline]
+  fn set_animating(&self, v: Self::Value) { self.state.set_animating(v) }
 
   #[inline]
   fn revert(&self, v: Self::Value) { self.state.revert(v) }
@@ -292,7 +302,10 @@ where
   fn get(&self) -> Self::Value { self.0.read().clone() }
 
   #[inline]
-  fn set(&self, v: Self::Value) { *self.0.shallow() = v; }
+  fn set_value(&self, v: Self::Value) { *self.0.write() = v; }
+
+  #[inline]
+  fn set_animating(&self, v: Self::Value) { *self.0.shallow() = v; }
 
   #[inline]
   fn revert(&self, v: Self::Value) {
@@ -346,7 +359,10 @@ impl AnimateState for AnimateStatePackEnd {
   fn get(&self) -> Self::Value { AnimateStatePackEnd }
 
   #[inline]
-  fn set(&self, _v: Self::Value) {}
+  fn set_value(&self, _v: Self::Value) {}
+
+  #[inline]
+  fn set_animating(&self, _v: Self::Value) {}
 
   #[inline]
   fn revert(&self, _v: Self::Value) {}
@@ -386,9 +402,15 @@ where
   fn get(&self) -> Self::Value { AnimateStatePack::new(self.head.get(), self.tail.get()) }
 
   #[inline]
-  fn set(&self, v: Self::Value) {
-    self.head.set(v.head);
-    self.tail.set(v.tail);
+  fn set_value(&self, v: Self::Value) {
+    self.head.set_value(v.head);
+    self.tail.set_value(v.tail);
+  }
+
+  #[inline]
+  fn set_animating(&self, v: Self::Value) {
+    self.head.set_animating(v.head);
+    self.tail.set_animating(v.tail);
   }
 
   #[inline]

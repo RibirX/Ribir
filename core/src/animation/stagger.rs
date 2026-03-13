@@ -153,6 +153,18 @@ impl Animation for Stateful<Stagger> {
 
   fn is_running(&self) -> bool { self.read().is_running() }
 
+  fn running_watcher(&self) -> Box<dyn StateWatcher<Value = bool>> {
+    Box::new(self.part_watcher(|a| PartRef::from_value(a.is_running())))
+  }
+
+  fn init_window(&self, window_id: WindowId) {
+    self
+      .read()
+      .animations
+      .iter()
+      .for_each(|(_, animation)| animation.init_window(window_id));
+  }
+
   fn stop(&self) {
     if self.is_running() {
       let mut this = self.write();
@@ -167,7 +179,7 @@ impl Animation for Stateful<Stagger> {
     }
   }
 
-  fn box_clone(&self) -> Box<dyn Animation> {
+  fn dyn_clone(&self) -> Box<dyn Animation> {
     let c = self.clone_writer();
     Box::new(c)
   }
@@ -179,7 +191,7 @@ impl Stateful<Stagger> {
     if let Some(step) = this.next_to_run.take() {
       if let Some((delay, next)) = this.animations.get(step.index) {
         let at = step.prev_at + *delay;
-        let next = next.box_clone();
+        let next = next.clone();
         this.next_to_run = Some(AnimationCursor { prev_at: at, index: step.index + 1 });
 
         // the status not changed(running -> running), so we can ignore the

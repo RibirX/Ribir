@@ -62,10 +62,7 @@ impl Reusable {
   /// - When crossing window boundaries
   pub fn get_widget(&self) -> Widget<'static> {
     let mut this = self.clone();
-    fn_widget! {
-      this.gen_widget()
-    }
-    .into_widget()
+    fn_widget! { this.gen_widget() }.into_widget()
   }
 
   // The widget is generated lazily when `get_widget` is called, with actual

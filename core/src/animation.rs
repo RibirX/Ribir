@@ -15,6 +15,8 @@ pub use stagger::Stagger;
 mod keyframes;
 pub use keyframes::*;
 
+use crate::{state::StateWatcher, window::WindowId};
+
 ///  Trait to describe how to control the animation.
 pub trait Animation {
   /// Start the animation.
@@ -23,6 +25,17 @@ pub trait Animation {
   fn stop(&self);
   /// Check if the animation is running.
   fn is_running(&self) -> bool;
-  /// clone the animation.
-  fn box_clone(&self) -> Box<dyn Animation>;
+  /// Observe running-state changes.
+  fn running_watcher(&self) -> Box<dyn StateWatcher<Value = bool>>;
+  /// Initialize the target window for animations that need one.
+  ///
+  /// If an animation is created outside of a valid `BuildCtx`, use this
+  /// function to explicitly initialize the window.
+  fn init_window(&self, _window_id: WindowId) {}
+  /// Clone the animation as a trait object.
+  fn dyn_clone(&self) -> Box<dyn Animation>;
+}
+
+impl Clone for Box<dyn Animation> {
+  fn clone(&self) -> Self { self.dyn_clone() }
 }

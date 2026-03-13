@@ -2,7 +2,7 @@ use std::cell::RefCell;
 
 use ribir_algo::Rc;
 
-use crate::{prelude::*, window::WindowId};
+use crate::prelude::*;
 
 /// Overlay let independent the widget "float" visual elements on top of
 /// other widgets by inserting them into the root stack of the widget stack.
@@ -54,34 +54,23 @@ struct InnerOverlay {
   gen_widget: GenWidget,
   auto_close_policy: AutoClosePolicy,
   mask: Option<Brush>,
-  showing: Option<ShowingInfo>,
-  track_id: RefCell<Option<TrackId>>,
+  showing: Option<MountHandle>,
 }
 
-struct ShowingInfo {
-  wnd_id: WindowId,
-  generator: GenWidget,
-}
+#[derive(Clone)]
+struct CurrentOverlay(Overlay);
 
 impl Overlay {
   /// Create overlay from a function widget that may call many times.
   pub fn new<K: ?Sized>(gen_widget: impl RInto<GenWidget, K>, style: OverlayStyle) -> Self {
     let gen_widget = gen_widget.r_into();
     let OverlayStyle { auto_close_policy, mask } = style;
-    Self(Rc::new(RefCell::new(InnerOverlay {
-      gen_widget,
-      auto_close_policy,
-      mask,
-      showing: None,
-      track_id: RefCell::new(None),
-    })))
+    Self(Rc::new(RefCell::new(InnerOverlay { gen_widget, auto_close_policy, mask, showing: None })))
   }
 
   /// Return the overlay that the `ctx` belongs to if it is within an overlay.
   pub fn of<C: AsRef<ProviderCtx> + WidgetCtx>(ctx: &C) -> Option<Self> {
-    let overlays = Provider::of::<ShowingOverlays>(&ctx).unwrap();
-
-    overlays.showing_of(ctx)
+    Provider::of::<CurrentOverlay>(ctx).map(|overlay| overlay.0.clone())
   }
 
   /// Get the auto close policy of the overlay.
@@ -164,33 +153,17 @@ impl Overlay {
 
   /// Close the overlay; all widgets within the overlay will be removed.
   pub fn close(&self) {
-    let showing = self.0.borrow_mut().showing.take();
-    let track_id = self.0.borrow_mut().track_id.take();
-    if let Some(showing) = showing {
-      let ShowingInfo { wnd_id, .. } = showing;
-      if let Some(wid) = track_id.and_then(|track_id| track_id.get()) {
-        let this = self.clone();
-        AppCtx::spawn_local(async move {
-          if let Some(wnd) = AppCtx::get_window(wnd_id) {
-            {
-              let _guard = BuildCtx::init_for(wnd.tree().root(), wnd.tree);
-              let showing_overlays = Provider::of::<ShowingOverlays>(BuildCtx::get()).unwrap();
-              showing_overlays.remove(&this);
-            }
-            let tree = wnd.tree_mut();
-            let root = tree.root();
-            wid.dispose_subtree(tree);
-            tree.dirty_marker().mark(root, DirtyPhase::Layout);
-          }
-        });
-      }
+    if let Some(handle) = self.0.borrow_mut().showing.take() {
+      AppCtx::spawn_local(async move {
+        handle.close();
+      });
     }
   }
 
   fn inner_show(&self, content: GenWidget, wnd: Rc<Window>) {
     let background = self.mask();
     let close_policy = self.auto_close_policy();
-    let inner = self.0.clone();
+    let overlay = CurrentOverlay(self.clone());
     let gen_widget = fn_widget! {
       let w = content.gen_widget();
       let mut w = if background.is_some() || close_policy.contains(AutoClosePolicy::TAP_OUTSIDE) {
@@ -220,85 +193,18 @@ impl Overlay {
           }
         });
       }
-
-      *inner.borrow().track_id.borrow_mut() = Some($clone(w.track_id()));
-      w
+      @Providers {
+        providers: [Provider::new(overlay.clone())],
+        @ { w }
+      }
     };
 
     let this = self.clone();
     AppCtx::spawn_local(async move {
-      let _guard = BuildCtx::init_for(wnd.tree().root(), wnd.tree);
       let generator: GenWidget = gen_widget.r_into();
-      let wid = BuildCtx::get_mut().build(generator.gen_widget());
-      let tree = wnd.tree_mut();
-      tree.root().append(wid, tree);
-      wid.on_mounted_subtree(tree);
-      tree.dirty_marker().mark(wid, DirtyPhase::Layout);
-
-      this.0.borrow_mut().showing = Some(ShowingInfo { generator, wnd_id: wnd.id() });
-
-      let showing_overlays = Provider::of::<ShowingOverlays>(BuildCtx::get()).unwrap();
-      showing_overlays.add(this);
+      this.0.borrow_mut().showing = Some(wnd.mount_gen(generator));
     });
   }
-
-  fn showing_root(&self) -> Option<WidgetId> {
-    self
-      .0
-      .borrow()
-      .track_id
-      .borrow()
-      .as_ref()
-      .and_then(|s| s.get())
-  }
-}
-
-pub(crate) struct ShowingOverlays(RefCell<Vec<Overlay>>);
-
-impl ShowingOverlays {
-  pub(crate) fn rebuild(&self) {
-    for o in self.0.borrow().iter() {
-      let o = o.0.borrow();
-      let InnerOverlay { showing, track_id, .. } = &*o;
-      let tree = BuildCtx::get_mut().tree_mut();
-      {
-        if let Some(id) = track_id.borrow().as_ref().and_then(|w| w.get()) {
-          id.dispose_subtree(tree);
-        }
-      }
-
-      let ShowingInfo { generator, .. } = showing.as_ref().unwrap();
-      let wid = BuildCtx::get_mut().build(generator.gen_widget());
-      tree.root().append(wid, tree);
-
-      wid.on_mounted_subtree(tree);
-    }
-  }
-
-  fn add(&self, overlay: Overlay) {
-    assert!(overlay.showing_root().is_some());
-    self.0.borrow_mut().push(overlay)
-  }
-
-  fn remove(&self, overlay: &Overlay) {
-    assert!(overlay.showing_root().is_none());
-    self
-      .0
-      .borrow_mut()
-      .retain(|o| !Rc::ptr_eq(&o.0, &overlay.0))
-  }
-
-  fn showing_of(&self, ctx: &impl WidgetCtx) -> Option<Overlay> {
-    self.0.borrow().iter().find_map(|o| {
-      o.showing_root()
-        .is_some_and(|wid| ctx.successor_of(wid))
-        .then(|| o.clone())
-    })
-  }
-}
-
-impl Default for ShowingOverlays {
-  fn default() -> Self { Self(RefCell::new(vec![])) }
 }
 
 #[cfg(test)]
@@ -359,5 +265,70 @@ mod tests {
     wnd.draw_frame();
     assert_eq!(*r_log.borrow(), &["mounted", "disposed"]);
     assert_eq!(wnd.tree().count(root), 3);
+  }
+
+  #[test]
+  fn overlay_of_still_resolves_after_mount_gen_migration() {
+    reset_test_env!();
+
+    let mounted_id = Stateful::new(None::<WidgetId>);
+    let found_overlay = Stateful::new(false);
+    let mounted_id_reader = mounted_id.clone_reader();
+    let found_overlay_reader = found_overlay.clone_reader();
+    let wnd = TestWindow::from_widget(fn_widget! { @MockBox { size: Size::zero() } });
+    let overlay = Overlay::new(
+      fn_widget! {
+        @MockBox {
+          size: Size::zero(),
+          on_mounted: move |e| *$write(mounted_id) = Some(e.current_target()),
+          on_event: move |e| {
+            if matches!(e, Event::CustomEvent(_)) {
+              *$write(found_overlay) = Overlay::of(&**e).is_some();
+            }
+          }
+        }
+      },
+      OverlayStyle { auto_close_policy: AutoClosePolicy::NOT_AUTO_CLOSE, mask: None },
+    );
+
+    overlay.show(wnd.0.clone());
+    wnd.draw_frame();
+    let overlay_root = mounted_id_reader
+      .read()
+      .expect("overlay root should mount");
+
+    wnd.bubble_custom_event(overlay_root, ());
+    wnd.draw_frame();
+    assert!(*found_overlay_reader.read());
+  }
+
+  #[test]
+  fn overlay_rebuild_remounts_through_window_rebuild_mounts() {
+    reset_test_env!();
+
+    let mounted_count = Stateful::new(0);
+    let mounted_count_reader = mounted_count.clone_reader();
+    let wnd = TestWindow::from_widget(fn_widget! { @MockBox { size: Size::zero() } });
+    let overlay = Overlay::new(
+      fn_widget! {
+        @MockBox {
+          size: Size::zero(),
+          on_mounted: move |_| *$write(mounted_count) += 1,
+        }
+      },
+      OverlayStyle { auto_close_policy: AutoClosePolicy::NOT_AUTO_CLOSE, mask: None },
+    );
+
+    overlay.show(wnd.0.clone());
+    wnd.draw_frame();
+    assert_eq!(*mounted_count_reader.read(), 1);
+
+    {
+      wnd.0.rebuild_mounts();
+    }
+
+    wnd.draw_frame();
+    assert_eq!(*mounted_count_reader.read(), 2);
+    assert!(overlay.is_showing());
   }
 }

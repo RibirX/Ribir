@@ -70,7 +70,7 @@ pub mod prelude {
     widget::*,
     widget_children::*,
     widget_tree::{Anchor, AnchorX, AnchorY, BoxClamp, DirtyPhase, LayoutInfo, TrackId, WidgetId},
-    window::{Window, WindowLevel},
+    window::{MountHandle, Window, WindowLevel},
   };
   pub use crate::*;
 }
