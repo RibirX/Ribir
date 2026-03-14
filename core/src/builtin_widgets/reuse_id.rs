@@ -221,7 +221,7 @@ fn wrap_dispose_recycled<'a>(
   let key = id.clone();
   w.on_disposing(move |_| {
     AppCtx::spawn_local(async move {
-      if !p.read().is_in_used(&key) {
+      if !p.read().is_in_use(&key) {
         p.write().remove(&key);
       }
     });
