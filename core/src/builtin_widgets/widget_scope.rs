@@ -12,7 +12,7 @@ pub struct WidgetScope<K>
 where
   K: Eq + Hash + Clone,
 {
-  widgets: ahash::HashMap<K, Reusable>,
+  widgets: ahash::HashMap<K, ReuseHandle>,
 }
 
 impl<K> WidgetScope<K>
@@ -25,16 +25,22 @@ where
   }
 
   /// Checks if a widget associated with the given key is currently in use.
-  pub fn is_in_used(&self, key: &K) -> bool {
+  pub fn is_in_use(&self, key: &K) -> bool {
     self
       .widgets
       .get(key)
-      .is_some_and(|r| r.is_in_used())
+      .is_some_and(|r| r.is_in_use())
+  }
+
+  /// Inserts a reuse handle into the cache.
+  pub fn insert_reuse_handle(&mut self, key: K, reusable: ReuseHandle) {
+    self.widgets.insert(key, reusable);
   }
 
   /// Inserts a reusable widget into the cache.
-  pub fn insert_reusable(&mut self, key: K, reusable: Reusable) {
-    self.widgets.insert(key, reusable);
+  #[deprecated(note = "Use insert_reuse_handle instead.")]
+  pub fn insert_reusable(&mut self, key: K, reusable: ReuseHandle) {
+    self.insert_reuse_handle(key, reusable);
   }
 
   /// Removes a widget associated with the given key from the cache.
@@ -56,16 +62,16 @@ pub(crate) fn get_or_insert<'a, K>(
 where
   K: Eq + Hash + Clone + 'static,
 {
-  let w = this.write().get(key);
-  if w.is_none() {
-    let this = this.clone_writer();
-    let (w, reusable) = Reusable::new(widget);
-    let key = key.clone();
-    return Some(w.into_widget().on_build(move |_| {
-      this.write().insert_reusable(key, reusable);
-    }));
+  if let Some(w) = this.write().get(key) {
+    return Some(w);
   }
-  w
+
+  let this = this.clone_writer();
+  let (w, reusable) = ReuseHandle::new(widget);
+  let key = key.clone();
+  Some(w.into_widget().on_build(move |_| {
+    this.write().insert_reuse_handle(key, reusable);
+  }))
 }
 
 /// GlobalWidgets

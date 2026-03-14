@@ -263,6 +263,8 @@ fn close_mounted_entry(wnd_id: WindowId, entry_id: u64) {
 
 #[cfg(test)]
 mod tests {
+  use std::{cell::RefCell, rc::Rc};
+
   use super::*;
   use crate::{reset_test_env, test_helper::*};
 
@@ -327,5 +329,43 @@ mod tests {
     *running.write() = false;
     wnd.draw_frame();
     assert_eq!(*disposed_reader.read(), 1);
+  }
+
+  #[test]
+  fn mount_reusable_loses_recycle_path_after_remount_regression() {
+    reset_test_env!();
+
+    let wnd = TestWindow::new_with_size(
+      fn_widget! { @MockBox { size: Size::zero() } },
+      Size::new(100., 100.),
+    );
+    let before = wnd.tree().count(wnd.tree().root());
+    let (tooltip, reusable) = ReuseHandle::new(Text::new("tip"));
+    let tooltip = Rc::new(RefCell::new(Some(tooltip.into_widget())));
+
+    let mount_tooltip = |x| {
+      let tooltip = tooltip
+        .borrow_mut()
+        .take()
+        .unwrap_or_else(|| reusable.get_widget());
+      let mut tooltip = FatObj::new(tooltip);
+      tooltip.with_x(x);
+      wnd.mount(tooltip.into_widget())
+    };
+
+    for (idx, x) in [10., 20., 30.].into_iter().enumerate() {
+      let handle = mount_tooltip(x);
+      wnd.draw_frame();
+      assert!(reusable.is_in_use(), "reusable should become active after mount in cycle {idx}");
+      assert!(wnd.tree().count(wnd.tree().root()) > before);
+
+      drop(handle);
+      wnd.draw_frame();
+      assert!(
+        !reusable.is_in_use(),
+        "reusable should return to cached state after close in cycle {idx}"
+      );
+      assert_eq!(wnd.tree().count(wnd.tree().root()), before);
+    }
   }
 }
