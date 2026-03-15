@@ -1,8 +1,6 @@
 use std::cell::RefCell;
 
-use ribir_algo::Rc;
-
-use crate::prelude::*;
+use crate::core::prelude::{Rc, *};
 
 /// Overlay let independent the widget "float" visual elements on top of
 /// other widgets by inserting them into the root stack of the widget stack.
@@ -76,7 +74,7 @@ impl Overlay {
   /// Get the auto close policy of the overlay.
   pub fn auto_close_policy(&self) -> AutoClosePolicy { self.0.borrow().auto_close_policy }
 
-  /// Get the mask of the the background of the overlay used.  
+  /// Get the mask of the the background of the overlay used.
   pub fn mask(&self) -> Option<Brush> { self.0.borrow().mask.clone() }
 
   /// Show the overlay.
@@ -211,14 +209,14 @@ impl Overlay {
 mod tests {
   use std::{cell::RefCell, rc::Rc};
 
-  use crate::{
-    overlay::{AutoClosePolicy, OverlayStyle},
-    prelude::*,
+  use ribir_core::{
+    prelude::{Point, Size},
     reset_test_env,
     test_helper::*,
   };
 
-  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+  use super::*;
+
   #[test]
   fn overlay() {
     reset_test_env!();
@@ -251,8 +249,8 @@ mod tests {
     );
     wnd.draw_frame();
 
-    let root = wnd.tree().root();
-    assert_eq!(wnd.tree().count(root), 3);
+    let root = wnd.root();
+    assert_eq!(wnd.count(root), 3);
 
     overlay.show_at(Point::new(50., 30.), wnd.0.clone());
     wnd.draw_frame();
@@ -264,7 +262,7 @@ mod tests {
     overlay.close();
     wnd.draw_frame();
     assert_eq!(*r_log.borrow(), &["mounted", "disposed"]);
-    assert_eq!(wnd.tree().count(root), 3);
+    assert_eq!(wnd.count(root), 3);
   }
 
   #[test]
@@ -324,7 +322,7 @@ mod tests {
     assert_eq!(*mounted_count_reader.read(), 1);
 
     {
-      wnd.0.rebuild_mounts();
+      wnd.rebuild_mounts();
     }
 
     wnd.draw_frame();

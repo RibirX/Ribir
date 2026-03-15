@@ -13,6 +13,7 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
 use crate::{
   prelude::*,
+  widget_tree::WidgetTree,
   window::{BoxShellWindow, RedrawDemand, Shell, ShellWindow, WindowFlags, WindowId},
 };
 
@@ -164,6 +165,16 @@ impl TestWindow {
   pub fn dispose(&self) { self.0.dispose(); }
 
   pub fn dispose_widget(&self, id: WidgetId) { id.dispose_subtree(self.0.tree_mut()); }
+
+  /// Returns a reference to the widget tree.
+  #[allow(private_interfaces)]
+  pub fn tree(&self) -> &WidgetTree { self.0.tree() }
+
+  /// Rebuild all widget mounts.
+  pub fn rebuild_mounts(&self) { self.0.rebuild_mounts(); }
+
+  /// Count the number of widgets in the subtree rooted at `id`.
+  pub fn count(&self, id: WidgetId) -> usize { id.descendants(self.0.tree()).count() }
 }
 
 impl std::ops::Deref for TestWindow {

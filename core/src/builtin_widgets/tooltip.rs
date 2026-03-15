@@ -85,34 +85,45 @@ struct FallbackTooltip {
   mounted: Option<MountHandle>,
   wnd: Rc<Window>,
   host: TrackId,
+  hovered: Box<dyn StateWatcher<Value = bool>>,
 }
 
 impl FallbackTooltip {
   fn new(tooltip: TextValue, wnd: Rc<Window>, host: TrackId) -> Self {
-    Self {
-      reusable: Reusable::new(text! { text: tooltip, class: TOOLTIP }),
-      mounted: None,
-      wnd,
-      host,
-    }
+    let mut root = Follow::declarer();
+    root
+      .with_target(host.clone())
+      .with_x_align(AnchorX::center())
+      .with_y_align(AnchorY::above());
+    let hovered = root.is_hovered().clone_boxed_watcher();
+
+    let root = root
+      .finish()
+      .with_child(text! {
+        text: tooltip,
+        class: TOOLTIP,
+      })
+      .into_widget();
+
+    Self { reusable: Reusable::new(root.into_widget()), mounted: None, wnd, host, hovered }
   }
 
-  fn mount(&mut self, id: WidgetId) {
+  fn mount(&mut self, _id: WidgetId) {
     if self.mounted.is_some() {
       return;
     }
 
-    let point = Tooltip::mount_point(&self.wnd, id);
-    let mut tooltip = FatObj::new(self.reusable.get_widget());
-    tooltip.with_x(point.x);
-    tooltip.with_y(point.y);
-    self.mounted = Some(self.wnd.mount(tooltip.into_widget()));
+    self.mounted = Some(self.wnd.mount(self.reusable.get_widget()));
   }
 
   fn close(&mut self) {
     if let Some(mounted) = self.mounted.take() {
       mounted.close();
     }
+  }
+
+  fn hovered_watcher(&self) -> Box<dyn StateWatcher<Value = bool>> {
+    self.hovered.clone_boxed_watcher()
   }
 }
 
@@ -143,16 +154,6 @@ impl Tooltip {
     Self(Rc::new(RefCell::new(TooltipInner::Init(tooltip))))
   }
 
-  fn mount_point(wnd: &Window, id: WidgetId) -> Point {
-    let size = wnd.widget_size(id).unwrap_or_default();
-    let pos = wnd.widget_pos(id).unwrap_or_default();
-    let global_pos = id
-      .parent(wnd.tree())
-      .map_or(pos, |p| wnd.map_to_global(pos, p));
-
-    Point::new(global_pos.x + size.width / 2., global_pos.y + size.height + 4.)
-  }
-
   pub fn show(&self) { self.with_control(|c| c.show()); }
 
   pub fn hide(&self) { self.with_control(|c| c.hide()); }
@@ -174,7 +175,8 @@ impl Tooltip {
     let wnd = BuildCtx::get().window();
     let mut child = FatObj::new(child);
     let control = Rc::new(RefCell::new(FallbackTooltip::new(text, wnd, child.track_id())));
-    let child = Self::bind_hover_focus(child, control.clone());
+    let tooltip_hovered = control.borrow().hovered_watcher();
+    let child = Self::bind_hover_focus_with_tooltip(child, tooltip_hovered, control.clone());
     (child, Box::new(control))
   }
 
@@ -183,9 +185,20 @@ impl Tooltip {
   ///
   /// This is the canonical wiring shared by all tooltip implementations.
   pub fn bind_hover_focus<'c, T: TooltipControl + 'static>(
-    mut host: FatObj<Widget<'c>>, control: Rc<RefCell<T>>,
+    host: FatObj<Widget<'c>>, control: Rc<RefCell<T>>,
   ) -> Widget<'c> {
-    let subscription = watch!(*$read(host.is_hovered()) || *$read(host.is_focused())).subscribe({
+    Self::bind_hover_focus_with_tooltip(host, Box::new(Stateful::new(false)), control)
+  }
+
+  pub fn bind_hover_focus_with_tooltip<'c, T: TooltipControl + 'static>(
+    mut host: FatObj<Widget<'c>>, tooltip_hovered: Box<dyn StateWatcher<Value = bool>>,
+    control: Rc<RefCell<T>>,
+  ) -> Widget<'c> {
+    let subscription = watch!(
+      *$read(host.is_hovered()) || *$read(host.is_focused()) || *$read(tooltip_hovered)
+    )
+    .distinct_until_changed()
+    .subscribe({
       let control = control.clone();
       move |active| {
         let mut control = control.borrow_mut();
@@ -390,6 +403,143 @@ mod tests {
       .blur(FocusReason::Other);
     wnd.draw_frame();
     assert_eq!(wnd.tree().count(wnd.tree().root()), before);
+  }
+
+  #[test]
+  fn fallback_tooltip_stays_visible_while_hovering_tooltip() {
+    reset_test_env!();
+
+    let wnd = TestWindow::new_with_size(
+      fn_widget! {
+        @MockBox {
+          size: Size::new(40., 20.),
+          tooltip: "tip",
+        }
+      },
+      Size::new(120., 80.),
+    );
+    wnd.draw_frame();
+
+    let before = wnd.tree().count(wnd.tree().root());
+    wnd.process_cursor_move(Point::new(10., 10.));
+    wnd.draw_frame();
+    let shown = wnd.tree().count(wnd.tree().root());
+    assert!(shown > before);
+
+    let overlay_root = wnd
+      .children(wnd.root())
+      .last()
+      .expect("fallback tooltip should mount into root");
+    let overlay_bubble = wnd
+      .children(overlay_root)
+      .last()
+      .unwrap_or(overlay_root);
+    let overlay_pos = wnd.map_to_global(Point::zero(), overlay_bubble);
+    let overlay_size = wnd
+      .widget_size(overlay_bubble)
+      .expect("fallback tooltip should have layout size");
+
+    wnd.process_cursor_move(Point::new(
+      overlay_pos.x + overlay_size.width / 2.,
+      overlay_pos.y + overlay_size.height / 2.,
+    ));
+    wnd.draw_frame();
+    assert_eq!(wnd.tree().count(wnd.tree().root()), shown);
+
+    wnd.process_cursor_move(Point::new(100., 70.));
+    wnd.draw_frame();
+    assert_eq!(wnd.tree().count(wnd.tree().root()), before);
+  }
+
+  #[test]
+  fn fallback_tooltip_positions_bubble_relative_to_host() {
+    reset_test_env!();
+
+    let wnd = TestWindow::new_with_size(
+      fn_widget! {
+        @MockBox {
+          size: Size::new(40., 20.),
+          x: 100.,
+          y: 80.,
+          tooltip: "tip",
+        }
+      },
+      Size::new(240., 200.),
+    );
+    wnd.draw_frame();
+
+    wnd.process_cursor_move(Point::new(110., 90.));
+    wnd.draw_frame();
+
+    let overlay_root = wnd
+      .children(wnd.root())
+      .last()
+      .expect("fallback tooltip should mount into root");
+    let overlay_bubble = wnd
+      .children(overlay_root)
+      .last()
+      .unwrap_or(overlay_root);
+    let overlay_pos = wnd
+      .widget_pos(overlay_bubble)
+      .expect("fallback tooltip should have layout position");
+    let overlay_size = wnd
+      .widget_size(overlay_bubble)
+      .expect("fallback tooltip should have layout size");
+
+    let host_center_x = 100. + 20.;
+    let bubble_center_x = overlay_pos.x + overlay_size.width / 2.;
+    assert!((bubble_center_x - host_center_x).abs() < 1.0);
+    assert!(overlay_pos.y < 80.);
+    assert!((overlay_pos.y + overlay_size.height - 80.).abs() < 1.0);
+  }
+
+  #[test]
+  fn fallback_tooltip_repositions_correctly_on_second_show() {
+    reset_test_env!();
+
+    let wnd = TestWindow::new_with_size(
+      fn_widget! {
+        @MockBox {
+          size: Size::new(40., 20.),
+          x: 100.,
+          y: 80.,
+          tooltip: "tip",
+        }
+      },
+      Size::new(240., 200.),
+    );
+    wnd.draw_frame();
+
+    let bubble_rect = || {
+      let overlay_root = wnd
+        .children(wnd.root())
+        .last()
+        .expect("fallback tooltip should mount into root");
+      let overlay_bubble = wnd
+        .children(overlay_root)
+        .last()
+        .unwrap_or(overlay_root);
+      let pos = wnd
+        .widget_pos(overlay_bubble)
+        .expect("fallback bubble should have position");
+      let size = wnd
+        .widget_size(overlay_bubble)
+        .expect("fallback bubble should have size");
+      (pos, size)
+    };
+
+    wnd.process_cursor_move(Point::new(110., 90.));
+    wnd.draw_frame();
+    let (first_pos, first_size) = bubble_rect();
+
+    wnd.process_cursor_move(Point::new(10., 10.));
+    wnd.draw_frame();
+    wnd.process_cursor_move(Point::new(110., 90.));
+    wnd.draw_frame();
+    let (second_pos, second_size) = bubble_rect();
+
+    assert_eq!(first_pos, second_pos);
+    assert_eq!(first_size, second_size);
   }
 
   #[test]
