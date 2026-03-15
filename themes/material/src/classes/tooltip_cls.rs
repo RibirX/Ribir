@@ -14,8 +14,6 @@ pub(super) fn init(classes: &mut Classes) {
         @(w) {
           margin: EdgeInsets::new(4., 8., 4., 8.),
           foreground: Palette::of(BuildCtx::get()).inverse_on_surface(),
-          x: AnchorX::center(),
-          y: AnchorY::center(),
         }
       };
       let opacity = w.opacity();

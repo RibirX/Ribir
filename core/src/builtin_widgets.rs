@@ -73,7 +73,7 @@ pub mod anchor;
 pub use anchor::*;
 pub mod follow;
 pub use follow::*;
-mod mix_builtin;
+pub mod mix_builtin;
 pub use mix_builtin::*;
 pub mod container;
 pub use container::*;

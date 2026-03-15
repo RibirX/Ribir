@@ -861,13 +861,16 @@ impl Window {
 
   /// Update the position of a widget. This is used by widgets like `Follow`
   /// that need to update position after layout is complete.
-  pub(crate) fn update_widget_position(&self, id: WidgetId, pos: Point) {
+  pub fn update_widget_position(&self, id: WidgetId, pos: Point) {
     self
       .tree_mut()
       .store
       .layout_info_or_default(id)
       .pos = pos;
   }
+
+  /// Returns the parent widget id of the given widget, if it has one.
+  pub fn parent(&self, id: WidgetId) -> Option<WidgetId> { id.parent(self.tree()) }
 
   pub fn is_valid_widget(&self, id: WidgetId) -> bool { !id.is_dropped(self.tree()) }
 

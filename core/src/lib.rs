@@ -21,7 +21,6 @@ pub mod window;
 pub use rxrust;
 pub mod convert;
 pub mod event_loop;
-pub mod overlay;
 pub mod query;
 pub mod reusable;
 
@@ -59,7 +58,6 @@ pub mod prelude {
     declare::*,
     event_loop::EventLoop,
     events::*,
-    overlay::{AutoClosePolicy, Overlay, OverlayStyle},
     pipe::Pipe,
     providers,
     query::*,
