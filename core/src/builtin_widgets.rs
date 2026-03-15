@@ -92,8 +92,8 @@ mod track_widget_id;
 pub use track_widget_id::*;
 mod text;
 pub use text::*;
-mod tooltips;
-pub use tooltips::*;
+mod tooltip;
+pub use tooltip::*;
 pub(crate) mod providers;
 pub use providers::*;
 mod border;
@@ -165,7 +165,7 @@ pub struct FatObj<T> {
   painting_style: Option<Stateful<PaintingStyleWidget>>,
   text_align: Option<Stateful<TextAlignWidget>>,
   text_style: Option<Stateful<TextStyleWidget>>,
-  tooltips: Option<Stateful<Tooltips>>,
+  tooltip: Option<Tooltip>,
   disabled: Option<Stateful<Disabled>>,
   clip_boundary: Option<Stateful<ClipBoundary>>,
   providers: Option<SmallVec<[Provider; 1]>>,
@@ -220,7 +220,7 @@ impl<T> FatObj<T> {
       text_align: self.text_align,
       visibility: self.visibility,
       opacity: self.opacity,
-      tooltips: self.tooltips,
+      tooltip: self.tooltip,
       clip_boundary: self.clip_boundary,
       disabled: self.disabled,
       providers: self.providers,
@@ -261,7 +261,7 @@ impl<T> FatObj<T> {
       && self.text_style.is_none()
       && self.visibility.is_none()
       && self.opacity.is_none()
-      && self.tooltips.is_none()
+      && self.tooltip.is_none()
       && self.disabled.is_none()
       && self.clip_boundary.is_none()
       && self.reuse.is_none()
@@ -906,11 +906,10 @@ impl<T> FatObj<T> {
     init_sub_widget!(self, opacity, opacity, v)
   }
 
-  /// Initializes the tooltips of the widget.
-  pub fn with_tooltips<K: ?Sized>(
-    &mut self, v: impl RInto<PipeValue<CowArc<str>>, K>,
-  ) -> &mut Self {
-    init_sub_widget!(self, tooltips, tooltips, v)
+  /// Initializes the tooltip of the widget.
+  pub fn with_tooltip<K: ?Sized>(&mut self, v: impl RInto<Tooltip, K>) -> &mut Self {
+    self.tooltip = Some(v.r_into());
+    self
   }
 
   /// Initializes the disabled state of the widget.
@@ -1281,13 +1280,6 @@ impl<T> FatObj<T> {
     part_writer!(&mut opacity.opacity)
   }
 
-  /// Returns a state writer for modifying tooltip content.
-  /// Controls the text displayed when hovering over the widget.
-  pub fn tooltips(&mut self) -> impl StateWriter<Value = CowArc<str>> + use<T> {
-    let tooltips = sub_widget!(self, tooltips);
-    part_writer!(&mut tooltips.tooltips)
-  }
-
   /// Returns the widget's unique tracking identifier.
   /// Used for performance monitoring and debugging purposes.
   pub fn track_id(&mut self) -> TrackId { sub_widget!(self, track_id).read().track_id() }
@@ -1397,14 +1389,6 @@ impl<T> FatObj<T> {
       .text_style
       .get_or_insert_with(|| Stateful::new(TextStyleWidget::inherit_widget()))
   }
-
-  /// Returns the `Stateful<Tooltips>` widget from the FatObj. If it doesn't
-  /// exist, a new one is created.
-  pub fn tooltips_widget(&mut self) -> &Stateful<Tooltips> {
-    self
-      .tooltips
-      .get_or_insert_with(|| Stateful::new(<_>::default()))
-  }
 }
 
 macro_rules! sub_widget {
@@ -1504,7 +1488,8 @@ impl<'a> FatObj<Widget<'a>> {
           fitted_box,
           radius,
           scrollable,
-          layout_box
+          layout_box,
+          tooltip
         ]
     );
     if let Some(providers) = self.providers {
@@ -1517,7 +1502,6 @@ impl<'a> FatObj<Widget<'a>> {
           class,
           fixed_size,
           constrained_box,
-          tooltips,
           margin,
           cursor,
           mix_builtin,

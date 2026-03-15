@@ -138,7 +138,7 @@ fn example() -> Widget<'static> {
     *   `font_face`: 设置字体系列。
 
 *   **其他**:
-    *   `tooltips`: 设置工具提示文本。
+    *   `tooltip`: 设置工具提示文本。
     *   `disabled`: 禁用 Widget 及其子项的交互。
     *   `providers`: 为 Widget 设置提供者上下文。
     *   `class`: 应用样式类。
@@ -268,10 +268,10 @@ fn simple_card(w: Widget<'static>) -> Widget<'static> {
 10. `radius`
 11. `scrollable`
 12. `layout_box`
-13. `providers`
-14. `class`
-15. `clamp` (constrained_box)
-16. `tooltips`
+13. `tooltip`
+14. `providers`
+15. `class`
+16. `clamp` (constrained_box)
 17. `margin`
 18. `cursor`
 19. **事件** (`mix_builtin`: `on_tap`, `on_pointer_move` 等)

@@ -43,7 +43,7 @@ const DEBUG_BUILTIN_WIDGET_BLACKLIST: &[&str] = &[
   "PaintingStyleWidget",
   "TextAlignWidget",
   "TextStyleWidget",
-  "Tooltips",
+  "Tooltip",
   "Disabled",
   "ClipBoundary",
   "Provider",

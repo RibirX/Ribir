@@ -140,7 +140,7 @@ These attributes are used to control the appearance and layout of Widgets.
     *   `font_face`: Sets font family.
 
 *   **Other**:
-    *   `tooltips`: Sets tooltip text.
+    *   `tooltip`: Sets tooltip text.
     *   `disabled`: Disables interaction for Widget and its children.
     *   `providers`: Sets provider context for the widget.
     *   `class`: Applies style classes.
@@ -270,10 +270,10 @@ The wrapping order from **inner to outer** is as follows (simplified for common 
 10. `radius`
 11. `scrollable`
 12. `layout_box`
-13. `providers`
-14. `class`
-15. `clamp` (constrained_box)
-16. `tooltips`
+13. `tooltip`
+14. `providers`
+15. `class`
+16. `clamp` (constrained_box)
 17. `margin`
 18. `cursor`
 19. **Events** (`mix_builtin`: `on_tap`, `on_pointer_move`, etc.)

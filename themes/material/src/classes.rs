@@ -15,7 +15,7 @@ mod scrollbar_cls;
 mod slider_cls;
 mod switch_cls;
 mod tabs_cls;
-mod tooltips_cls;
+mod tooltip_cls;
 
 pub fn initd_classes() -> Classes {
   let mut classes = Classes::default();
@@ -25,7 +25,7 @@ pub fn initd_classes() -> Classes {
   radio_cls::init(&mut classes);
   progress_cls::init(&mut classes);
   checkbox_cls::init(&mut classes);
-  tooltips_cls::init(&mut classes);
+  tooltip_cls::init(&mut classes);
   slider_cls::init(&mut classes);
   input_cls::init(&mut classes);
   divider_cls::init(&mut classes);

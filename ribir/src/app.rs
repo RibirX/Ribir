@@ -377,7 +377,19 @@ impl Drop for AppRunGuard {
       }
 
       AppCtx::spawn_local(async move {
-        AppCtx::new_window(root(), WindowFlags::DEFAULT, attr).await;
+        #[cfg(feature = "widgets")]
+        let root = {
+          let root = root();
+          GenWidget::new(move || {
+            Providers::new([ribir_widgets::tooltip::default_tooltip_provider()])
+              .with_child(root.gen_widget())
+          })
+        };
+
+        #[cfg(not(feature = "widgets"))]
+        let root = root();
+
+        AppCtx::new_window(root, WindowFlags::DEFAULT, attr).await;
       });
     });
   }

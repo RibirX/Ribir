@@ -4,7 +4,7 @@ use ribir_widgets::prelude::*;
 use crate::md;
 
 pub(super) fn init(classes: &mut Classes) {
-  classes.insert(TOOLTIPS, |w| {
+  classes.insert(TOOLTIP, |w| {
     fn_widget! {
       let mut w = FatObj::new(w);
       let mut w = @FatObj {
