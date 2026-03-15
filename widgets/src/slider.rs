@@ -206,7 +206,7 @@ impl Slider {
       let thumb_container_width = thumb_container.layout_width();
       let mut thumb = @Void {
         class: SLIDER_THUMB,
-        tooltips: pipe! {
+        tooltip: pipe! {
           let this = $read(this);
           slider_tooltip(this.min, this.max, this.value)
         },
@@ -319,7 +319,7 @@ impl RangeSlider {
 
       let mut start_thumb = @Void {
         class: SLIDER_THUMB,
-        tooltips: pipe! {
+        tooltip: pipe! {
           let this = $read(this);
           slider_tooltip(this.min, this.max, this.start)
         },
@@ -327,7 +327,7 @@ impl RangeSlider {
       let start_thumb_width = start_thumb.layout_width();
       let mut end_thumb = @Void {
         class: SLIDER_THUMB,
-        tooltips: pipe! {
+        tooltip: pipe! {
           let this = $read(this);
           slider_tooltip(this.min, this.max, this.end)
         },

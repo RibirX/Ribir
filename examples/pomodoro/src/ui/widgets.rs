@@ -257,7 +257,7 @@ pub(crate) fn main_page() -> Widget<'static> {
           margin: EdgeInsets::only_left(10.),
           cursor: CursorIcon::Pointer,
           on_tap: move |_| $write(pomodoro).next_state(),
-          tooltips: "skip",
+          tooltip: "skip",
           @{ svg_registry::get("skip_next").unwrap() }
         }
       }

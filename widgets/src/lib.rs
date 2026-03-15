@@ -21,6 +21,7 @@ pub mod select_region;
 pub mod slider;
 pub mod switch;
 pub mod tabs;
+pub mod tooltip;
 
 pub mod transform_box;
 
@@ -31,7 +32,7 @@ pub mod prelude {
   pub use super::{
     animation::*, avatar::*, badge::*, buttons::*, checkbox::*, common_widget::*, divider::*,
     grid_view::*, icon::*, input::*, label::*, layout::*, list::*, menu::*, path::*, progress::*,
-    radio::*, router::*, scrollbar::*, select_region::*, slider::*, switch::*, tabs::*,
+    radio::*, router::*, scrollbar::*, select_region::*, slider::*, switch::*, tabs::*, tooltip::*,
     transform_box::*,
   };
   pub use crate::{cases, transitions};
