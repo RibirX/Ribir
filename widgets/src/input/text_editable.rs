@@ -7,7 +7,7 @@ use super::{
   edit_text::EditText,
   text_selectable::{Selection, TextSelectable},
 };
-use crate::{input::text_glyphs::VisualGlyphsHelper, prelude::*};
+use crate::{input::text_glyphs::ParagraphLayoutExt, prelude::*};
 
 class_names! {
   #[doc = "Class name for the text caret"]
@@ -198,8 +198,8 @@ impl<T: EditText + 'static> BasicEditor<T> {
 
   fn insert(&mut self, chars: &str) -> usize {
     let del_rg = self.del_sel();
-    let len = self.insert_str(del_rg.start, chars);
-    let pos = CaretPosition { cluster: len + del_rg.start, position: None };
+    let len = self.text_mut().insert_str(del_rg.start, chars);
+    let pos = CaretPosition::new(len + del_rg.start);
     self.host.selection = Selection::splat(pos);
     len
   }
@@ -207,8 +207,8 @@ impl<T: EditText + 'static> BasicEditor<T> {
   fn del_sel(&mut self) -> Range<usize> { self.delete(self.cluster_rg()) }
 
   fn delete(&mut self, rg: Range<usize>) -> Range<usize> {
-    let del_rg = self.del_rg_str(rg);
-    self.host.selection = Selection::splat(CaretPosition { cluster: del_rg.start, position: None });
+    let del_rg = self.text_mut().del_rg_str(rg);
+    self.host.selection = Selection::splat(CaretPosition::new(del_rg.start));
     del_rg
   }
 
@@ -234,17 +234,14 @@ impl<T: EditText + 'static> BasicEditor<T> {
         let len = self.insert(value);
         let pos = if len == value.len() {
           *editing = Some(value.clone());
-          CaretPosition {
-            cluster: *pos + cursor.map(|(start, _)| start).unwrap_or(0),
-            position: None,
-          }
+          CaretPosition::new(*pos + cursor.map(|(start, _)| start).unwrap_or(0))
         } else {
           *editing = Some(
             self
               .substr(Range { start: *pos, end: *pos + len })
               .to_string(),
           );
-          CaretPosition { cluster: *pos + len, position: None }
+          CaretPosition::new(*pos + len)
         };
         self.host.selection = Selection::splat(pos);
       }

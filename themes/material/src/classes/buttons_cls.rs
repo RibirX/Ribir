@@ -112,7 +112,7 @@ fn fab_init(classes: &mut Classes) {
   fn large_label_style(line_height: f32) -> TextStyle {
     let text_theme = TypographyTheme::of(BuildCtx::get());
     let mut text_style = text_theme.title_large.text.clone();
-    text_style.line_height = line_height;
+    text_style.line_height = line_height.into();
     text_style
   }
 
@@ -217,7 +217,7 @@ fn fab_init(classes: &mut Classes) {
 fn btn_label_style(line_height: f32) -> TextStyle {
   let text_theme = TypographyTheme::of(BuildCtx::get());
   let mut text_style = text_theme.label_large.text.clone();
-  text_style.line_height = line_height;
+  text_style.line_height = line_height.into();
   text_style
 }
 

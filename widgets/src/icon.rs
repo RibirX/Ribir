@@ -83,7 +83,9 @@ impl WrapRender for IconText {
     let font_face = Provider::of::<IconFont>(&ctx).unwrap().0.clone();
     let mut style = Provider::of::<TextStyle>(ctx).unwrap().clone();
     style.font_face = font_face;
-    style.font_size = style.line_height;
+    style.font_size = style
+      .line_height
+      .resolve_for_font_size(style.font_size);
     let mut style = Provider::new(style);
     style.setup(ctx.as_mut());
     let size = host.measure(clamp, ctx);
@@ -102,9 +104,10 @@ struct IconRender {
 
 impl Render for IconRender {
   fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
-    let icon_size = Provider::of::<TextStyle>(ctx)
-      .unwrap()
-      .line_height;
+    let text_style = Provider::of::<TextStyle>(ctx).unwrap();
+    let icon_size = text_style
+      .line_height
+      .resolve_for_font_size(text_style.font_size);
     let child_size = ctx
       .perform_single_child_layout(BoxClamp::default())
       .unwrap_or_default();

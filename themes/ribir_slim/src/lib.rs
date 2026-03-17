@@ -26,8 +26,17 @@ pub fn with_palette(palette: Palette) -> Theme {
 }
 
 fn typography_theme() -> TypographyTheme {
-  let regular_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Lato"))]);
-  let medium_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Lato"))]);
+  let mut families = vec![FontFamily::Name(std::borrow::Cow::Borrowed("Lato"))];
+  families.extend(
+    fallback_font_families()
+      .iter()
+      .copied()
+      .map(|family| FontFamily::Name(std::borrow::Cow::Borrowed(family))),
+  );
+  families.push(FontFamily::SansSerif);
+
+  let regular_family = families.clone().into_boxed_slice();
+  let medium_family = families.into_boxed_slice();
 
   let regular_face =
     FontFace { families: regular_family.clone(), weight: FontWeight::NORMAL, ..<_>::default() };
@@ -39,7 +48,7 @@ fn typography_theme() -> TypographyTheme {
   ) -> TextTheme {
     TextTheme {
       text: TextStyle {
-        line_height,
+        line_height: line_height.into(),
         font_size,
         letter_space,
         font_face,

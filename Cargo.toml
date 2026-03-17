@@ -2,6 +2,7 @@
 exclude = ["examples/attachments", "tools/mcp-adapter"]
 members = [
   "core",
+  "text",
   "gpu",
   "painter",
   "macros",
@@ -19,6 +20,7 @@ members = [
 # tools/* are excluded from default builds.
 default-members = [
   "core",
+  "text",
   "gpu",
   "painter",
   "macros",
@@ -63,6 +65,7 @@ ribir_gpu = { path = "gpu", version = "0.4.0-alpha.62" }
 ribir_geom = { path = "geom", version = "0.4.0-alpha.62" }
 ribir_macros = { path = "macros", version = "0.4.0-alpha.62" }
 ribir_painter = { path = "painter", version = "0.4.0-alpha.62" }
+ribir_text = { path = "text", version = "0.4.0-alpha.62" }
 ribir_widgets = { path = "widgets", version = "0.4.0-alpha.62" }
 ribir_material = { path = "themes/material", version = "0.4.0-alpha.62" }
 ribir_slim = { path = "themes/ribir_slim", version = "0.4.0-alpha.62" }
@@ -115,6 +118,7 @@ quick-xml = "0.38.4"
 tokio = { version = "1.0" }
 swash = "0.1.18"
 ttf-parser = "0.21.1"
+parley = "0.7.0"
 
 # Logging / telemetry (used by debug server)
 tracing = { version = "0.1.41", features = ["log"] }

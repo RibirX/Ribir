@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::{ops::Range, sync::Arc};
 
 use ribir_core::prelude::*;
 
@@ -72,8 +72,8 @@ impl Input {
   /// cluster
   pub fn select(&mut self, from: usize, to: usize) {
     let selection = &mut self.basic.selection;
-    selection.from = CaretPosition { cluster: from, position: None };
-    selection.to = CaretPosition { cluster: to, position: None };
+    selection.from = CaretPosition::new(from);
+    selection.to = CaretPosition::new(to);
   }
 
   /// return the selection range of the text
@@ -106,8 +106,8 @@ impl TextArea {
   /// cluster
   pub fn select(&mut self, from: usize, to: usize) {
     let selection = &mut self.basic.selection;
-    selection.from = CaretPosition { cluster: from, position: None };
-    selection.to = CaretPosition { cluster: to, position: None };
+    selection.from = CaretPosition::new(from);
+    selection.to = CaretPosition::new(to);
   }
 
   /// return the selection range of the text
@@ -127,15 +127,19 @@ impl BaseText for InputText {
   fn measure_bytes(&self, byte_from: usize, char_len: isize) -> usize {
     self.0.measure_bytes(byte_from, char_len)
   }
-  fn select_token(&self, byte_from: usize) -> Range<usize> { self.0.select_token(byte_from) }
+  fn select_token(&self, byte_from: usize) -> Range<usize> {
+    BaseText::select_token(&self.0, byte_from)
+  }
 }
 
 impl VisualText for InputText {
-  fn layout_glyphs(&self, clamp: BoxClamp, ctx: &MeasureCtx) -> VisualGlyphs {
+  fn layout_glyphs(&self, clamp: BoxClamp, ctx: &MeasureCtx) -> Arc<ParagraphLayout> {
     self.0.layout_glyphs(clamp, ctx)
   }
 
-  fn paint(&self, painter: &mut Painter, style: PaintingStyle, glyphs: &VisualGlyphs, rect: Rect) {
+  fn paint(
+    &self, painter: &mut Painter, style: PaintingStyle, glyphs: &Arc<ParagraphLayout>, rect: Rect,
+  ) {
     self.0.paint(painter, style, glyphs, rect);
   }
 }
@@ -152,12 +156,25 @@ impl EditText for InputText {
   fn del_rg_str(&mut self, rg: Range<usize>) -> Range<usize> { self.0.del_rg_str(rg) }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CaretPosition {
   /// the cluster of the caret
   pub cluster: usize,
+  /// the affinity of the caret when the logical cluster maps to multiple visual
+  /// slots.
+  pub affinity: CaretAffinity,
   /// the position of the caret, it may be set by the ui interaction
   pub position: Option<(usize, usize)>,
+}
+
+impl CaretPosition {
+  pub const fn new(cluster: usize) -> Self {
+    Self { cluster, affinity: CaretAffinity::Downstream, position: None }
+  }
+}
+
+impl Default for CaretPosition {
+  fn default() -> Self { Self::new(0) }
 }
 
 impl Compose for Input {

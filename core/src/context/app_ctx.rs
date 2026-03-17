@@ -1,7 +1,6 @@
 use std::{cell::RefCell, future::Future, pin::Pin, sync::LazyLock};
 
 use ribir_algo::Rc;
-use ribir_painter::{TypographyStore, font_db::FontDB};
 use rxrust::LocalScheduler;
 use tracing::warn;
 
@@ -9,6 +8,7 @@ use tracing::warn;
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 #[cfg(target_arch = "wasm32")]
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
+use ribir_painter::{TextServices, new_text_services};
 use smallvec::SmallVec;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 #[cfg(not(target_arch = "wasm32"))]
@@ -42,8 +42,7 @@ use crate::{
 pub struct AppCtx {
   app_theme: Stateful<Theme>,
   windows: RefCell<ahash::HashMap<WindowId, Rc<Window>>>,
-  font_db: Rc<RefCell<FontDB>>,
-  typography_store: RefCell<TypographyStore>,
+  text_services: Box<TextServices>,
   clipboard: RefCell<Box<dyn Clipboard>>,
   core_event_sender: RefCell<Option<UnboundedSender<CoreMsg>>>,
   shell: RefCell<Option<BoxShell>>,
@@ -278,15 +277,8 @@ impl AppCtx {
   #[track_caller]
   pub fn clipboard() -> &'static RefCell<Box<dyn Clipboard>> { &Self::shared().clipboard }
 
-  /// Get the typography store of the application.
   #[track_caller]
-  pub fn typography_store() -> &'static RefCell<TypographyStore> {
-    &Self::shared().typography_store
-  }
-
-  /// Get the font database of the application.
-  #[track_caller]
-  pub fn font_db() -> &'static Rc<RefCell<FontDB>> { &Self::shared().font_db }
+  pub fn text_services() -> &'static TextServices { AppCtx::shared().text_services.as_ref() }
 
   /// Set the theme of the application
   ///
@@ -308,14 +300,7 @@ impl AppCtx {
   }
 
   #[track_caller]
-  pub(crate) fn end_frame() {
-    // todo: frame cache is not a good algorithm? because not every text will
-    // relayout in every frame.
-    Self::shared()
-      .typography_store
-      .borrow_mut()
-      .end_frame();
-  }
+  pub(crate) fn end_frame() {}
 
   pub(crate) fn data_changed(path: SmallVec<[PartialId; 1]>, writer: Rc<WriterInfo>) {
     AppCtx::shared()
@@ -441,25 +426,18 @@ impl AppCtx {
 impl Default for AppCtx {
   fn default() -> Self {
     let app_theme = Stateful::new(Theme::default());
-
-    let mut font_db = FontDB::default();
-    font_db.load_system_fonts();
-
-    let font_db = Rc::new(RefCell::new(font_db));
-    let typography_store = RefCell::new(TypographyStore::new(font_db.clone()));
+    let text_services = new_text_services();
 
     AppCtx {
-      font_db,
+      text_services,
       app_theme,
-      typography_store,
       clipboard: RefCell::new(Box::new(MockClipboard {})),
-
       windows: RefCell::new(ahash::HashMap::default()),
       change_dataset: ChangeDataset::default(),
       core_event_sender: RefCell::new(None),
       shell: RefCell::new(None),
       #[cfg(not(target_arch = "wasm32"))]
-      local_set: RefCell::new(LocalSet::new()), // Will be reset in first test
+      local_set: RefCell::new(LocalSet::new()),
       #[cfg(all(not(target_arch = "wasm32"), feature = "test-utils"))]
       spawn_count: std::cell::Cell::new(0),
     }

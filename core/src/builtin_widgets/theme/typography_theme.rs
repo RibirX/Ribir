@@ -116,12 +116,12 @@ pub fn fallback_font_families() -> &'static [&'static str] {
 
   #[cfg(target_os = "macos")]
   const FAMILIES: &[&str] = &[
+    "PingFang SC",       // Simplified Chinese
+    "Hiragino Sans",     // Japanese
     ".SF NS",            // San Francisco (system default)
     "Menlo",             // macOS monospace
     "Apple Color Emoji", // Apple emoji
     "Noto Sans CJK SC",  // Pan-CJK fallback
-    "PingFang SC",       // Simplified Chinese
-    "Hiragino Sans",     // Japanese
     "Geneva",            // Legacy system UI
     "Arial Unicode MS",  // Broad Unicode support
     "Roboto",            // Cross-platform fallback

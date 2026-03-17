@@ -1,5 +1,5 @@
 use ribir_geom::Transform;
-use ribir_painter::{ColorFormat, GlyphProvider, PixelImage};
+use ribir_painter::{ColorFormat, GlyphRasterSource, PixelImage};
 
 /// This macro generates image tests for the painter with every backend.
 ///
@@ -30,10 +30,9 @@ macro_rules! painter_backend_eq_image_test {
         ribir_core::reset_test_env!();
         let mut painter = $painter_fn();
         let viewport = painter.viewport().to_i32().cast_unit();
-        let font_db = AppCtx::font_db();
-        let glyph_provider = font_db.borrow_mut().glyph_provider();
+        let glyph_provider = AppCtx::text_services().raster_source();
         let img = wgpu_render_commands(
-          &painter.finish(), viewport, Color::TRANSPARENT, &glyph_provider);
+          &painter.finish(), viewport, Color::TRANSPARENT, glyph_provider.as_ref());
         let name = format!("{}_wgpu", std::stringify!($painter_fn));
         let file_path = test_case_name!(name, "png");
         ImageTest::new(img, &file_path)
@@ -182,7 +181,7 @@ pub fn assert_texture_eq_png(test_img: PixelImage, ref_path: &std::path::Path) {
 /// Render painter by wgpu backend, and return the image.
 pub fn wgpu_render_commands(
   commands: &[ribir_painter::PaintCommand], viewport: ribir_geom::DeviceRect,
-  surface: ribir_painter::Color, glyph_provider: &dyn GlyphProvider,
+  surface: ribir_painter::Color, glyph_provider: &dyn GlyphRasterSource,
 ) -> PixelImage {
   use futures::executor::block_on;
   use ribir_geom::{DeviceRect, DeviceSize};
