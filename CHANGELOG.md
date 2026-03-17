@@ -10,6 +10,26 @@ For older versions:
 
 <!-- next-header -->
 
+## [0.4.0-alpha.61](https://github.com/RibirX/Ribir/releases/tag/v0.4.0-alpha.61) - 2026-03-17
+
+### 🎨 Features
+
+- **core**: add window mounting API for managing persistent widget subtrees (\#917 @M-Adoo)
+- **core**: split widget disposal into Disposing and Disposed phases (\#917 @M-Adoo)
+- **widgets**: add AnimatedPresence and AnimatedVisibility for high-level lifecycle animations (\#917 @M-Adoo)
+
+### 💥 Breaking
+
+- **core**: DisposedEvent no longer supports preserve(); use on\_disposing instead (\#917 @M-Adoo)
+- **widgets**: move and refactor AnimatePresence from core to widgets crate (\#917 @M-Adoo)
+
+<details>
+<summary>🔧 Internal</summary>
+
+- core: synchronize Stateful completion with pending modifications (#917 @M-Adoo)
+
+</details>
+
 ## [0.4.0-alpha.60](https://github.com/RibirX/Ribir/releases/tag/v0.4.0-alpha.60) - 2026-03-10
 
 ### 🎨 Features
@@ -53,7 +73,7 @@ For older versions:
 <details>
 <summary>🔧 Internal</summary>
 
-- ci: 🎡 ensure coverage job runs even if upstream checks are skipped (#912 @M-Adoo)
+- ci: 🎡 ensure coverage job runs even if upstream checks are skipped (\#912 @M-Adoo)
 
 </details>
 
