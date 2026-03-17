@@ -1,16 +1,15 @@
 use std::ops::{Deref, DerefMut};
 
-pub use fontdb::ID as FaceId;
 use ribir_algo::Resource;
 use ribir_geom::{Angle, DeviceRect, Point, Rect, Size, Transform, Vector};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
+pub use crate::FontFaceId as FaceId;
 use crate::{
-  Brush, Color, Glyph, PixelImage, Svg, VisualGlyphs,
+  Brush, Color, GlyphRasterSource, PixelImage, Svg, TextDrawPayload,
   color::{ColorFilterMatrix, LinearGradient, RadialGradient},
   filter::{Filter, FilterLayer, FilterOp},
-  font_db::{Face, FontDB},
   path::*,
   path_builder::PathBuilder,
 };
@@ -57,17 +56,10 @@ pub trait PainterBackend {
   /// it may cause undefined behavior.
   fn draw_commands(
     &mut self, viewport: DeviceRect, commands: &[PaintCommand], global_matrix: &Transform,
-    output: &mut Self::Texture, glyph_provider: &dyn GlyphProvider,
+    output: &mut Self::Texture, glyph_provider: &dyn GlyphRasterSource,
   );
   /// A frame end.
   fn end_frame(&mut self);
-}
-
-/// A provider that the backend uses to access immutable font face data.
-///
-/// Glyph rasterization and render caching are backend responsibilities.
-pub trait GlyphProvider {
-  fn get_face(&self, face_id: FaceId) -> Option<std::sync::Arc<Face>>;
 }
 
 /// A text drawing command carrying deferred glyph data.
@@ -77,16 +69,16 @@ pub trait GlyphProvider {
 /// scale factor and the current transform.
 #[derive(Debug, Clone)]
 pub struct TextCommand {
-  /// The font size in logical pixels.
-  pub font_size: f32,
   /// The bounding box for visibility culling.
   pub paint_bounds: Rect,
   /// The transform at time of emission.
   pub transform: Transform,
-  /// The brush (color/gradient) used to fill the text.
-  pub brush: CommandBrush,
-  /// The glyphs to render. Each glyph carries its own `face_id`.
-  pub glyphs: Resource<Box<[Glyph]>>,
+  /// The shaped text payload to render.
+  pub payload: Resource<TextDrawPayload>,
+  /// The fallback brush used for runs that don't override their own brush.
+  pub default_brush: CommandBrush,
+  /// The active color filter applied to overridden run brushes.
+  pub color_filter: ColorMatrix,
 }
 
 /// The enum of path types, which can be either shared or owned. This suggests
@@ -115,8 +107,8 @@ pub enum PaintPathAction {
 pub enum CommandBrush {
   Color(Color),
   Image { img: Resource<PixelImage>, color_filter: ColorMatrix },
-  Radial(RadialGradient),
-  Linear(LinearGradient),
+  Radial(Resource<RadialGradient>),
+  Linear(Resource<LinearGradient>),
 }
 
 #[repr(u32)]
@@ -191,10 +183,10 @@ pub enum PaintCommand {
   },
 
   /// A deferred text drawing command. The backend resolves the physical pixel
-  /// size and rasterizes glyphs via the injected [`GlyphProvider`].
+  /// size and rasterizes glyphs via the injected `GlyphRasterSource`.
   ///
-  /// This variant is skipped during serialization because `Glyph` and
-  /// `fontdb::ID` do not implement serde.
+  /// This variant is skipped during serialization because text payloads contain
+  /// shared resources and backend-specific runtime state.
   #[serde(skip)]
   Text(TextCommand),
 }
@@ -509,6 +501,8 @@ impl Painter {
   }
 
   pub fn is_transparent(&self) -> bool { self.current_state().color_filter.is_transparent() }
+
+  pub fn current_color_filter(&self) -> &ColorMatrix { &self.current_state().color_filter }
 
   #[inline]
   pub fn set_strokes(&mut self, strokes: StrokeOptions) -> &mut Self {
@@ -858,8 +852,9 @@ impl Painter {
           PaintCommand::Text(mut text_cmd) => {
             text_cmd.transform = text_cmd.transform.then(&transform);
             text_cmd
-              .brush
+              .default_brush
               .apply_color_filter(self.color_filter());
+            text_cmd.color_filter.chains(self.color_filter());
             PaintCommand::Text(text_cmd)
           }
         };
@@ -906,70 +901,21 @@ impl Painter {
     self
   }
 
-  pub fn draw_glyph(&mut self, g: &Glyph, font_size: f32, _font_db: &FontDB) -> &mut Self {
+  pub fn draw_text_payload(
+    &mut self, payload: Resource<TextDrawPayload>, paint_bounds: Rect,
+  ) -> &mut Self {
     invisible_return!(self);
-    let paint_bounds = g.bounds();
-    if paint_bounds.is_empty()
-      || self
-        .intersection_paint_bounds(&paint_bounds)
-        .is_none()
-    {
-      return self;
-    }
-
-    let brush = self.fill_brush().clone();
-    if !brush.is_visible() {
-      return self;
-    }
-    let mut cmd_brush = CommandBrush::from(brush);
-    cmd_brush.apply_color_filter(self.color_filter());
-
+    let mut default_brush = CommandBrush::from(self.fill_brush().clone());
+    default_brush.apply_color_filter(self.current_color_filter());
     self
       .commands
       .push(PaintCommand::Text(TextCommand {
-        font_size,
         paint_bounds,
         transform: *self.transform(),
-        brush: cmd_brush,
-        glyphs: Resource::new(vec![g.clone()].into_boxed_slice()),
+        payload,
+        default_brush,
+        color_filter: *self.current_color_filter(),
       }));
-
-    self
-  }
-
-  pub fn draw_glyphs_in_rect(
-    self: &mut Painter, visual_glyphs: &VisualGlyphs, box_rect: Rect,
-  ) -> &mut Self {
-    invisible_return!(self);
-    let visual_rect = visual_glyphs.visual_rect();
-    let Some(paint_rect) = self.intersection_paint_bounds(&box_rect) else {
-      return self;
-    };
-    let Some(glyphs) = visual_glyphs.glyphs_in_bounds(&paint_rect) else {
-      return self;
-    };
-
-    let brush = self.fill_brush().clone();
-    if !brush.is_visible() {
-      return self;
-    }
-    let mut cmd_brush = CommandBrush::from(brush);
-    cmd_brush.apply_color_filter(self.color_filter());
-
-    let transform = self
-      .transform()
-      .pre_translate(ribir_geom::Vector::new(visual_rect.origin.x, visual_rect.origin.y));
-
-    let text_cmd = TextCommand {
-      font_size: visual_glyphs.font_size(),
-      paint_bounds: box_rect,
-      transform,
-      brush: cmd_brush,
-      glyphs: Resource::new(glyphs.collect::<Vec<_>>().into_boxed_slice()),
-    };
-
-    self.commands.push(PaintCommand::Text(text_cmd));
-
     self
   }
 
@@ -1322,10 +1268,22 @@ impl CommandBrush {
     match self {
       CommandBrush::Color(color) => *color = filter.apply_to(color),
       CommandBrush::Image { color_filter, .. } => color_filter.chains(filter),
-      CommandBrush::Radial(RadialGradient { stops, .. })
-      | CommandBrush::Linear(LinearGradient { stops, .. }) => stops
-        .iter_mut()
-        .for_each(|s| s.color = filter.apply_to(&s.color)),
+      CommandBrush::Radial(gradient) => {
+        let mut gradient = (**gradient).clone();
+        gradient
+          .stops
+          .iter_mut()
+          .for_each(|s| s.color = filter.apply_to(&s.color));
+        *self = CommandBrush::Radial(Resource::new(gradient));
+      }
+      CommandBrush::Linear(gradient) => {
+        let mut gradient = (**gradient).clone();
+        gradient
+          .stops
+          .iter_mut()
+          .for_each(|s| s.color = filter.apply_to(&s.color));
+        *self = CommandBrush::Linear(Resource::new(gradient));
+      }
     }
     self
   }

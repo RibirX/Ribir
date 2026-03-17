@@ -21,13 +21,13 @@ lyon_tessellation = {version = "1.0.3", features = ["serialization"], optional =
 material-colors = {workspace = true}
 ribir_algo = { workspace = true }
 ribir_geom = { workspace = true }
+ribir_text = { workspace = true }
 serde = {version = "1.0", features = ["derive"]}
 serde_json.workspace = true
 usvg.workspace = true
 zerocopy = {workspace = true, optional = true, features = ["derive"]}
 derive_more= {workspace = true, features = ["add", "add_assign", "not", "mul"]} 
 smallvec = { workspace = true, features = ["serde"] }
-fontdb.workspace = true
 swash.workspace = true
 ttf-parser.workspace = true
 unicode-bidi.workspace = true
@@ -35,6 +35,7 @@ unicode-script.workspace = true
 unicode-segmentation.workspace = true
 quick-xml.workspace = true
 ahash.workspace = true
+parley.workspace = true
 
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

@@ -1,6 +1,13 @@
-use std::cell::{Ref, RefCell};
+use std::{
+  cell::{Ref, RefCell},
+  ops::Range,
+  sync::Arc,
+};
 
-use ribir_core::prelude::*;
+use ribir_core::{
+  prelude::*,
+  text::{single_style_paragraph_style, single_style_span_style},
+};
 
 use super::{CaretPosition, edit_text::BaseText};
 
@@ -16,7 +23,7 @@ where
 {
   text: T,
   #[declare(skip)]
-  glyphs: RefCell<Option<VisualGlyphs>>,
+  glyphs: RefCell<Option<Arc<ParagraphLayout>>>,
 }
 
 impl<T: 'static> TextGlyphs<T> {
@@ -29,27 +36,42 @@ impl<T: 'static> TextGlyphs<T> {
     &mut self.text
   }
 
-  pub fn glyphs(&self) -> Option<Ref<'_, VisualGlyphs>> {
+  pub fn glyphs(&self) -> Option<Ref<'_, Arc<ParagraphLayout>>> {
     Ref::filter_map(self.glyphs.borrow(), |v| v.as_ref()).ok()
   }
 }
 
 pub trait VisualText: BaseText {
   /// return self's glyphs layout info.
-  fn layout_glyphs(&self, clamp: BoxClamp, ctx: &MeasureCtx) -> VisualGlyphs;
+  fn layout_glyphs(&self, clamp: BoxClamp, ctx: &MeasureCtx) -> Arc<ParagraphLayout>;
 
   /// paint the glyphs in the rect.
-  fn paint(&self, painter: &mut Painter, style: PaintingStyle, glyphs: &VisualGlyphs, rect: Rect);
+  fn paint(
+    &self, painter: &mut Painter, style: PaintingStyle, glyphs: &Arc<ParagraphLayout>, rect: Rect,
+  );
 }
 
 impl VisualText for CowArc<str> {
-  fn layout_glyphs(&self, clamp: BoxClamp, ctx: &MeasureCtx) -> VisualGlyphs {
+  fn layout_glyphs(&self, clamp: BoxClamp, ctx: &MeasureCtx) -> Arc<ParagraphLayout> {
     let style = Provider::of::<TextStyle>(ctx).unwrap();
-    text_glyph(self.substr(..), &style, TextAlign::Start, clamp.max)
+    let paragraph_style = single_style_paragraph_style(&style, TextAlign::Start);
+    let paragraph = AppCtx::text_services()
+      .paragraph(AttributedText::styled(self.to_string(), single_style_span_style(&style)));
+    paragraph.layout(&style, &paragraph_style, clamp.max)
   }
 
-  fn paint(&self, painter: &mut Painter, style: PaintingStyle, glyphs: &VisualGlyphs, rect: Rect) {
-    paint_text(painter, glyphs, style, rect);
+  fn paint(
+    &self, painter: &mut Painter, style: PaintingStyle, glyphs: &Arc<ParagraphLayout>, rect: Rect,
+  ) {
+    let _ = (style, rect);
+    let brush = painter.fill_brush().clone();
+    if !brush.is_visible() {
+      return;
+    }
+    painter.draw_text_payload(
+      Resource::new(glyphs.draw_payload().clone()),
+      glyphs.draw_payload().bounds,
+    );
   }
 }
 
@@ -68,7 +90,7 @@ impl<T: VisualText> TextGlyphs<T> {
 impl<T: VisualText + 'static> Render for TextGlyphs<T> {
   fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     let glyphs = self.text.layout_glyphs(clamp, ctx);
-    let size = glyphs.visual_rect().size;
+    let size = glyphs.size();
     *self.glyphs.borrow_mut() = Some(glyphs);
     size
   }
@@ -84,12 +106,14 @@ impl<T: VisualText + 'static> Render for TextGlyphs<T> {
     };
 
     let style = Provider::of::<PaintingStyle>(ctx).map(|p| p.clone());
-    let visual_glyphs = self.glyphs().unwrap();
-    paint_text(ctx.painter(), &visual_glyphs, style.unwrap_or(PaintingStyle::Fill), box_rect);
+    let layout = self.glyphs().unwrap();
+    self
+      .text
+      .paint(ctx.painter(), style.unwrap_or(PaintingStyle::Fill), &layout, box_rect);
   }
 }
 
-pub trait VisualGlyphsHelper {
+pub trait ParagraphLayoutExt {
   fn caret_position_from_pos(&self, pos: Point) -> CaretPosition;
 
   fn line_end(&self, caret: CaretPosition) -> CaretPosition;
@@ -109,101 +133,104 @@ pub trait VisualGlyphsHelper {
   fn cursor(&self, caret: CaretPosition) -> Point;
 
   fn caret_position(&self, caret: CaretPosition) -> (usize, usize);
+
+  fn select_range(&self, rg: &Range<usize>) -> Vec<Rect>;
 }
 
-impl VisualGlyphsHelper for VisualGlyphs {
+fn to_caret(caret: CaretPosition) -> Caret {
+  Caret {
+    byte: TextByteIndex(caret.cluster),
+    affinity: caret.affinity,
+    visual: caret
+      .position
+      .map(|(line, slot)| VisualPosition { line: LineIndex(line), slot }),
+  }
+}
+
+fn from_caret(caret: Caret) -> CaretPosition {
+  CaretPosition {
+    cluster: caret.byte.0,
+    affinity: caret.affinity,
+    position: caret.visual.map(|p| (p.line.0, p.slot)),
+  }
+}
+
+impl ParagraphLayoutExt for ParagraphLayout {
   fn caret_position_from_pos(&self, pos: Point) -> CaretPosition {
-    let (para, mut offset) = self.nearest_glyph(pos.x, pos.y);
-    let rc = self.glyph_rect(para, offset);
-    if (rc.min_x() - pos.x).abs() > (rc.max_x() - pos.x).abs() {
-      offset += 1;
-    }
-    let cluster = self.position_to_cluster(para, offset);
-    CaretPosition { cluster, position: Some((para, offset)) }
+    from_caret(self.hit_test_point(pos).caret)
   }
 
   fn line_end(&self, caret: CaretPosition) -> CaretPosition {
-    let row = self.caret_position(caret).0;
-    let col = self.glyph_count(row, true);
-    let cluster = self.cluster_from_glyph_position(row, col);
-    CaretPosition { cluster, position: Some((row, col)) }
+    from_caret(self.line_end_caret(to_caret(caret)))
   }
 
   fn line_begin(&self, caret: CaretPosition) -> CaretPosition {
-    let row = self.caret_position(caret).0;
-    let cluster: usize = self.cluster_from_glyph_position(row, 0);
-    CaretPosition { cluster, position: Some((row, 0)) }
+    from_caret(self.line_start_caret(to_caret(caret)))
   }
 
   fn cluster_from_glyph_position(&self, row: usize, col: usize) -> usize {
-    self.position_to_cluster(row, col)
+    let mut caret = self.line_start_caret(Caret {
+      byte: TextByteIndex(0),
+      affinity: CaretAffinity::Downstream,
+      visual: Some(VisualPosition { line: LineIndex(row), slot: 0 }),
+    });
+    for _ in 0..col {
+      caret = self.move_caret(caret, CaretMotion::Next);
+    }
+    caret.byte.0
   }
 
   fn prev(&self, caret: CaretPosition) -> CaretPosition {
-    let (mut row, mut col) = self.caret_position(caret);
-
-    (row, col) = match (row > 0, col > 0) {
-      (_, true) => (row, col - 1),
-      (true, false) => (row - 1, self.glyph_count(row - 1, true)),
-      (false, false) => (0, 0),
-    };
-
-    let cluster = self.position_to_cluster(row, col);
-    CaretPosition { cluster, position: Some((row, col)) }
+    from_caret(self.move_caret(to_caret(caret), CaretMotion::Prev))
   }
 
   fn next(&self, caret: CaretPosition) -> CaretPosition {
-    let (mut row, mut col) = self.caret_position(caret);
-
-    (row, col) = match (row + 1 < self.glyph_row_count(), col < self.glyph_count(row, true)) {
-      (_, true) => (row, col + 1),
-      (true, false) => (row + 1, 0),
-      (false, false) => (row, self.glyph_count(row, true)),
-    };
-
-    let cluster = self.position_to_cluster(row, col);
-    CaretPosition { cluster, position: Some((row, col)) }
+    from_caret(self.move_caret(to_caret(caret), CaretMotion::Next))
   }
 
   fn up(&self, caret: CaretPosition) -> CaretPosition {
-    let (mut row, mut col) = self.caret_position(caret);
-
-    (row, col) = match row > 0 {
-      true => (row - 1, col.min(self.glyph_count(row - 1, true))),
-      false => (row, col),
-    };
-    let cluster = self.position_to_cluster(row, col);
-    CaretPosition { cluster, position: Some((row, col)) }
+    from_caret(self.move_caret(to_caret(caret), CaretMotion::Up))
   }
 
   fn down(&self, caret: CaretPosition) -> CaretPosition {
-    let (mut row, mut col) = self.caret_position(caret);
-
-    (row, col) = match row + 1 < self.glyph_row_count() {
-      true => (row + 1, col.min(self.glyph_count(row + 1, true))),
-      false => (row, col),
-    };
-    let cluster = self.position_to_cluster(row, col);
-    CaretPosition { cluster, position: Some((row, col)) }
+    from_caret(self.move_caret(to_caret(caret), CaretMotion::Down))
   }
 
-  fn cursor(&self, caret: CaretPosition) -> Point {
-    let (row, col) = self.caret_position(caret);
-
-    if col == 0 {
-      let glyph = self.glyph_rect(row, col);
-      Point::new(glyph.min_x(), glyph.min_y())
-    } else {
-      let glyph = self.glyph_rect(row, col - 1);
-      Point::new(glyph.max_x(), glyph.min_y())
-    }
-  }
+  fn cursor(&self, caret: CaretPosition) -> Point { self.caret_rect(to_caret(caret)).origin }
 
   fn caret_position(&self, caret: CaretPosition) -> (usize, usize) {
-    caret
+    from_caret(to_caret(caret))
       .position
-      .unwrap_or_else(|| self.position_by_cluster(caret.cluster))
+      .unwrap_or_default()
   }
+
+  fn select_range(&self, rg: &Range<usize>) -> Vec<Rect> {
+    self
+      .selection_rects(TextRange::new(rg.start, rg.end))
+      .into_vec()
+  }
+}
+
+impl ParagraphLayoutExt for Arc<ParagraphLayout> {
+  fn caret_position_from_pos(&self, pos: Point) -> CaretPosition {
+    self.as_ref().caret_position_from_pos(pos)
+  }
+  fn line_end(&self, caret: CaretPosition) -> CaretPosition { self.as_ref().line_end(caret) }
+  fn line_begin(&self, caret: CaretPosition) -> CaretPosition { self.as_ref().line_begin(caret) }
+  fn cluster_from_glyph_position(&self, row: usize, col: usize) -> usize {
+    self
+      .as_ref()
+      .cluster_from_glyph_position(row, col)
+  }
+  fn prev(&self, caret: CaretPosition) -> CaretPosition { self.as_ref().prev(caret) }
+  fn next(&self, caret: CaretPosition) -> CaretPosition { self.as_ref().next(caret) }
+  fn up(&self, caret: CaretPosition) -> CaretPosition { self.as_ref().up(caret) }
+  fn down(&self, caret: CaretPosition) -> CaretPosition { self.as_ref().down(caret) }
+  fn cursor(&self, caret: CaretPosition) -> Point { self.as_ref().cursor(caret) }
+  fn caret_position(&self, caret: CaretPosition) -> (usize, usize) {
+    self.as_ref().caret_position(caret)
+  }
+  fn select_range(&self, rg: &Range<usize>) -> Vec<Rect> { self.as_ref().select_range(rg) }
 }
 
 impl<T> std::ops::Deref for TextGlyphs<T> {
@@ -218,61 +245,265 @@ impl<T> std::ops::DerefMut for TextGlyphs<T> {
 
 #[cfg(test)]
 mod tests {
-  use std::cell::RefCell;
+  use std::sync::Arc;
 
-  use ribir_core::prelude::{font_db::FontDB, typography::PlaceLineDirection, *};
+  use ribir_core::{prelude::*, text::LineHeight};
   use ribir_geom::Size;
 
-  use crate::{input::text_glyphs::VisualGlyphsHelper, prelude::CaretPosition};
+  use crate::{input::text_glyphs::ParagraphLayoutExt, prelude::CaretPosition};
 
-  fn test_store() -> TypographyStore {
-    let font_db = Rc::new(RefCell::new(FontDB::default()));
-    let path = env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/DejaVuSans.ttf";
-    let _ = font_db.borrow_mut().load_font_file(path);
-    TypographyStore::new(font_db)
+  fn assert_caret(caret: CaretPosition, cluster: usize, position: Option<(usize, usize)>) {
+    assert_eq!((caret.cluster, caret.position), (cluster, position));
   }
-  #[test]
-  fn glyph_move() {
-    let mut store = test_store();
 
-    let style = TextStyle {
+  fn build_glyphs(text: &str, wrap: TextWrap, size: Size) -> Arc<ParagraphLayout> {
+    let text_services = new_text_services();
+    let path = env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/DejaVuSans.ttf";
+    let _ = text_services.register_font_file(std::path::Path::new(&path));
+
+    let paragraph_style = ParagraphStyle { text_align: TextAlign::Start, wrap };
+    let paragraph = text_services.paragraph(AttributedText::styled(
+      text,
+      SpanStyle {
+        font: Some(FontRequest {
+          face: FontFace {
+            families: Box::new([FontFamily::Name("DejaVu Sans".into())]),
+            ..<_>::default()
+          },
+        }),
+        font_size: Some(16.),
+        letter_spacing: Some(0.),
+        line_height: Some(LineHeight::Px(16.)),
+        brush: None,
+      },
+    ));
+    let text_style = TextStyle {
       font_size: 16.,
       font_face: FontFace {
         families: Box::new([FontFamily::Name("DejaVu Sans".into())]),
         ..<_>::default()
       },
       letter_space: 0.,
-      line_height: 16.,
+      line_height: LineHeight::Px(16.),
       overflow: TextOverflow::AutoWrap,
     };
-    let text: CowArc<str> = "1 23 456 7890\n12345".into();
-    let glyphs = store.typography(
-      text.substr(..),
-      &style,
-      Size::new(GlyphUnit::PIXELS_PER_EM as f32 * 5.0, GlyphUnit::PIXELS_PER_EM as f32 * 3.0),
-      TextAlign::Start,
-      font_db::GlyphBaseline::Alphabetic,
-      PlaceLineDirection::TopToBottom,
-    );
+    paragraph.layout(&text_style, &paragraph_style, size)
+  }
 
-    let mut caret = CaretPosition { cluster: 0, position: None };
+  fn build_test_glyphs() -> Arc<ParagraphLayout> {
+    build_glyphs(
+      "1 23 456 7890\n12345",
+      TextWrap::Wrap,
+      Size::new(GlyphUnit::PIXELS_PER_EM as f32 * 5.0, GlyphUnit::PIXELS_PER_EM as f32 * 3.0),
+    )
+  }
+
+  fn build_three_line_glyphs() -> Arc<ParagraphLayout> {
+    build_glyphs(
+      "abc\ndef\nghi",
+      TextWrap::NoWrap,
+      Size::new(GlyphUnit::PIXELS_PER_EM as f32 * 20.0, GlyphUnit::PIXELS_PER_EM as f32 * 4.0),
+    )
+  }
+
+  fn build_trailing_empty_line_glyphs() -> Arc<ParagraphLayout> {
+    build_glyphs(
+      "abc\ndef\n",
+      TextWrap::NoWrap,
+      Size::new(GlyphUnit::PIXELS_PER_EM as f32 * 20.0, GlyphUnit::PIXELS_PER_EM as f32 * 4.0),
+    )
+  }
+
+  fn build_increasing_line_glyphs() -> Arc<ParagraphLayout> {
+    build_glyphs(
+      "a\nab\nabc",
+      TextWrap::NoWrap,
+      Size::new(GlyphUnit::PIXELS_PER_EM as f32 * 20.0, GlyphUnit::PIXELS_PER_EM as f32 * 4.0),
+    )
+  }
+
+  fn build_wrapped_multiline_glyphs() -> Arc<ParagraphLayout> {
+    build_glyphs(
+      "1 23 456 7890 12345 67890",
+      TextWrap::Wrap,
+      Size::new(GlyphUnit::PIXELS_PER_EM as f32 * 5.0, GlyphUnit::PIXELS_PER_EM as f32 * 4.0),
+    )
+  }
+
+  fn last_line_start(glyphs: &Arc<ParagraphLayout>) -> CaretPosition {
+    let mut caret = CaretPosition::default();
+    for _ in 0..16 {
+      let next = glyphs.down(caret);
+      if next.position == caret.position {
+        break;
+      }
+      caret = next;
+    }
+    glyphs.line_begin(caret)
+  }
+
+  #[test]
+  fn glyph_move() {
+    let glyphs = build_test_glyphs();
+
+    let mut caret = CaretPosition::default();
     caret = glyphs.prev(caret);
-    assert!(caret == CaretPosition { cluster: 0, position: Some((0, 0)) });
+    assert_caret(caret, 0, Some((0, 0)));
     caret = glyphs.line_end(caret);
-    assert!(caret == CaretPosition { cluster: 9, position: Some((0, 9)) });
+    assert_caret(caret, 9, Some((0, 9)));
     caret = glyphs.next(caret);
-    assert!(caret == CaretPosition { cluster: 9, position: Some((1, 0)) });
+    assert_caret(caret, 9, Some((1, 0)));
     caret = glyphs.prev(caret);
-    assert!(caret == CaretPosition { cluster: 9, position: Some((0, 9)) });
+    assert_caret(caret, 9, Some((0, 9)));
     caret = glyphs.down(caret);
-    assert!(caret == CaretPosition { cluster: 13, position: Some((1, 4)) });
+    assert_caret(caret, 13, Some((1, 4)));
     caret = glyphs.next(caret);
-    assert!(caret == CaretPosition { cluster: 14, position: Some((2, 0)) });
+    assert_caret(caret, 14, Some((2, 0)));
     caret = glyphs.prev(caret);
-    assert!(caret == CaretPosition { cluster: 13, position: Some((1, 4)) });
+    assert_caret(caret, 13, Some((1, 4)));
     caret = glyphs.line_begin(caret);
-    assert!(caret == CaretPosition { cluster: 9, position: Some((1, 0)) });
+    assert_caret(caret, 9, Some((1, 0)));
     caret = glyphs.up(caret);
-    assert!(caret == CaretPosition { cluster: 0, position: Some((0, 0)) });
+    assert_caret(caret, 0, Some((0, 0)));
+  }
+
+  #[test]
+  fn glyph_move_keeps_direction_without_visual_position() {
+    let glyphs = build_test_glyphs();
+
+    let line_end = glyphs.line_end(CaretPosition::default());
+    let wrapped_start = glyphs.next(line_end);
+    let wrapped_next = glyphs.next(wrapped_start);
+    let wrapped_prev = glyphs.prev(wrapped_start);
+    let wrapped_up = glyphs.up(wrapped_start);
+    let wrapped_down = glyphs.down(wrapped_start);
+
+    assert_eq!(glyphs.next(CaretPosition { position: None, ..line_end }), wrapped_start);
+    assert_eq!(glyphs.next(CaretPosition { position: None, ..wrapped_start }), wrapped_next);
+    assert_eq!(glyphs.prev(CaretPosition { position: None, ..wrapped_start }), wrapped_prev);
+    assert_eq!(glyphs.up(CaretPosition { position: None, ..wrapped_start }), wrapped_up);
+    assert_eq!(glyphs.down(CaretPosition { position: None, ..wrapped_start }), wrapped_down);
+  }
+
+  #[test]
+  fn glyph_cursor_uses_visual_position_for_wrapped_boundary() {
+    let glyphs = build_test_glyphs();
+
+    let line_end = glyphs.line_end(CaretPosition::default());
+    let wrapped_start = glyphs.next(line_end);
+
+    assert_ne!(line_end.position, wrapped_start.position);
+    assert_ne!(glyphs.cursor(line_end), glyphs.cursor(wrapped_start));
+  }
+
+  #[test]
+  fn glyph_hit_test_round_trips_wrapped_last_line_boundary() {
+    let glyphs = build_wrapped_multiline_glyphs();
+    let last_line_start = last_line_start(&glyphs);
+    let prev = glyphs.prev(last_line_start);
+
+    assert_eq!(glyphs.caret_position_from_pos(glyphs.cursor(last_line_start)), last_line_start);
+    assert_eq!(glyphs.caret_position_from_pos(glyphs.cursor(prev)), prev);
+  }
+
+  #[test]
+  fn glyph_cursor_stays_on_same_visual_line_around_wrapped_boundaries() {
+    let glyphs = build_wrapped_multiline_glyphs();
+    let last_line_start = last_line_start(&glyphs);
+    let prev = glyphs.prev(last_line_start);
+    let prev_prev = glyphs.prev(prev);
+    let up = glyphs.up(last_line_start);
+    let up_next = glyphs.next(up);
+
+    assert_eq!(prev.position.unwrap().0, prev_prev.position.unwrap().0);
+    assert_eq!(up.position.unwrap().0, up_next.position.unwrap().0);
+    assert_eq!(glyphs.cursor(prev).y, glyphs.cursor(prev_prev).y);
+    assert_eq!(glyphs.cursor(up).y, glyphs.cursor(up_next).y);
+  }
+
+  #[test]
+  fn glyph_move_three_lines_keeps_expected_line_when_visual_position_is_missing() {
+    let glyphs = build_three_line_glyphs();
+
+    let mut last_line_start = glyphs.down(CaretPosition::default());
+    last_line_start = glyphs.down(last_line_start);
+    last_line_start = glyphs.line_begin(last_line_start);
+
+    let expected_prev = glyphs.prev(last_line_start);
+    let expected_prev_prev = glyphs.prev(expected_prev);
+    let expected_up = glyphs.up(last_line_start);
+
+    assert_eq!(glyphs.prev(CaretPosition { position: None, ..last_line_start }), expected_prev);
+    assert_eq!(glyphs.prev(CaretPosition { position: None, ..expected_prev }), expected_prev_prev);
+    assert_eq!(glyphs.up(CaretPosition { position: None, ..last_line_start }), expected_up);
+  }
+
+  #[test]
+  fn glyph_move_wrapped_last_line_keeps_expected_line_when_visual_position_is_missing() {
+    let glyphs = build_wrapped_multiline_glyphs();
+    let last_line_start = last_line_start(&glyphs);
+
+    assert!(last_line_start.position.unwrap().0 >= 2);
+
+    let expected_prev = glyphs.prev(last_line_start);
+    let expected_prev_prev = glyphs.prev(expected_prev);
+    let expected_up = glyphs.up(last_line_start);
+
+    assert_eq!(glyphs.prev(CaretPosition { position: None, ..last_line_start }), expected_prev);
+    assert_eq!(glyphs.prev(CaretPosition { position: None, ..expected_prev }), expected_prev_prev);
+    assert_eq!(glyphs.up(CaretPosition { position: None, ..last_line_start }), expected_up);
+  }
+
+  #[test]
+  fn glyph_move_trailing_empty_line_keeps_expected_line() {
+    let glyphs = build_trailing_empty_line_glyphs();
+
+    let mut last_line_start = glyphs.down(CaretPosition::default());
+    last_line_start = glyphs.down(last_line_start);
+    last_line_start = glyphs.line_begin(last_line_start);
+
+    assert_eq!(last_line_start.position, Some((2, 0)));
+
+    let prev = glyphs.prev(last_line_start);
+    let prev_prev = glyphs.prev(prev);
+    let up = glyphs.up(last_line_start);
+
+    assert_eq!(prev.position.unwrap().0, 1);
+    assert_eq!(prev_prev.position.unwrap().0, 1);
+    assert_eq!(up.position.unwrap().0, 1);
+    assert_eq!(glyphs.cursor(prev).y, glyphs.cursor(prev_prev).y);
+    assert_eq!(glyphs.cursor(up).y, glyphs.cursor(prev).y);
+  }
+
+  #[test]
+  fn glyph_move_across_increasing_hard_lines_does_not_bounce() {
+    let glyphs = build_increasing_line_glyphs();
+
+    let second_line_start = glyphs.line_begin(glyphs.down(CaretPosition::default()));
+    let third_line_start = glyphs.line_begin(glyphs.down(second_line_start));
+    let second_line_end = glyphs.prev(third_line_start);
+    let second_line_interior = glyphs.prev(second_line_end);
+    let first_line_end = glyphs.prev(second_line_start);
+    let second_line_next = glyphs.next(second_line_start);
+    let second_line_next_next = glyphs.next(second_line_next);
+
+    assert_eq!(third_line_start.position, Some((2, 0)));
+    assert_eq!(second_line_end.position.unwrap().0, 1);
+    assert_eq!(second_line_interior.position.unwrap().0, 1);
+    assert_eq!(first_line_end.position.unwrap().0, 0);
+    assert_eq!(second_line_next.position.unwrap().0, 1);
+    assert_eq!(second_line_next_next.position.unwrap().0, 1);
+    let second_line_end_cursor = glyphs.cursor(second_line_end);
+    let second_line_interior_cursor = glyphs.cursor(second_line_interior);
+    assert_ne!(second_line_end_cursor, second_line_interior_cursor);
+    assert!(
+      second_line_interior_cursor.x < second_line_end_cursor.x,
+      "expected interior x < end x, got interior={second_line_interior_cursor:?}, \
+       end={second_line_end_cursor:?}, start={:?}, next={:?}, next_next={:?}",
+      glyphs.cursor(second_line_start),
+      glyphs.cursor(second_line_next),
+      glyphs.cursor(second_line_next_next),
+    );
+    assert_eq!(glyphs.cursor(first_line_end).y, glyphs.cursor(CaretPosition::default()).y);
   }
 }

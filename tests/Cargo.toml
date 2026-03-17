@@ -50,10 +50,6 @@ path = "path_child_test.rs"
 
 
 [[bench]]
-name = "text_bench"
-harness = false
-
-[[bench]]
 name = "example_bench"
 harness = false
 

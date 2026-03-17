@@ -5,7 +5,7 @@ use ribir_core::{impl_compose_child_for_wrap_render, prelude::*, wrap_render::Wr
 #[declare]
 pub struct TextClamp {
   /// If rows is Some(rows), the height of the child will be constrained to
-  /// rows * text_style.line_height
+  /// rows * resolved line height.
   /// Default is None, no additional constraints on height will be applied
   #[declare(default)]
   pub rows: Option<f32>,
@@ -23,7 +23,10 @@ impl WrapRender for TextClamp {
   fn measure(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut MeasureCtx) -> Size {
     let text_style = Provider::of::<TextStyle>(ctx).unwrap();
     if let Some(rows) = self.rows {
-      let height = rows * text_style.line_height;
+      let height = rows
+        * text_style
+          .line_height
+          .resolve_for_font_size(text_style.font_size);
       clamp = clamp.with_fixed_height(height.clamp(clamp.min.height, clamp.max.height));
     }
     if let Some(cols) = self.cols {

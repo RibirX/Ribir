@@ -12,8 +12,8 @@ pub enum Brush {
   Color(Color),
   /// Image brush always use a repeat mode to brush the path.
   Image(Resource<PixelImage>),
-  RadialGradient(RadialGradient),
-  LinearGradient(LinearGradient),
+  RadialGradient(Resource<RadialGradient>),
+  LinearGradient(Resource<LinearGradient>),
 }
 
 impl Brush {
@@ -29,10 +29,8 @@ impl Brush {
     match self {
       Brush::Color(c) => c.alpha > 0,
       Brush::Image(_) => true,
-      Brush::RadialGradient(RadialGradient { stops, .. })
-      | Brush::LinearGradient(LinearGradient { stops, .. }) => {
-        stops.iter().any(|s| s.color.alpha > 0)
-      }
+      Brush::RadialGradient(gradient) => gradient.stops.iter().any(|s| s.color.alpha > 0),
+      Brush::LinearGradient(gradient) => gradient.stops.iter().any(|s| s.color.alpha > 0),
     }
   }
 }
@@ -55,6 +53,26 @@ impl From<Resource<PixelImage>> for Brush {
 impl From<PixelImage> for Brush {
   #[inline]
   fn from(img: PixelImage) -> Self { Resource::new(img).into() }
+}
+
+impl From<Resource<RadialGradient>> for Brush {
+  #[inline]
+  fn from(gradient: Resource<RadialGradient>) -> Self { Brush::RadialGradient(gradient) }
+}
+
+impl From<RadialGradient> for Brush {
+  #[inline]
+  fn from(gradient: RadialGradient) -> Self { Resource::new(gradient).into() }
+}
+
+impl From<Resource<LinearGradient>> for Brush {
+  #[inline]
+  fn from(gradient: Resource<LinearGradient>) -> Self { Brush::LinearGradient(gradient) }
+}
+
+impl From<LinearGradient> for Brush {
+  #[inline]
+  fn from(gradient: LinearGradient) -> Self { Resource::new(gradient).into() }
 }
 
 impl Default for Brush {

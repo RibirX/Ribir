@@ -1,0 +1,25 @@
+[package]
+authors.workspace = true
+categories.workspace = true
+description.workspace = true
+documentation.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+name = "ribir_text"
+readme.workspace = true
+repository = "https://github.com/RibirX/Ribir/text"
+version.workspace = true
+
+[dependencies]
+ahash.workspace = true
+derive_more = { workspace = true, features = ["add", "add_assign", "mul", "not"] }
+parley.workspace = true
+quick-xml.workspace = true
+ribir_algo = { workspace = true }
+ribir_geom = { workspace = true }
+swash.workspace = true
+tracing.workspace = true
+ttf-parser.workspace = true
+unicode-segmentation.workspace = true

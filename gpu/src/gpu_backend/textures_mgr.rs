@@ -209,12 +209,21 @@ where
   ) -> TextureSlice {
     match img.color_format() {
       ColorFormat::Rgba8 => {
+        let blank_side = SideOffsets2D::new_all_same(RGBA_BLEED_EDGE);
         let atlas = &mut self.rgba_atlas;
-        let h =
-          atlas.get_or_cache(img.clone().into_any(), 1., img.size(), gpu, |rect, texture, gpu| {
-            texture.write_data(rect, img.pixel_bytes(), gpu)
-          });
-        TextureSlice { tex_id: TextureID::Rgba(h.tex_id()), rect: h.tex_rect(atlas) }
+        let h = atlas.get_or_cache(
+          img.clone().into_any(),
+          1.,
+          size_expand_edge(img.size(), RGBA_BLEED_EDGE),
+          gpu,
+          // Mirror the outermost texels into a 1px border so linear sampling
+          // doesn't blend color emoji edges with transparent atlas pixels.
+          |rect, texture, gpu| texture.write_data(rect, &rgba_pixels_with_bleed(img), gpu),
+        );
+        TextureSlice {
+          tex_id: TextureID::Rgba(h.tex_id()),
+          rect: h.tex_rect(atlas).inner_rect(blank_side),
+        }
       }
       ColorFormat::Alpha8 => {
         let key = PathKey::Fill(img.clone().into_any());
@@ -461,17 +470,70 @@ fn extend_buffer<V>(dist: &mut VertexBuffers<V>, from: VertexBuffers<V>) {
 }
 
 const ALPHA_BLANK_EDGE: i32 = 2;
+const RGBA_BLEED_EDGE: i32 = 1;
 
-fn size_expand_blank(mut size: DeviceSize) -> DeviceSize {
-  size.width += ALPHA_BLANK_EDGE * 2;
-  size.height += ALPHA_BLANK_EDGE * 2;
+fn size_expand_edge(mut size: DeviceSize, edge: i32) -> DeviceSize {
+  size.width += edge * 2;
+  size.height += edge * 2;
   size
 }
+
+fn size_expand_blank(size: DeviceSize) -> DeviceSize { size_expand_edge(size, ALPHA_BLANK_EDGE) }
 
 fn size_shrink_blank(mut size: DeviceSize) -> DeviceSize {
   size.width -= ALPHA_BLANK_EDGE * 2;
   size.height -= ALPHA_BLANK_EDGE * 2;
   size
+}
+
+fn rgba_pixels_with_bleed(img: &PixelImage) -> Vec<u8> {
+  let width = img.width() as usize;
+  let height = img.height() as usize;
+  if width == 0 || height == 0 {
+    return Vec::new();
+  }
+
+  let src = img.pixel_bytes();
+  let edge = RGBA_BLEED_EDGE as usize;
+  let padded_width = width + edge * 2;
+  let padded_height = height + edge * 2;
+  let stride = width * 4;
+  let padded_stride = padded_width * 4;
+  let mut padded = vec![0; padded_stride * padded_height];
+
+  for y in 0..height {
+    let src_row = &src[y * stride..(y + 1) * stride];
+    let dst_offset = (y + edge) * padded_stride;
+    let dst_row = &mut padded[dst_offset..dst_offset + padded_stride];
+    dst_row[edge * 4..edge * 4 + stride].copy_from_slice(src_row);
+
+    let first = &src_row[..4];
+    for x in 0..edge {
+      let offset = x * 4;
+      dst_row[offset..offset + 4].copy_from_slice(first);
+    }
+
+    let last = &src_row[stride - 4..stride];
+    for x in 0..edge {
+      let offset = (edge + width + x) * 4;
+      dst_row[offset..offset + 4].copy_from_slice(last);
+    }
+  }
+
+  let first_row = padded[edge * padded_stride..(edge + 1) * padded_stride].to_vec();
+  for y in 0..edge {
+    let start = y * padded_stride;
+    padded[start..start + padded_stride].copy_from_slice(&first_row);
+  }
+
+  let last_row_start = (edge + height - 1) * padded_stride;
+  let last_row = padded[last_row_start..last_row_start + padded_stride].to_vec();
+  for y in 0..edge {
+    let start = (edge + height + y) * padded_stride;
+    padded[start..start + padded_stride].copy_from_slice(&last_row);
+  }
+
+  padded
 }
 
 impl TextureSlice {
@@ -530,7 +592,7 @@ pub mod tests {
     let red_img = color_image(Color::RED, 32, 32);
     let red_rect = mgr.store_image(&red_img, &mut wgpu);
 
-    assert_eq!(red_rect.rect.min().to_array(), [0, 0]);
+    assert_eq!(red_rect.rect.min().to_array(), [RGBA_BLEED_EDGE, RGBA_BLEED_EDGE]);
 
     // same image should have same position in atlas
     assert_eq!(red_rect, mgr.store_image(&red_img, &mut wgpu));
@@ -615,5 +677,27 @@ pub mod tests {
       let red_img = color_image(Color::RED, 32, 32).into_any();
       assert!(mgr.rgba_atlas.get(&red_img, 1.).is_none());
     }
+  }
+
+  #[test]
+  fn rgba_images_store_edge_bleed_pixels() {
+    let mut wgpu = block_on(WgpuImpl::headless());
+    let mut mgr = TexturesMgr::<WgpuTexture>::new(&mut wgpu);
+    let pixels = vec![1, 2, 3, 4, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120];
+    let img = Resource::new(PixelImage::new(Cow::Owned(pixels), 2, 2, ColorFormat::Rgba8));
+
+    let slice = mgr.store_image(&img, &mut wgpu);
+    let bleed = guillotiere::euclid::SideOffsets2D::<_, ribir_geom::PhysicUnit>::new_all_same(
+      RGBA_BLEED_EDGE,
+    );
+    let atlas_rect = slice.rect.outer_rect(bleed);
+
+    wgpu.begin_frame();
+    let texture = mgr.texture(slice.tex_id);
+    let atlas_img = texture.copy_as_image(&atlas_rect, &mut wgpu);
+    wgpu.end_frame();
+
+    let atlas_img = block_on(atlas_img).unwrap();
+    assert_eq!(atlas_img.pixel_bytes(), rgba_pixels_with_bleed(&img));
   }
 }

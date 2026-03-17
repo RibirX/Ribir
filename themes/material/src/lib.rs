@@ -120,7 +120,7 @@ pub fn typography_theme() -> TypographyTheme {
   ) -> TextTheme {
     TextTheme {
       text: TextStyle {
-        line_height,
+        line_height: line_height.into(),
         font_size,
         letter_space,
         font_face,

@@ -1,9 +1,12 @@
-use std::cell::{Ref, RefCell};
+use std::{
+  cell::{Ref, RefCell},
+  sync::Arc,
+};
 
-use font_db::GlyphBaseline;
-use typography::PlaceLineDirection;
-
-use crate::prelude::*;
+use crate::{
+  prelude::*,
+  text::{single_style_paragraph_style, single_style_span_style},
+};
 
 pub type TextValue = PipeValue<CowArc<str>>;
 
@@ -41,51 +44,24 @@ pub struct Text {
 
   /// Cached glyph layout results for the current text and style configuration
   #[declare(skip)]
-  glyphs: RefCell<Option<VisualGlyphs>>,
+  layout: RefCell<Option<Arc<ParagraphLayout>>>,
 }
 
-pub fn text_glyph(
-  text: Substr, text_style: &TextStyle, text_align: TextAlign, bounds: Size,
-) -> VisualGlyphs {
-  AppCtx::typography_store()
-    .borrow_mut()
-    .typography(
-      text,
-      text_style,
-      bounds,
-      text_align,
-      GlyphBaseline::Middle,
-      PlaceLineDirection::TopToBottom,
-    )
-}
-
-pub fn paint_text(
-  painter: &mut Painter, glyphs: &VisualGlyphs, style: PaintingStyle, box_rect: Rect,
-) {
-  if let Some(rect) = painter.intersection_paint_bounds(&box_rect) {
-    if let PaintingStyle::Stroke(options) = style {
-      painter
-        .set_style(PathStyle::Stroke)
-        .set_strokes(options);
-    } else {
-      painter.set_style(PathStyle::Fill);
-    }
-
-    painter.draw_glyphs_in_rect(glyphs, rect);
-  }
+fn text_layout(
+  text: CowArc<str>, text_style: &TextStyle, text_align: TextAlign, bounds: Size,
+) -> Arc<ParagraphLayout> {
+  let paragraph_style = single_style_paragraph_style(text_style, text_align);
+  let paragraph = AppCtx::text_services()
+    .paragraph(AttributedText::styled(text.to_string(), single_style_span_style(text_style)));
+  paragraph.layout(text_style, &paragraph_style, bounds)
 }
 
 impl Render for Text {
   fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     let style = Provider::of::<TextStyle>(ctx).unwrap();
-    let text_align = Provider::of::<TextAlign>(ctx).map_or(TextAlign::Start, |t| *t);
-    let mut glyphs = text_glyph(self.text.substr(..), &style, text_align, clamp.max);
-    let size = glyphs.visual_rect().size;
-    if text_align != TextAlign::Start {
-      glyphs.align(Rect::from_size(size));
-    }
-
-    *self.glyphs.borrow_mut() = Some(glyphs);
+    let layout = text_layout(self.text.clone(), &style, TextAlign::Start, clamp.max);
+    let size = layout.size();
+    *self.layout.borrow_mut() = Some(layout);
     clamp.clamp(size)
   }
 
@@ -94,9 +70,18 @@ impl Render for Text {
 
   fn paint(&self, ctx: &mut PaintingCtx) {
     let style = Provider::of::<PaintingStyle>(ctx).map(|p| p.clone());
-    let visual_glyphs = self.glyphs().unwrap();
-    let rect = visual_glyphs.visual_rect();
-    paint_text(ctx.painter(), &visual_glyphs, style.unwrap_or(PaintingStyle::Fill), rect);
+    let Some(layout) = self.layout.borrow().clone() else {
+      return;
+    };
+    let brush = ctx.painter().fill_brush().clone();
+    if !brush.is_visible() {
+      return;
+    }
+
+    let payload = Resource::new(layout.draw_payload().clone());
+    let rect = layout.draw_payload().bounds;
+    let _ = style;
+    ctx.painter().draw_text_payload(payload, rect);
   }
 
   #[cfg(feature = "debug")]
@@ -112,10 +97,11 @@ impl Render for Text {
 
 impl Text {
   pub fn new(text: impl Into<CowArc<str>>) -> Self {
-    Self { text: text.into(), glyphs: Default::default() }
+    Self { text: text.into(), layout: Default::default() }
   }
-  pub fn glyphs(&self) -> Option<Ref<'_, VisualGlyphs>> {
-    Ref::filter_map(self.glyphs.borrow(), |v| v.as_ref()).ok()
+
+  pub fn layout(&self) -> Option<Ref<'_, Arc<ParagraphLayout>>> {
+    Ref::filter_map(self.layout.borrow(), |v| v.as_ref()).ok()
   }
 }
 

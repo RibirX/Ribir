@@ -4,7 +4,7 @@
 pub use ribir_algo::{CowArc, Resource};
 use smallvec::{SmallVec, smallvec};
 
-use crate::prelude::*;
+use crate::{prelude::*, text::LineHeight};
 
 mod palette;
 pub use palette::*;
@@ -122,6 +122,11 @@ impl Theme {
     load_fonts(&this);
     let container_color =
       this.part_reader(|t| PartRef::from_value(ContainerColor(t.palette.secondary_container())));
+    let default_text_style = this.part_reader(|theme| {
+      let mut text = theme.typography_theme.body_medium.text.clone();
+      text.line_height = LineHeight::default();
+      PartRef::from_value(text)
+    });
 
     let providers = smallvec![
       // The theme provider is designated as writable state,
@@ -129,7 +134,7 @@ impl Theme {
       Provider::writer(this.clone_writer(), None),
       Provider::reader(part_reader!(&this.palette.primary)),
       Provider::reader(container_color),
-      Provider::reader(part_reader!(&this.typography_theme.body_medium.text)),
+      Provider::reader(default_text_style),
       Provider::reader(part_reader!(&this.palette)),
       Provider::reader(part_reader!(&this.typography_theme)),
       Classes::reader_into_provider(part_reader!(&this.classes)),
@@ -146,15 +151,15 @@ impl Theme {
 
   /// Loads the fonts specified in the theme configuration.
   fn load_fonts(&mut self) {
-    let mut font_db = AppCtx::font_db().borrow_mut();
+    let text_services = AppCtx::text_services();
     let Theme { font_bytes, font_files, .. } = self;
 
-    font_bytes
-      .drain(..)
-      .for_each(|data| font_db.load_from_bytes(data.clone()));
+    font_bytes.drain(..).for_each(|data| {
+      let _ = text_services.register_font_bytes(data);
+    });
 
     font_files.drain(..).for_each(|path| {
-      let _ = font_db.load_font_file(path);
+      let _ = text_services.register_font_file(std::path::Path::new(&path));
     });
   }
 }
@@ -186,14 +191,29 @@ impl Default for Theme {
 
 fn typography_theme() -> TypographyTheme {
   fn text_theme(line_height: f32, font_size: f32, letter_space: f32) -> TextTheme {
+    let mut families = vec![FontFamily::Name(std::borrow::Cow::Borrowed("Lato"))];
+    families.extend(
+      fallback_font_families()
+        .iter()
+        .copied()
+        .map(|family| FontFamily::Name(std::borrow::Cow::Borrowed(family))),
+    );
+    families.push(FontFamily::SansSerif);
+    families.push(FontFamily::Serif);
     let font_face = FontFace {
-      families: Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Lato")), FontFamily::Serif]),
+      families: families.into_boxed_slice(),
       weight: FontWeight::NORMAL,
       ..<_>::default()
     };
     let overflow = TextOverflow::Overflow;
     TextTheme {
-      text: TextStyle { line_height, font_size, letter_space, font_face, overflow },
+      text: TextStyle {
+        line_height: line_height.into(),
+        font_size,
+        letter_space,
+        font_face,
+        overflow,
+      },
       decoration: TextDecorationStyle {
         decoration: TextDecoration::NONE,
         decoration_color: Color::BLACK.with_alpha(0.87).into(),

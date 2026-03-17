@@ -18,6 +18,7 @@ pub mod widget;
 pub mod widget_children;
 pub(crate) mod widget_tree;
 pub mod window;
+pub use ribir_text as text;
 pub use rxrust;
 pub mod convert;
 pub mod event_loop;

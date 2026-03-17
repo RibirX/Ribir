@@ -233,7 +233,7 @@ fn brush_from_usvg_paint(paint: &usvg::Paint, opacity: usvg::Opacity) -> (Brush,
         spread_method: linear.spread_method().into(),
       };
 
-      (Brush::LinearGradient(gradient), matrix_convert(linear.transform()))
+      (Brush::LinearGradient(Resource::new(gradient)), matrix_convert(linear.transform()))
     }
     usvg::Paint::RadialGradient(radial_gradient) => {
       let stops = convert_to_gradient_stops(radial_gradient.stops());
@@ -246,7 +246,7 @@ fn brush_from_usvg_paint(paint: &usvg::Paint, opacity: usvg::Opacity) -> (Brush,
         spread_method: radial_gradient.spread_method().into(),
       };
 
-      (Brush::RadialGradient(gradient), matrix_convert(radial_gradient.transform()))
+      (Brush::RadialGradient(Resource::new(gradient)), matrix_convert(radial_gradient.transform()))
     }
     paint => {
       tracing::warn!("[painter]: not support `{paint:?}` in svg, use black instead!");

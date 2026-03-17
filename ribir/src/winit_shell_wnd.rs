@@ -1,7 +1,7 @@
 use std::{future::Future, sync::Arc};
 
 use ribir_core::{
-  prelude::{font_db::FontDBGlyphProvider, *},
+  prelude::*,
   window::{
     BoxShellWindow, RedrawDemand, Shell, ShellWindow, UiEvent, WindowAttributes, WindowId,
     WindowLevel,
@@ -34,7 +34,7 @@ pub enum ShellCmd {
     viewport: Rect,
     surface_color: Color,
     commands: Vec<PaintCommand>,
-    glyph_provider: FontDBGlyphProvider,
+    glyph_provider: Arc<dyn GlyphRasterSource + Send + Sync>,
   },
   Close {
     id: WindowId,
@@ -104,7 +104,7 @@ pub trait WinitBackend<'a>: Sized {
 
   fn draw_commands(
     &mut self, viewport: DeviceRect, global_matrix: &Transform, commands: &[PaintCommand],
-    glyph_provider: &dyn GlyphProvider,
+    glyph_provider: &dyn GlyphRasterSource,
   );
 
   fn end_frame(&mut self);
@@ -148,12 +148,11 @@ impl WinitShellWnd {
             .round_out()
             .to_i32()
             .cast_unit();
-
           self.backend.draw_commands(
             viewport,
             &Transform::scale(scale_factor, scale_factor),
             &commands,
-            &glyph_provider,
+            glyph_provider.as_ref(),
           );
 
           #[cfg(feature = "debug")]
@@ -270,8 +269,7 @@ impl ShellWindow for ShellWndHandle {
   fn draw_commands(
     &mut self, wnd_size: Size, viewport: Rect, surface_color: Color, commands: &[PaintCommand],
   ) {
-    let font_db = AppCtx::font_db();
-    let glyph_provider = font_db.borrow_mut().glyph_provider();
+    let glyph_provider = AppCtx::text_services().raster_source();
     self.sender.send(ShellCmd::Draw {
       id: self.id(),
       wnd_size,

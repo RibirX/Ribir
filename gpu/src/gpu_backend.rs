@@ -1,16 +1,17 @@
-use std::error::Error;
+use std::{borrow::Cow, error::Error};
 
 use ahash::HashMap;
 use guillotiere::euclid::Vector2D;
 use ribir_algo::Resource;
 use ribir_geom::{
-  DevicePoint, DeviceRect, DeviceSize, Point, Transform, rect_corners, transform_to_device_rect,
+  DevicePoint, DeviceRect, DeviceSize, Point, Transform, Vector, rect_corners,
+  transform_to_device_rect,
 };
 use ribir_painter::{
   Color, ColorFormat, ColorMatrix, CommandBrush, FaceId, FilterComposite, FilterLayer, FilterOp,
-  GlyphId, GlyphProvider, LineCap, LineJoin, PaintCommand, PaintPath, PaintPathAction,
-  PainterBackend, PaintingStyle, Path, PathCommand, PathKind, PixelImage, StrokeOptions, Svg,
-  TextCommand, Vertex, VertexBuffers, color::ColorFilterMatrix, font_db::Face,
+  GlyphId, GlyphRasterSource, LineCap, LineJoin, PaintCommand, PaintPath, PaintPathAction,
+  PainterBackend, PaintingStyle, PathCommand, PathKind, PixelImage, RasterBitmapFormat,
+  StrokeOptions, Svg, TextCommand, Vertex, VertexBuffers, color::ColorFilterMatrix,
 };
 
 use crate::{
@@ -25,6 +26,14 @@ mod textures_mgr;
 use textures_mgr::*;
 
 type RasterImageGlyphs = HashMap<(FaceId, u16, u16), Option<(Resource<PixelImage>, Point)>>;
+
+struct GlyphDrawCtx<'a, T> {
+  glyph_provider: &'a dyn GlyphRasterSource,
+  brush: &'a CommandBrush,
+  text_matrix: &'a Transform,
+  output_tex_size: DeviceSize,
+  output: &'a mut T,
+}
 
 pub struct GPUBackend<Impl: GPUBackendImpl> {
   gpu_impl: Impl,
@@ -49,7 +58,6 @@ pub struct GPUBackend<Impl: GPUBackendImpl> {
   surface_color: Option<Color>,
   frame_no: u64,
   raster_image_glyphs: RasterImageGlyphs,
-  outline_glyphs: HashMap<(FaceId, u16), Option<Resource<Path>>>,
   svg_glyphs: HashMap<(FaceId, u16), Option<Svg>>,
 }
 
@@ -117,7 +125,7 @@ where
 
   fn draw_commands(
     &mut self, viewport: DeviceRect, commands: &[PaintCommand], global_matrix: &Transform,
-    output: &mut Self::Texture, glyph_provider: &dyn GlyphProvider,
+    output: &mut Self::Texture, glyph_provider: &dyn GlyphRasterSource,
   ) {
     let clips = self.clip_layer_stack.len();
     self.viewport = viewport;
@@ -226,7 +234,6 @@ where
       surface_color: Some(Color::WHITE),
       frame_no: 0,
       raster_image_glyphs: <_>::default(),
-      outline_glyphs: <_>::default(),
       svg_glyphs: <_>::default(),
     }
   }
@@ -242,7 +249,7 @@ where
 
   fn draw_command(
     &mut self, cmd: &PaintCommand, global_matrix: &Transform, output_tex_size: DeviceSize,
-    output: &mut Impl::Texture, glyph_provider: &dyn GlyphProvider,
+    output: &mut Impl::Texture, glyph_provider: &dyn GlyphRasterSource,
   ) {
     match cmd {
       PaintCommand::Path(cmd @ PathCommand { path, paint_bounds, transform, action }) => {
@@ -465,142 +472,138 @@ where
 
   fn draw_text_command(
     &mut self, text_cmd: &TextCommand, global_matrix: &Transform, output_tex_size: DeviceSize,
-    output: &mut Impl::Texture, glyph_provider: &dyn GlyphProvider,
+    output: &mut Impl::Texture, glyph_provider: &dyn GlyphRasterSource,
   ) {
     if self.skip_clip_cnt > 0 {
       return;
     }
 
     let text_matrix = text_cmd.transform.then(global_matrix);
-    let font_size = text_cmd.font_size;
+    for run in text_cmd.payload.runs.iter() {
+      let brush = run
+        .brush
+        .clone()
+        .map(|brush| {
+          let mut brush = CommandBrush::from(brush);
+          brush.apply_color_filter(&text_cmd.color_filter);
+          brush
+        })
+        .unwrap_or_else(|| text_cmd.default_brush.clone());
+      self.draw_payload_run(
+        glyph_provider,
+        run,
+        text_cmd.payload.origin_offset,
+        &brush,
+        &text_matrix,
+        output_tex_size,
+        output,
+      );
+    }
+  }
 
-    // Compute the physical pixel size from the combined transform.
-    let scale = text_matrix.m11.abs().max(text_matrix.m22.abs());
+  #[allow(clippy::too_many_arguments)]
+  fn draw_payload_run(
+    &mut self, glyph_provider: &dyn GlyphRasterSource, run: &ribir_painter::DrawGlyphRun,
+    origin_offset: Vector, brush: &CommandBrush, text_matrix: &Transform,
+    output_tex_size: DeviceSize, output: &mut Impl::Texture,
+  ) {
+    let mut ctx = GlyphDrawCtx { glyph_provider, brush, text_matrix, output_tex_size, output };
+    for glyph in run.glyphs.iter() {
+      self.draw_rasterized_glyph(
+        &mut ctx,
+        run.face_id,
+        glyph.glyph_id,
+        run.logical_font_size,
+        Point::new(
+          glyph.baseline_origin.x + origin_offset.x,
+          glyph.baseline_origin.y + origin_offset.y,
+        ),
+      );
+    }
+  }
+
+  fn draw_rasterized_glyph(
+    &mut self, ctx: &mut GlyphDrawCtx<'_, Impl::Texture>, face_id: FaceId, glyph_id: GlyphId,
+    font_size: f32, baseline_origin: Point,
+  ) {
+    let scale = ctx
+      .text_matrix
+      .m11
+      .abs()
+      .max(ctx.text_matrix.m22.abs());
     let physical_size = (font_size * scale).ceil().max(1.) as u16;
 
-    for glyph in text_cmd.glyphs.iter() {
-      let glyph_bounds = glyph.bounds();
-      let Some(face) = glyph_provider.get_face(glyph.face_id) else {
-        continue;
+    if let Some(svg) = self.glyph_svg_image(ctx.glyph_provider, face_id, glyph_id) {
+      let Some(metrics) = ctx.glyph_provider.face_metrics(face_id) else {
+        return;
       };
+      let unit = metrics.units_per_em as f32;
+      let grid_scale = metrics
+        .vertical_height
+        .map(|h| h / unit)
+        .unwrap_or(1.)
+        .max(1.);
+      let svg_size = svg.size();
+      let s = font_size.min(font_size) / svg_size.height.max(1.) / grid_scale;
+      let svg_matrix =
+        Transform::new(s, 0., 0., s, baseline_origin.x, baseline_origin.y - font_size)
+          .then(ctx.text_matrix);
 
-      if let Some(svg) = self.glyph_svg_image(glyph.face_id, &face, glyph.glyph_id) {
-        let unit = face.units_per_em() as f32;
-        let grid_scale = face
-          .vertical_height()
-          .map(|h| h as f32 / unit)
-          .unwrap_or(1.)
-          .max(1.);
-        let svg_size = svg.size();
-        let bound_size = glyph_bounds.size;
-        let s =
-          (bound_size.width / svg_size.width).min(bound_size.height / svg_size.height) / grid_scale;
-        let svg_matrix = Transform::new(s, 0., 0., s, glyph_bounds.min_x(), glyph_bounds.min_y())
-          .then(&text_matrix);
-
-        // SVG glyphs have their own fill; render as sub-commands.
-        let brush = ribir_painter::Brush::from(ribir_painter::Color::BLACK);
-        let commands = svg.commands(&brush, &brush);
-        for cmd in commands.iter() {
-          let cmd = match cmd.clone() {
-            PaintCommand::Path(mut path) => {
-              path.transform(&svg_matrix);
-              PaintCommand::Path(path)
-            }
-            other => other,
-          };
-          self.draw_command(&cmd, &Transform::identity(), output_tex_size, output, glyph_provider);
-        }
-      } else if let Some((image, offset)) =
-        self.glyph_raster_image(glyph.face_id, &face, glyph.glyph_id, physical_size)
-      {
-        let img_h = image.height() as f32;
-        let img_w = image.width() as f32;
-
-        let is_color = matches!(image.color_format(), ColorFormat::Rgba8);
-
-        if is_color {
-          // Color bitmap emoji.
-          // We use vertical centering rather than baseline+offset.y because
-          // `placement.top` has inconsistent semantics across formats:
-          //   - CBDT/CBLC: bearingY (distance from baseline to top, Y-up)
-          //   - sbix:      originOffsetY (distance from glyph origin to *bottom* of
-          //     bitmap)
-          // Centering within the line box is the most reliable heuristic.
-          // `offset.x` (placement.left) is reliable in both formats, so we use it for X.
-          let img_size_px = physical_size as f32;
-          let s = font_size / img_size_px;
-          let dst_h = img_h * s;
-          let draw_x = glyph_bounds.min_x() + offset.x * s;
-          let draw_y = glyph_bounds.min_y() + (font_size - dst_h) / 2.0;
-          let dst_size = ribir_geom::Size::new(img_w * s, dst_h);
-          let dst_rect = ribir_geom::Rect::new(Point::new(draw_x, draw_y), dst_size);
-
-          // Compute the image's own transform: place at dst_rect within the text's
-          // coordinate space.
-          let img_matrix = Transform::new(
-            dst_rect.width() / img_w,
-            0.,
-            0.,
-            dst_rect.height() / img_h,
-            dst_rect.min_x(),
-            dst_rect.min_y(),
-          )
-          .then(&text_matrix);
-
-          self.draw_color_bitmap_glyph(&image, &img_matrix, output_tex_size, output);
-        } else {
-          // Alpha-channel bitmap glyph.
-          // swash renders these with Origin::BottomLeft, so placement.top is the
-          // distance from the baseline to the top of the image (Y-up). We convert:
-          //   offset.y = -placement.top  →  draw_y = baseline + offset.y * s
-          let img_size_px = physical_size as f32;
-          let s = font_size / img_size_px;
-          let baseline_y = glyph_bounds.min_y() + font_size;
-          let draw_x = glyph_bounds.min_x() + offset.x * s;
-          let draw_y = baseline_y + offset.y * s;
-
-          let glyph_matrix = Transform::new(s, 0., 0., s, draw_x, draw_y).then(&text_matrix);
-
-          // Create a path command for the alpha bitmap
-          let path = PaintPath::PixelImage(image);
-          let p_bounds = path.bounds(None);
-          let device_bounds = transform_to_device_rect(&p_bounds, &glyph_matrix);
-
-          if self
-            .viewport()
-            .intersection(&device_bounds)
-            .is_some()
-          {
-            let path_cmd = PathCommand {
-              path,
-              paint_bounds: glyph_matrix.outer_transformed_rect(&p_bounds),
-              transform: glyph_matrix,
-              action: PaintPathAction::Paint {
-                brush: text_cmd.brush.clone(),
-                painting_style: PaintingStyle::Fill,
-              },
-            };
-            let cmd = PaintCommand::Path(path_cmd);
-            self.draw_command(
-              &cmd,
-              &Transform::identity(),
-              output_tex_size,
-              output,
-              glyph_provider,
-            );
+      let brush = ribir_painter::Brush::from(ribir_painter::Color::BLACK);
+      let commands = svg.commands(&brush, &brush);
+      for cmd in commands.iter() {
+        let cmd = match cmd.clone() {
+          PaintCommand::Path(mut path) => {
+            path.transform(&svg_matrix);
+            PaintCommand::Path(path)
           }
-        }
-      } else if let Some(path) = self.outline_glyph(glyph.face_id, &face, glyph.glyph_id) {
-        let unit = face.units_per_em() as f32;
-        let s = font_size / unit;
-        let outline_matrix =
-          Transform::new(s, 0., 0., -s, glyph_bounds.min_x(), glyph_bounds.min_y())
-            .pre_translate(ribir_geom::Vector::new(0., -unit))
-            .then(&text_matrix);
+          other => other,
+        };
+        self.draw_command(
+          &cmd,
+          &Transform::identity(),
+          ctx.output_tex_size,
+          ctx.output,
+          ctx.glyph_provider,
+        );
+      }
+      return;
+    }
 
+    if let Some((image, offset)) =
+      self.glyph_raster_image(ctx.glyph_provider, face_id, glyph_id, physical_size)
+    {
+      let img_h = image.height() as f32;
+      let img_w = image.width() as f32;
+      let is_color = matches!(image.color_format(), ColorFormat::Rgba8);
+
+      if is_color {
+        let img_size_px = physical_size as f32;
+        let s = font_size / img_size_px;
+        let dst_h = img_h * s;
+        let draw_x = baseline_origin.x + offset.x * s;
+        let draw_y = baseline_origin.y + offset.y * s;
+        let dst_size = ribir_geom::Size::new(img_w * s, dst_h);
+        let dst_rect = ribir_geom::Rect::new(Point::new(draw_x, draw_y), dst_size);
+        let img_matrix = Transform::new(
+          dst_rect.width() / img_w,
+          0.,
+          0.,
+          dst_rect.height() / img_h,
+          dst_rect.min_x(),
+          dst_rect.min_y(),
+        )
+        .then(ctx.text_matrix);
+        self.draw_color_bitmap_glyph(&image, &img_matrix, ctx.output_tex_size, ctx.output);
+      } else {
+        let img_size_px = physical_size as f32;
+        let s = font_size / img_size_px;
+        let draw_x = baseline_origin.x + offset.x * s;
+        let draw_y = baseline_origin.y + offset.y * s;
+        let glyph_matrix = Transform::new(s, 0., 0., s, draw_x, draw_y).then(ctx.text_matrix);
+        let path = PaintPath::PixelImage(image);
         let p_bounds = path.bounds(None);
-        let device_bounds = transform_to_device_rect(&p_bounds, &outline_matrix);
+        let device_bounds = transform_to_device_rect(&p_bounds, &glyph_matrix);
 
         if self
           .viewport()
@@ -608,51 +611,64 @@ where
           .is_some()
         {
           let path_cmd = PathCommand {
-            path: PaintPath::Share(path),
-            paint_bounds: outline_matrix.outer_transformed_rect(&p_bounds),
-            transform: outline_matrix,
+            path,
+            paint_bounds: glyph_matrix.outer_transformed_rect(&p_bounds),
+            transform: glyph_matrix,
             action: PaintPathAction::Paint {
-              brush: text_cmd.brush.clone(),
+              brush: ctx.brush.clone(),
               painting_style: PaintingStyle::Fill,
             },
           };
           let cmd = PaintCommand::Path(path_cmd);
-          self.draw_command(&cmd, &Transform::identity(), output_tex_size, output, glyph_provider);
+          self.draw_command(
+            &cmd,
+            &Transform::identity(),
+            ctx.output_tex_size,
+            ctx.output,
+            ctx.glyph_provider,
+          );
         }
       }
     }
   }
 
   fn glyph_raster_image(
-    &mut self, face_id: ribir_painter::FaceId, face: &Face, glyph_id: GlyphId, img_size: u16,
+    &mut self, glyph_provider: &dyn GlyphRasterSource, face_id: ribir_painter::FaceId,
+    glyph_id: GlyphId, img_size: u16,
   ) -> Option<(ribir_algo::Resource<PixelImage>, Point)> {
     let key = (face_id, glyph_id.0, img_size);
     self
       .raster_image_glyphs
       .entry(key)
-      .or_insert_with(|| face.glyph_raster_image(glyph_id.0, img_size))
-      .clone()
-  }
-
-  fn outline_glyph(
-    &mut self, face_id: ribir_painter::FaceId, face: &Face, glyph_id: GlyphId,
-  ) -> Option<ribir_algo::Resource<ribir_painter::Path>> {
-    let key = (face_id, glyph_id.0);
-    self
-      .outline_glyphs
-      .entry(key)
-      .or_insert_with(|| face.outline_glyph(glyph_id.0))
+      .or_insert_with(|| {
+        glyph_provider
+          .raster_bitmap(face_id, glyph_id, img_size)
+          .map(|bitmap| {
+            let format = match bitmap.format {
+              RasterBitmapFormat::Rgba8 => ColorFormat::Rgba8,
+              RasterBitmapFormat::Alpha8 => ColorFormat::Alpha8,
+            };
+            let image =
+              PixelImage::new(Cow::Owned(bitmap.data), bitmap.width, bitmap.height, format);
+            (Resource::new(image), bitmap.placement)
+          })
+      })
       .clone()
   }
 
   fn glyph_svg_image(
-    &mut self, face_id: ribir_painter::FaceId, face: &Face, glyph_id: GlyphId,
+    &mut self, glyph_provider: &dyn GlyphRasterSource, face_id: ribir_painter::FaceId,
+    glyph_id: GlyphId,
   ) -> Option<ribir_painter::Svg> {
     let key = (face_id, glyph_id.0);
     self
       .svg_glyphs
       .entry(key)
-      .or_insert_with(|| face.glyph_svg_image(glyph_id.0))
+      .or_insert_with(|| {
+        glyph_provider
+          .raster_svg(face_id, glyph_id)
+          .and_then(|svg| Svg::parse_from_bytes(svg.as_bytes(), true, false).ok())
+      })
       .clone()
   }
 

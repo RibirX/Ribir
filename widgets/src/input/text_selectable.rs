@@ -86,10 +86,10 @@ impl<T: VisualText + Clone + 'static> Compose for TextSelectable<T> {
           if let Some(caret) = caret {
             let mut selection = $write(selection);
             if e.with_shift_key() {
-              selection.to = CaretPosition{ cluster: caret.cluster, position: None };
+              selection.to = caret;
             } else {
-              selection.from = CaretPosition{ cluster: caret.cluster, position: None };
-              selection.to = CaretPosition{ cluster: caret.cluster, position: None };
+              selection.from = caret;
+              selection.to = caret;
             }
           }
         },
@@ -101,8 +101,8 @@ impl<T: VisualText + Clone + 'static> Compose for TextSelectable<T> {
           if let Some(caret) = caret {
             let rg = this.text().select_token(caret.cluster);
             let mut selection = $write(selection);
-            selection.from = CaretPosition{ cluster: rg.start, position: None };
-            selection.to = CaretPosition{ cluster: rg.end, position: None };
+            selection.from = CaretPosition::new(rg.start);
+            selection.to = CaretPosition::new(rg.end);
           }
         },
         @Stack {
@@ -166,7 +166,7 @@ impl<T: BaseText> TextSelectable<T> {
           if rg.start == cur_sel.to.cluster && cur_sel.to.cluster > 1 {
             rg = text.text().select_token(cur_sel.to.cluster - 1);
           }
-          CaretPosition { cluster: rg.start, position: None }
+          CaretPosition::new(rg.start)
         } else if event.with_command_key() {
           glyphs.line_begin(cur_sel.to)
         } else {
@@ -179,7 +179,7 @@ impl<T: BaseText> TextSelectable<T> {
           if rg.end == cur_sel.to.cluster {
             rg = text.text().select_token(cur_sel.to.cluster + 1);
           }
-          CaretPosition { cluster: rg.end, position: None }
+          CaretPosition::new(rg.end)
         } else if event.with_command_key() {
           glyphs.line_end(cur_sel.to)
         } else {
@@ -215,10 +215,8 @@ impl<T: BaseText> TextSelectable<T> {
       }
       PhysicalKey::Code(KeyCode::KeyA) => {
         if text.len() > 0 {
-          let selection = Selection {
-            from: CaretPosition { cluster: 0, position: None },
-            to: CaretPosition { cluster: text.len(), position: None },
-          };
+          let selection =
+            Selection { from: CaretPosition::new(0), to: CaretPosition::new(text.len()) };
           Ok(Some(selection))
         } else {
           Ok(None)

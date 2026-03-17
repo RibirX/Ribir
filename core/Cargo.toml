@@ -27,6 +27,7 @@ ribir_algo = { workspace = true }
 ribir_geom = { workspace = true }
 ribir_macros = { workspace = true }
 ribir_painter = { workspace = true }
+ribir_text = { workspace = true }
 image-webp.workspace = true
 rxrust.workspace = true
 smallvec.workspace = true

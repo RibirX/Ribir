@@ -7,9 +7,11 @@
 
 mod painting_style;
 use std::ops::DerefMut;
+use crate::text::LineHeight;
 pub mod reuse;
 pub use reuse::*;
 pub mod reuse_scope;
+
 pub use painting_style::*;
 mod text_align;
 pub use reuse_scope::*;
@@ -678,7 +680,7 @@ impl<T> FatObj<T> {
 
   /// Initializes the text line height of this widget.
   pub fn with_text_line_height<K: ?Sized>(
-    &mut self, v: impl RInto<PipeValue<f32>, K>,
+    &mut self, v: impl RInto<PipeValue<LineHeight>, K>,
   ) -> &mut Self {
     init_text_style!(self, line_height, v)
   }
@@ -1177,9 +1179,9 @@ impl<T> FatObj<T> {
   }
 
   /// Returns a state writer for modifying line height (leading).
-  /// Controls vertical spacing between lines of text (multiplier relative to
-  /// font size).
-  pub fn text_line_height(&mut self) -> impl StateWriter<Value = f32> + use<T> {
+  /// Supports relative and absolute semantics. Passing a bare `f32`
+  /// keeps the existing absolute-length behavior.
+  pub fn text_line_height(&mut self) -> impl StateWriter<Value = LineHeight> + use<T> {
     let style = self.text_style_widget();
     part_writer!(&mut style.text_style.line_height)
   }
