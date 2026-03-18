@@ -23,3 +23,10 @@ Cargo.lock
 **/.log/**
 /test_cases/**/*_actual.png
 /test_cases/**/*_diff.png
+
+# Agent configurations
+.gemini/
+.claude/
+.claude.json
+*.skill
+.env

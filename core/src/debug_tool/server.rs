@@ -886,9 +886,9 @@ fn resolve_widget_id_by_debug_name(tree: &WidgetTree, name: &str) -> Option<Widg
   while let Some(node) = stack.pop() {
     if let Some(label) = node
       .query_ref::<OriginWidgetName>(tree)
-      .map(|n| n.0)
+      .map(|n| n.0.clone())
     {
-      if label == name {
+      if &*label == name {
         return Some(node);
       }
     } else if let Some(render) = node.get(tree) {

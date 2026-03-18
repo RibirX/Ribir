@@ -138,7 +138,7 @@ use crate::prelude::*;
 pub struct FatObj<T> {
   host: T,
   #[cfg(feature = "debug")]
-  debug_name: Option<&'static str>,
+  debug_name: Option<CowArc<str>>,
   track_id: Option<Stateful<TrackWidgetId>>,
   class: Option<Stateful<Class>>,
   padding: Option<Stateful<Padding>>,
@@ -962,10 +962,10 @@ impl<T> FatObj<T> {
   ///   }
   /// };
   /// ```
-  pub fn with_debug_name(&mut self, _name: &'static str) -> &mut Self {
+  pub fn with_debug_name(&mut self, _name: impl Into<CowArc<str>>) -> &mut Self {
     #[cfg(feature = "debug")]
     {
-      self.debug_name = Some(_name);
+      self.debug_name = Some(_name.into());
     }
     self
   }

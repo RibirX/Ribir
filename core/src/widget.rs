@@ -281,7 +281,8 @@ impl<'w> Widget<'w> {
   pub fn attach_debug_name<T: ?Sized>(self) -> Self { self }
 
   #[cfg(feature = "debug")]
-  pub fn attach_debug_name_value(self, name: &'static str) -> Self {
+  pub fn attach_debug_name_value(self, name: impl Into<CowArc<str>>) -> Self {
+    let name = name.into();
     if name.trim().is_empty() {
       self
     } else {
