@@ -10,8 +10,6 @@ mod lerp;
 pub use lerp::Lerp;
 mod animate_state;
 pub use animate_state::*;
-mod stagger;
-pub use stagger::Stagger;
 
 use crate::{state::StateWatcher, window::WindowId};
 
@@ -30,10 +28,28 @@ pub trait Animation {
   /// If an animation is created outside of a valid `BuildCtx`, use this
   /// function to explicitly initialize the window.
   fn init_window(&self, _window_id: WindowId) {}
+  /// Return the bound target window if the animation has one.
+  fn window_id(&self) -> Option<WindowId> { None }
   /// Clone the animation as a trait object.
   fn dyn_clone(&self) -> Box<dyn Animation>;
 }
 
 impl Clone for Box<dyn Animation> {
   fn clone(&self) -> Self { self.dyn_clone() }
+}
+
+/// Convert an animation handle into a boxed trait object.
+pub trait IntoAnimation {
+  fn into_animation(self) -> Box<dyn Animation>;
+}
+
+impl<T> IntoAnimation for T
+where
+  T: Animation + 'static,
+{
+  fn into_animation(self) -> Box<dyn Animation> { Box::new(self) }
+}
+
+impl IntoAnimation for Box<dyn Animation> {
+  fn into_animation(self) -> Box<dyn Animation> { self }
 }
