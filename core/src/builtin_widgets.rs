@@ -71,8 +71,7 @@ pub use focus_scope::*;
 
 pub mod anchor;
 pub use anchor::*;
-pub mod follow;
-pub use follow::*;
+
 pub mod mix_builtin;
 pub use mix_builtin::*;
 pub mod container;
@@ -90,6 +89,8 @@ pub use fixed_size::*;
 
 mod track_widget_id;
 pub use track_widget_id::*;
+mod follow;
+pub use follow::*;
 mod text;
 pub use text::*;
 mod tooltip;

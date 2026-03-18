@@ -85,12 +85,32 @@ macro_rules! impl_event_callback {
   ($this:ident, $listen_type:ident, $event_name:ident, $event_ty:ty, $handler:ident) => {{
     $this.silent_mark(MixFlags::$listen_type);
     let mut handler = $handler;
-    let _ = $this.subject().subscribe(move |e: &mut Event| {
-      if let Event::$event_name(inner) = e {
-        handler(inner);
-      }
-    });
+    let _ = $this
+      .subject()
+      .filter(|e| !e.is_prevent_default())
+      .subscribe(move |e: &mut Event| {
+        if let Event::$event_name(inner) = e {
+          handler(inner);
+        }
+      });
 
+    $this
+  }};
+}
+
+macro_rules! lifecycle_once_handler {
+  ($this:ident, $event_name:ident, $event_ty:ty, $handler:ident) => {{
+    $this.silent_mark(MixFlags::Lifecycle);
+    let mut handler = life_fn_once_to_fn_mut($handler);
+    $this
+      .subject()
+      .filter(|e| !e.is_prevent_default() && matches!(e, Event::$event_name(_)))
+      .first()
+      .subscribe(move |e: &mut Event| {
+        if let Event::$event_name(inner) = e {
+          handler(inner);
+        }
+      });
     $this
   }};
 }
@@ -189,25 +209,15 @@ impl MixBuiltin {
   /// Listen to all events
   pub fn on_event(&self, handler: impl FnMut(&mut Event) + 'static) -> &Self {
     self.silent_mark(MixFlags::AllListeners);
-    let _ = self.subject().subscribe(handler);
+    let _ = self
+      .subject()
+      .filter(|e| !e.is_prevent_default())
+      .subscribe(handler);
     self
   }
 
   pub fn on_mounted(&self, handler: impl FnOnce(&mut LifecycleEvent) + 'static) -> &Self {
-    self.silent_mark(MixFlags::Lifecycle);
-
-    let mut handler = life_fn_once_to_fn_mut(handler);
-    self
-      .subject()
-      .filter(|e| matches!(e, Event::Mounted(_)))
-      .first()
-      .subscribe(move |e: &mut Event| {
-        if let Event::Mounted(inner) = e {
-          handler(inner);
-        }
-      });
-
-    self
+    lifecycle_once_handler!(self, Mounted, LifecycleEvent, handler)
   }
 
   pub fn on_performed_layout(&self, handler: impl FnMut(&mut LifecycleEvent) + 'static) -> &Self {
@@ -215,37 +225,11 @@ impl MixBuiltin {
   }
 
   pub fn on_disposing(&self, handler: impl FnOnce(&mut DisposingEvent) + 'static) -> &Self {
-    self.silent_mark(MixFlags::Lifecycle);
-
-    let mut handler = life_fn_once_to_fn_mut(handler);
-    self
-      .subject()
-      .filter(|e| matches!(e, Event::Disposing(_)))
-      .first()
-      .subscribe(move |e: &mut Event| {
-        if let Event::Disposing(inner) = e {
-          handler(inner);
-        }
-      });
-
-    self
+    lifecycle_once_handler!(self, Disposing, DisposingEvent, handler)
   }
 
   pub fn on_disposed(&self, handler: impl FnOnce(&mut DisposedEvent) + 'static) -> &Self {
-    self.silent_mark(MixFlags::Lifecycle);
-
-    let mut handler = life_fn_once_to_fn_mut(handler);
-    self
-      .subject()
-      .filter(|e| matches!(e, Event::Disposed(_)))
-      .first()
-      .subscribe(move |e: &mut Event| {
-        if let Event::Disposed(inner) = e {
-          handler(inner);
-        }
-      });
-
-    self
+    lifecycle_once_handler!(self, Disposed, DisposedEvent, handler)
   }
 
   pub fn on_pointer_down(&self, handler: impl FnMut(&mut PointerEvent) + 'static) -> &Self {
@@ -335,11 +319,14 @@ impl MixBuiltin {
     self.silent_mark(MixFlags::Pointer);
     let mut map_filter = x_times_tap_map_filter(times, dur, capture);
     let mut handler = handler;
-    self.subject().subscribe(move |e: &mut Event| {
-      if let Some(e) = map_filter(e) {
-        handler(e);
-      }
-    });
+    self
+      .subject()
+      .filter(|e| !e.is_prevent_default())
+      .subscribe(move |e: &mut Event| {
+        if let Some(e) = map_filter(e) {
+          handler(e);
+        }
+      });
     self
   }
 
@@ -377,47 +364,24 @@ impl MixBuiltin {
 
   pub fn on_action(&self, handler: impl FnMut(&mut Event) + 'static) -> &Self {
     self.silent_mark(MixFlags::Pointer | MixFlags::KeyBoard);
+    let mut handler = handler;
+    let _ = self
+      .subject()
+      .filter(|e| !e.is_prevent_default())
+      .subscribe(move |e: &mut Event| {
+        let is_action = match e {
+          Event::Tap(_) => true,
+          Event::KeyDown(k) => {
+            matches!(k.key(), VirtualKey::Named(NamedKey::Enter)) && !k.is_repeat()
+          }
+          Event::KeyUp(k) => matches!(k.key(), VirtualKey::Named(NamedKey::Space)),
+          _ => false,
+        };
 
-    let handler = Rc::new(RefCell::new(handler));
-
-    let sub_tap = {
-      let h = handler.clone();
-      self.subject().subscribe(move |e: &mut Event| {
-        if let Event::Tap(_) = e {
-          (h.borrow_mut())(e);
+        if is_action {
+          handler(e);
         }
-      })
-    };
-
-    let sub_key_down = {
-      let h = handler.clone();
-      self.subject().subscribe(move |e: &mut Event| {
-        if let Event::KeyDown(k) = e
-          && matches!(k.key(), VirtualKey::Named(NamedKey::Enter))
-          && !k.is_repeat()
-        {
-          (h.borrow_mut())(e);
-        }
-      })
-    };
-
-    let sub_key_up = {
-      let h = handler;
-      self.subject().subscribe(move |e: &mut Event| {
-        if let Event::KeyUp(k) = e
-          && matches!(k.key(), VirtualKey::Named(NamedKey::Space))
-        {
-          (h.borrow_mut())(e);
-        }
-      })
-    };
-
-    self.on_disposed(move |_| {
-      sub_tap.unsubscribe();
-      sub_key_down.unsubscribe();
-      sub_key_up.unsubscribe();
-    });
-
+      });
     self
   }
 
@@ -693,6 +657,10 @@ impl Clone for FocusHandle {
 
 #[cfg(test)]
 mod tests {
+  use std::ptr::NonNull;
+
+  use winit::event::ElementState;
+
   use super::*;
   use crate::{reset_test_env, test_helper::*};
 
@@ -735,5 +703,140 @@ mod tests {
 
     assert_eq!(mix.focus_changed_reason(), FocusReason::Pointer);
     assert_eq!(mix.tab_index(), Some(-10));
+  }
+
+  #[test]
+  fn prevent_default_stops_later_typed_and_raw_callbacks_in_same_mix() {
+    reset_test_env!();
+
+    let typed_calls = Stateful::new(0);
+    let raw_calls = Stateful::new(0);
+    let typed_calls_reader = typed_calls.clone_reader();
+    let raw_calls_reader = raw_calls.clone_reader();
+    let typed_calls_writer = typed_calls.clone_writer();
+    let typed_calls_writer2 = typed_calls.clone_writer();
+    let raw_calls_writer = raw_calls.clone_writer();
+
+    let wnd = TestWindow::from_widget(fn_widget! { @MockBox { size: Size::zero() } });
+    wnd.draw_frame();
+
+    let mix = MixBuiltin::default();
+    mix.on_mounted(move |e| {
+      *typed_calls_writer.write() += 1;
+      e.prevent_default();
+    });
+    mix.on_mounted(move |_| *typed_calls_writer2.write() += 10);
+    mix.on_event(move |e| {
+      if matches!(e, Event::Mounted(_)) {
+        *raw_calls_writer.write() += 1;
+      }
+    });
+
+    let mut event = Event::Mounted(LifecycleEvent::new(wnd.root(), NonNull::from(wnd.tree())));
+    mix.dispatch(&mut event);
+
+    assert_eq!(*typed_calls_reader.read(), 1);
+    assert_eq!(*raw_calls_reader.read(), 0);
+  }
+
+  #[test]
+  fn prevent_default_from_raw_callback_stops_later_typed_callbacks_in_same_mix() {
+    reset_test_env!();
+
+    let raw_calls = Stateful::new(0);
+    let typed_calls = Stateful::new(0);
+    let raw_calls_reader = raw_calls.clone_reader();
+    let typed_calls_reader = typed_calls.clone_reader();
+    let raw_calls_writer = raw_calls.clone_writer();
+    let typed_calls_writer = typed_calls.clone_writer();
+
+    let wnd = TestWindow::from_widget(fn_widget! { @MockBox { size: Size::zero() } });
+    wnd.draw_frame();
+
+    let mix = MixBuiltin::default();
+    mix.on_event(move |e| {
+      if matches!(e, Event::Mounted(_)) {
+        *raw_calls_writer.write() += 1;
+        e.prevent_default();
+      }
+    });
+    mix.on_mounted(move |_| *typed_calls_writer.write() += 1);
+
+    let mut event = Event::Mounted(LifecycleEvent::new(wnd.root(), NonNull::from(wnd.tree())));
+    mix.dispatch(&mut event);
+
+    assert_eq!(*raw_calls_reader.read(), 1);
+    assert_eq!(*typed_calls_reader.read(), 0);
+  }
+
+  #[test]
+  fn on_action_only_reacts_to_tap_enter_and_space() {
+    reset_test_env!();
+
+    let actions = Stateful::new(Vec::<String>::new());
+
+    let wnd = TestWindow::new_with_size(
+      fn_widget! {
+        @MockBox {
+          size: Size::new(100., 100.),
+          auto_focus: true,
+          on_action: move |e| {
+            let action = match e {
+              Event::Tap(_) => "tap",
+              Event::KeyDown(_) => "enter",
+              Event::KeyUp(_) => "space",
+              _ => unreachable!(),
+            };
+            $write(actions).push(action.to_string());
+          },
+        }
+      },
+      Size::new(100., 100.),
+    );
+    wnd.draw_frame();
+
+    wnd.process_cursor_move(Point::new(50., 50.));
+    wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
+    wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
+    wnd.draw_frame();
+
+    wnd.process_keyboard_event(
+      PhysicalKey::Code(KeyCode::Enter),
+      VirtualKey::Named(NamedKey::Enter),
+      false,
+      KeyLocation::Standard,
+      ElementState::Pressed,
+    );
+    wnd.process_keyboard_event(
+      PhysicalKey::Code(KeyCode::Enter),
+      VirtualKey::Named(NamedKey::Enter),
+      true,
+      KeyLocation::Standard,
+      ElementState::Pressed,
+    );
+    wnd.process_keyboard_event(
+      PhysicalKey::Code(KeyCode::Space),
+      VirtualKey::Named(NamedKey::Space),
+      false,
+      KeyLocation::Standard,
+      ElementState::Pressed,
+    );
+    wnd.process_keyboard_event(
+      PhysicalKey::Code(KeyCode::Space),
+      VirtualKey::Named(NamedKey::Space),
+      false,
+      KeyLocation::Standard,
+      ElementState::Released,
+    );
+    wnd.process_keyboard_event(
+      PhysicalKey::Code(KeyCode::KeyA),
+      VirtualKey::Character("a".into()),
+      false,
+      KeyLocation::Standard,
+      ElementState::Pressed,
+    );
+    wnd.draw_frame();
+
+    assert_eq!(&*actions.read(), &["tap", "enter", "space"]);
   }
 }

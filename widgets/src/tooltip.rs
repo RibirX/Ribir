@@ -1,83 +1,150 @@
-use std::cell::RefCell;
-
 use ribir_core::prelude::*;
 
 use crate::overlay::{AutoClosePolicy, Overlay, OverlayStyle};
 
-pub fn default_tooltip_provider() -> Provider {
-  Provider::new(CustomTooltip(Box::new(compose_custom_tooltip)))
+class_names! {
+  #[doc = "Class name for the widgets tooltip presentation shell"]
+  TOOLTIP_SHELL,
 }
 
-struct OverlayTooltip {
-  overlay: Overlay,
-  wnd: Rc<Window>,
-  host: TrackId,
-  hovered: Box<dyn StateWatcher<Value = bool>>,
-}
+struct OverlayTooltip;
 
-impl OverlayTooltip {
-  fn new(tooltip: TextValue, wnd: Rc<Window>, host: TrackId) -> Self {
-    let mut root = FatObj::new(
-      follow! {
-        target: $clone(host),
-        x_align: AnchorX::center(),
-        y_align: AnchorY::above(),
-        @Text {
-          text: tooltip,
-          class: TOOLTIP,
-        }
-      }
-      .into_widget(),
-    );
-    let hovered = root.is_hovered().clone_boxed_watcher();
-    let tooltip = Reusable::new(root.into_widget());
+impl CustomTooltip for OverlayTooltip {
+  fn spawn_bubble(
+    &self, bubble: Widget<'static>, visible: Stateful<bool>, host_track: TrackId,
+  ) -> Box<dyn FnOnce()> {
+    let reusable = Reusable::new(bubble);
     let overlay = Overlay::new(
-      move || tooltip.get_widget(),
+      move || {
+        let reusable = reusable.clone();
+        class! { class: TOOLTIP_SHELL, @ { reusable.get_widget() } }
+      },
       OverlayStyle { auto_close_policy: AutoClosePolicy::NOT_AUTO_CLOSE, mask: None },
     );
-    Self { overlay, wnd, host, hovered }
-  }
 
-  fn hovered_watcher(&self) -> Box<dyn StateWatcher<Value = bool>> {
-    self.hovered.clone_boxed_watcher()
+    let sub = watch!(*$read(visible))
+      .distinct_until_changed()
+      .subscribe({
+        let overlay = overlay.clone();
+        let wnd = BuildCtx::get().window();
+        move |visible| {
+          if visible && host_track.get().is_some() {
+            overlay.show(wnd.clone());
+          } else {
+            overlay.close();
+          }
+        }
+      });
+
+    Box::new(move || {
+      overlay.close();
+      sub.unsubscribe();
+    })
   }
 }
 
-impl TooltipControl for OverlayTooltip {
-  fn show(&mut self) {
-    if self.host.get().is_some() {
-      tracing::trace!(target = ?self.host.get(), "showing overlay tooltip");
-      self.overlay.show(self.wnd.clone());
-    } else {
-      tracing::trace!("tooltip show requested after host was disposed; closing overlay");
-      self.overlay.close();
-    }
-  }
-
-  fn hide(&mut self) {
-    tracing::trace!("hiding overlay tooltip");
-    self.overlay.close();
-  }
-
-  fn is_showing(&self) -> bool { self.overlay.is_showing() }
-}
-
-fn compose_custom_tooltip<'c>(
-  child: Widget<'c>, text: TextValue,
-) -> (Widget<'c>, Box<dyn TooltipControl>) {
-  let mut child = FatObj::new(child);
-  let wnd = BuildCtx::get().window();
-  let control = Rc::new(RefCell::new(OverlayTooltip::new(text, wnd, child.track_id())));
-  let tooltip_hovered = control.borrow().hovered_watcher();
-  let child = Tooltip::bind_hover_focus_with_tooltip(child, tooltip_hovered, control.clone());
-  (child, Box::new(control))
+pub fn default_tooltip_provider() -> Provider {
+  Provider::new(Box::new(OverlayTooltip) as Box<dyn CustomTooltip>)
 }
 
 #[cfg(test)]
 mod tests {
-  use ribir_core::{reset_test_env, test_helper::*};
+  use ribir_core::{reset_test_env, test_helper::*, window::WindowFlags};
 
   use super::*;
+  use crate::prelude::{AnimatedPresence, Interruption, cases};
+
+  const TOOLTIP_SHOW_DELAY: Duration = Duration::from_millis(500);
+  const TOOLTIP_HIDE_DELAY: Duration = Duration::from_millis(150);
+  const HOST_POINT: Point = Point::new(10., 10.);
+  const OUTSIDE_POINT: Point = Point::new(100., 70.);
+  const OFFSET_HOST_POINT: Point = Point::new(110., 90.);
+
+  fn wait_for_tooltip_show_delay() {
+    AppCtx::run_until(AppCtx::timer(TOOLTIP_SHOW_DELAY + Duration::from_millis(20)));
+    AppCtx::run_until_stalled();
+  }
+
+  fn wait_for_tooltip_hide_delay() {
+    AppCtx::run_until(AppCtx::timer(TOOLTIP_HIDE_DELAY + Duration::from_millis(20)));
+    AppCtx::run_until_stalled();
+  }
+
+  fn wait_for(duration: Duration) {
+    AppCtx::run_until(AppCtx::timer(duration));
+    AppCtx::run_until_stalled();
+  }
+
+  fn root_children_count(wnd: &TestWindow) -> usize { wnd.children_count(wnd.root()) }
+
+  fn move_cursor_and_draw(wnd: &TestWindow, point: Point) {
+    wnd.process_cursor_move(point);
+    wnd.draw_frame();
+  }
+
+  fn hover_and_show(wnd: &TestWindow, point: Point) -> usize {
+    move_cursor_and_draw(wnd, point);
+    wait_for_tooltip_show_delay();
+    wnd.draw_frame();
+    root_children_count(wnd)
+  }
+
+  fn overlay_root(wnd: &TestWindow) -> WidgetId {
+    wnd
+      .children(wnd.root())
+      .last()
+      .expect("overlay tooltip should be mounted at window root")
+  }
+
+  fn overlay_rect(wnd: &TestWindow) -> (Point, Size) {
+    let overlay_root = overlay_root(wnd);
+    let pos = wnd
+      .widget_pos(overlay_root)
+      .expect("overlay tooltip should have a layout position");
+    let size = wnd
+      .widget_size(overlay_root)
+      .expect("overlay tooltip should have a layout size");
+    (pos, size)
+  }
+
+  fn overlay_center_global(wnd: &TestWindow) -> Point {
+    let overlay_root = overlay_root(wnd);
+    let global = wnd.map_to_global(Point::zero(), overlay_root);
+    let size = wnd
+      .widget_size(overlay_root)
+      .expect("overlay tooltip should have a layout size");
+    Point::new(global.x + size.width / 2., global.y + size.height / 2.)
+  }
+
+  fn install_animated_tooltip_shell_theme() {
+    let mut theme = Theme::default();
+    theme.classes.insert(TOOLTIP_SHELL, |w| {
+      fn_widget! {
+        let mut w = FatObj::new(w);
+        let opacity = w.opacity();
+
+        @AnimatedPresence {
+          cases: cases! {
+            state: opacity,
+            true => 1.0,
+            false => 0.0,
+          },
+          enter: EasingTransition {
+            easing: easing::CubicBezierEasing::new(0., 0., 0.2, 1.),
+            duration: Duration::from_millis(150),
+          },
+          leave: EasingTransition {
+            easing: easing::CubicBezierEasing::new(0.4, 0., 1., 1.),
+            duration: Duration::from_millis(150),
+          },
+          interruption: Interruption::Fluid,
+          @ { w }
+        }
+      }
+      .into_widget()
+    });
+    AppCtx::set_app_theme(theme);
+  }
 
   #[test]
   fn custom_tooltip_provider_mounts_on_hover() {
@@ -97,63 +164,25 @@ mod tests {
     );
     wnd.draw_frame();
 
-    let before = wnd.children_count(wnd.root());
-    wnd.process_cursor_move(Point::new(10., 10.));
-    wnd.draw_frame();
-    let after = wnd.children_count(wnd.root());
+    let before = root_children_count(&wnd);
+    let shown = hover_and_show(&wnd, HOST_POINT);
 
-    assert!(after > before, "custom tooltip should mount overlay content when hovered");
+    assert!(shown > before, "custom tooltip should mount overlay content when hovered");
 
-    wnd.process_cursor_move(Point::new(100., 70.));
+    move_cursor_and_draw(&wnd, OUTSIDE_POINT);
+    assert_eq!(root_children_count(&wnd), shown);
+    wait_for_tooltip_hide_delay();
     wnd.draw_frame();
-    assert_eq!(wnd.children_count(wnd.root()), before);
+    assert_eq!(root_children_count(&wnd), before);
   }
 
   #[test]
-  fn custom_tooltip_keeps_overlay_mounted_while_text_changes() {
+  fn custom_tooltip_provider_supports_widget_content() {
     reset_test_env!();
 
-    let (tooltip_text, tooltip_text_writer) = split_value(String::new());
-    let wnd = TestWindow::new_with_size(
-      fn_widget! {
-        @Providers {
-          providers: [default_tooltip_provider()],
-          @MockBox {
-            size: Size::new(40., 20.),
-            tooltip: pipe!($read(tooltip_text).clone()),
-          }
-        }
-      },
-      Size::new(120., 80.),
-    );
-    wnd.draw_frame();
-
-    let before = wnd.children_count(wnd.root());
-    wnd.process_cursor_move(Point::new(10., 10.));
-    wnd.draw_frame();
-    let shown = wnd.children_count(wnd.root());
-
-    assert!(shown > before, "custom tooltip should show even when text starts empty");
-
-    *tooltip_text_writer.write() = "tip".into();
-    wnd.draw_frame();
-    assert_eq!(wnd.children_count(wnd.root()), shown);
-
-    wnd.process_cursor_move(Point::new(100., 70.));
-    wnd.draw_frame();
-    assert_eq!(wnd.children_count(wnd.root()), before);
-
-    *tooltip_text_writer.write() = "tip 2".into();
-    wnd.process_cursor_move(Point::new(10., 10.));
-    wnd.draw_frame();
-    assert_eq!(wnd.children_count(wnd.root()), shown);
-  }
-
-  #[test]
-  fn custom_tooltip_provider_supports_manual_control() {
-    reset_test_env!();
-
-    let tooltip = Tooltip::new("tip");
+    let tooltip = Tooltip::from_widget(fn_widget! {
+      @MockBox { size: Size::new(60., 24.) }
+    });
     let tooltip_in_widget = tooltip.clone();
     let wnd = TestWindow::new_with_size(
       fn_widget! {
@@ -162,26 +191,26 @@ mod tests {
           providers: [default_tooltip_provider()],
           @MockBox {
             size: Size::new(40., 20.),
-            tooltip: tooltip,
+            tooltip,
           }
         }
       },
-      Size::new(120., 80.),
+      Size::new(160., 120.),
     );
     wnd.draw_frame();
 
-    let before = wnd.children_count(wnd.root());
-    tooltip.show();
-    wnd.draw_frame();
-    let shown = wnd.children_count(wnd.root());
+    hover_and_show(&wnd, HOST_POINT);
 
-    assert!(shown > before, "manual show should mount overlay content");
-    assert!(tooltip.is_showing());
+    let overlay_root = overlay_root(&wnd);
+    let overlay_bubble = wnd
+      .children(overlay_root)
+      .last()
+      .unwrap_or(overlay_root);
+    let overlay_size = wnd
+      .widget_size(overlay_bubble)
+      .expect("overlay tooltip should have a layout size");
 
-    tooltip.hide();
-    wnd.draw_frame();
-    assert_eq!(wnd.children_count(wnd.root()), before);
-    assert!(!tooltip.is_showing());
+    assert_eq!(overlay_size, Size::new(60., 24.));
   }
 
   #[test]
@@ -204,23 +233,9 @@ mod tests {
     );
     wnd.draw_frame();
 
-    wnd.process_cursor_move(Point::new(110., 90.));
-    wnd.draw_frame();
+    hover_and_show(&wnd, OFFSET_HOST_POINT);
 
-    let overlay_root = wnd
-      .children(wnd.root())
-      .last()
-      .expect("overlay tooltip should be mounted at window root");
-    let overlay_bubble = wnd
-      .children(overlay_root)
-      .last()
-      .unwrap_or(overlay_root);
-    let overlay_size = wnd
-      .widget_size(overlay_bubble)
-      .expect("overlay tooltip should have a layout size");
-    let overlay_pos = wnd
-      .widget_pos(overlay_bubble)
-      .expect("overlay tooltip should have a layout position");
+    let (overlay_pos, overlay_size) = overlay_rect(&wnd);
 
     let host_center_x = 100. + 20.;
     let bubble_center_x = overlay_pos.x + overlay_size.width / 2.;
@@ -249,45 +264,31 @@ mod tests {
     );
     wnd.draw_frame();
 
-    let before = wnd.children_count(wnd.root());
-    wnd.process_cursor_move(Point::new(110., 90.));
-    wnd.draw_frame();
-    let shown = wnd.children_count(wnd.root());
+    let before = root_children_count(&wnd);
+    let shown = hover_and_show(&wnd, OFFSET_HOST_POINT);
     assert!(shown > before, "tooltip should mount while host is hovered");
 
-    let overlay_root = wnd
-      .children(wnd.root())
-      .last()
-      .expect("overlay tooltip should be mounted at window root");
-    let overlay_bubble = wnd
-      .children(overlay_root)
-      .last()
-      .unwrap_or(overlay_root);
-    let overlay_global_pos = wnd.map_to_global(Point::zero(), overlay_bubble);
-    let overlay_size = wnd
-      .widget_size(overlay_bubble)
-      .expect("overlay tooltip should have a layout size");
-
-    wnd.process_cursor_move(Point::new(
-      overlay_global_pos.x + overlay_size.width / 2.,
-      overlay_global_pos.y + overlay_size.height / 2.,
-    ));
+    wnd.process_cursor_move(overlay_center_global(&wnd));
     wnd.draw_frame();
 
     assert_eq!(
-      wnd.children_count(wnd.root()),
+      root_children_count(&wnd),
       shown,
       "moving onto tooltip content should keep tooltip visible"
     );
 
-    wnd.process_cursor_move(Point::new(10., 10.));
+    move_cursor_and_draw(&wnd, HOST_POINT);
+    assert_eq!(root_children_count(&wnd), shown);
+    wait_for_tooltip_hide_delay();
     wnd.draw_frame();
-    assert_eq!(wnd.children_count(wnd.root()), before);
+    assert_eq!(root_children_count(&wnd), before);
   }
 
   #[test]
-  fn custom_tooltip_repositions_correctly_on_second_show() {
+  fn custom_tooltip_survives_second_hover_with_material_shell() {
     reset_test_env!();
+
+    install_animated_tooltip_shell_theme();
 
     let wnd = TestWindow::new_with_size(
       fn_widget! {
@@ -305,35 +306,75 @@ mod tests {
     );
     wnd.draw_frame();
 
-    let bubble_rect = || {
-      let overlay_root = wnd
-        .children(wnd.root())
-        .last()
-        .expect("overlay tooltip should be mounted at window root");
-      let overlay_bubble = wnd
-        .children(overlay_root)
-        .last()
-        .unwrap_or(overlay_root);
-      let pos = wnd
-        .widget_pos(overlay_bubble)
-        .expect("overlay bubble should have position");
-      let size = wnd
-        .widget_size(overlay_bubble)
-        .expect("overlay bubble should have size");
-      (pos, size)
+    let before = root_children_count(&wnd);
+
+    for cycle in 0..2 {
+      let shown = hover_and_show(&wnd, OFFSET_HOST_POINT);
+      assert!(shown > before, "tooltip should mount in hover cycle {cycle}");
+
+      move_cursor_and_draw(&wnd, HOST_POINT);
+      wait_for_tooltip_hide_delay();
+      wnd.draw_frame();
+      assert_eq!(root_children_count(&wnd), before);
+    }
+  }
+
+  #[test]
+  fn custom_tooltip_leave_animation_keeps_bubble_pinned() {
+    reset_test_env!();
+
+    install_animated_tooltip_shell_theme();
+
+    let bubble_track = Stateful::new(None::<TrackId>);
+    let bubble_track_reader = bubble_track.clone_reader();
+    let wnd = TestWindow::new(
+      fn_widget! {
+        let mut bubble = @MockBox {
+          size: Size::new(60., 24.),
+        };
+        let bubble_id = bubble.track_id();
+        bubble.on_mounted(move |_| *$write(bubble_track) = Some($clone(bubble_id)));
+
+        @Providers {
+          providers: [default_tooltip_provider()],
+          @MockBox {
+            size: Size::new(40., 20.),
+            x: 100.,
+            y: 80.,
+            tooltip: Tooltip::from_widget(bubble),
+          }
+        }
+      },
+      Size::new(240., 200.),
+      WindowFlags::ANIMATIONS,
+    );
+    wnd.draw_frame();
+
+    let bubble_pos = || {
+      let bubble = bubble_track_reader
+        .read()
+        .clone()
+        .and_then(|track| track.get())
+        .expect("tooltip bubble should stay mounted while visible or leaving");
+      wnd.map_to_global(Point::zero(), bubble)
     };
 
-    wnd.process_cursor_move(Point::new(110., 90.));
-    wnd.draw_frame();
-    let (first_pos, first_size) = bubble_rect();
+    hover_and_show(&wnd, OFFSET_HOST_POINT);
+    let shown_pos = bubble_pos();
 
-    wnd.process_cursor_move(Point::new(10., 10.));
+    move_cursor_and_draw(&wnd, HOST_POINT);
+    wait_for_tooltip_hide_delay();
     wnd.draw_frame();
-    wnd.process_cursor_move(Point::new(110., 90.));
-    wnd.draw_frame();
-    let (second_pos, second_size) = bubble_rect();
 
-    assert_eq!(first_pos, second_pos);
-    assert_eq!(first_size, second_size);
+    let leave_start = bubble_pos();
+    assert_eq!(
+      leave_start, shown_pos,
+      "tooltip should start leave animation from its shown position"
+    );
+
+    wait_for(Duration::from_millis(60));
+    wnd.draw_frame();
+    let leave_mid = bubble_pos();
+    assert_eq!(leave_mid, shown_pos, "tooltip should remain pinned during leave animation");
   }
 }

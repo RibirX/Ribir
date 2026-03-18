@@ -4,6 +4,7 @@ pub fn counter(cnt: &'static Stateful<i32>) -> Widget<'static> {
   button! {
     x: AnchorX::center(),
     y: AnchorY::center(),
+    tooltip: "Click to count",
     on_tap: move |_| *$write(cnt) += 1,
     @pipe!($read(cnt).to_string())
   }

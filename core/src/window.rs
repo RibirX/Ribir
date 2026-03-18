@@ -861,7 +861,7 @@ impl Window {
 
   /// Update the position of a widget. This is used by widgets like `Follow`
   /// that need to update position after layout is complete.
-  pub fn update_widget_position(&self, id: WidgetId, pos: Point) {
+  pub(crate) fn update_widget_position(&self, id: WidgetId, pos: Point) {
     self
       .tree_mut()
       .store

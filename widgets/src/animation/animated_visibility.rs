@@ -14,7 +14,7 @@ use super::{AnimateMatch, Interruption, MatchCases, OptionalTransitionSelector};
 /// this wrapper can keep painting hidden content while a leave animation is
 /// still running.
 pub struct AnimatedVisibility<S: AnimateState + 'static> {
-  pub show: bool,
+  show: bool,
   animate_match: OnceCell<AnimateMatch<bool, S>>,
 }
 
@@ -175,7 +175,7 @@ where
       // When the leave animation starts or finishes, we need to rebuild to
       // toggle the "hidden paint" or layout visibility.
       let leave_subscription = leave_running
-        .raw_modifies()
+        .modifies()
         .subscribe(move |_| $write(this).shallow().touch_to_rebuild());
 
       @FocusScope {

@@ -38,6 +38,7 @@ impl HoverLayer {
 
     let u = watch!(*$read(host.is_hovered()))
       .distinct_until_changed()
+      .delay_bool(HOVER_THROTTLE_TIME, HOVER_THROTTLE_TIME)
       .subscribe({
         let layer = layer.clone_writer();
         move |visible| layer.write().set_visible_state(visible)
