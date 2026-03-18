@@ -81,8 +81,11 @@ impl<T: Transition + Clone + 'static> Transition for DelayTransition<T> {
 
 impl<T: Transition + Clone + 'static> Transition for RepeatTransition<T> {
   fn rate_of_change(&self, dur: Duration) -> AnimateProgress {
-    let repeat = self.repeat;
     let duration = self.transition.duration();
+    if duration.is_zero() {
+      return AnimateProgress::Finish;
+    }
+    let repeat = self.repeat;
     let rounds = dur.as_secs_f32() / duration.as_secs_f32();
     if rounds > repeat {
       return AnimateProgress::Finish;
@@ -124,7 +127,7 @@ impl Transition for Box<dyn Transition> {
 
 impl<E: Easing + Clone + 'static> Transition for EasingTransition<E> {
   fn rate_of_change(&self, run_dur: Duration) -> AnimateProgress {
-    if run_dur > self.duration {
+    if self.duration.is_zero() || run_dur >= self.duration {
       return AnimateProgress::Finish;
     }
     let time_rate = run_dur.as_secs_f32() / self.duration.as_secs_f32();

@@ -74,7 +74,8 @@ impl DisposedEvent {
 /// A handle that keeps a detached widget subtree alive.
 ///
 /// The subtree will be disposed of when this handle is dropped, unless it is
-/// converted back into a [`Widget`] and reinserted into a window's widget tree.
+/// converted back into a [`Widget`] with [`reinsert`](Self::reinsert) and
+/// reinserted into a window's widget tree.
 pub struct Preserve {
   id: Option<WidgetId>,
   wnd_id: WindowId,
@@ -82,20 +83,24 @@ pub struct Preserve {
 
 impl Preserve {
   fn new(id: WidgetId, wnd_id: WindowId) -> Self { Self { id: Some(id), wnd_id } }
-}
 
-impl From<Preserve> for Widget<'static> {
-  fn from(mut value: Preserve) -> Self {
-    let wnd_id = value.wnd_id;
+  /// Converts this preserved detached subtree into a widget that can be
+  /// reinserted into the same window.
+  ///
+  /// If the returned widget is dropped before it is built, the preserved
+  /// subtree is still disposed through [`Drop`] on the captured [`Preserve`].
+  pub fn reinsert(self) -> Widget<'static> {
+    let wnd_id = self.wnd_id;
+    let mut preserve = Some(self);
     Widget::from_fn(move |ctx| {
       assert_eq!(
         wnd_id,
         ctx.window().id(),
         "Preserve widget must be used in the same window it was preserved in."
       );
-      value
-        .id
+      preserve
         .take()
+        .and_then(|mut preserve| preserve.id.take())
         .expect("Preserve handle already consumed")
     })
   }
@@ -103,15 +108,14 @@ impl From<Preserve> for Widget<'static> {
 
 impl Drop for Preserve {
   fn drop(&mut self) {
-    if let Some(id) = self.id.take()
-      && let Some(wnd) = AppCtx::get_window(self.wnd_id)
-    {
-      let tree = wnd.tree();
-      // If the widget is already dropped or has a parent (reinserted), we don't
-      // need to dispose it.
-      if !id.is_dropped(tree) && id.tree_parent(tree).is_none() {
-        id.dispose_subtree(wnd.tree_mut());
-      }
+    let Some(id) = self.id.take() else { return };
+    let Some(wnd) = AppCtx::get_window(self.wnd_id) else { return };
+
+    let tree = wnd.tree();
+    let is_detached = !id.is_dropped(tree) && id.tree_parent(tree).is_none();
+
+    if is_detached {
+      id.dispose_subtree(wnd.tree_mut());
     }
   }
 }
@@ -424,6 +428,49 @@ mod tests {
 
     assert!(id.is_dropped(wnd.tree()));
     assert!(!lifecycle_reader.read().is_empty());
+  }
+
+  #[test]
+  fn dropping_unbuilt_reinserted_widget_disposes_preserved_subtree() {
+    reset_test_env!();
+
+    let keep = Stateful::new(None::<Widget<'static>>);
+    let disposed = Stateful::new(0);
+    let mounted_id = Stateful::new(None::<WidgetId>);
+    let keep_reader = keep.clone_reader();
+    let keep_writer = keep.clone_writer();
+    let disposed_reader = disposed.clone_reader();
+    let mounted_id_reader = mounted_id.clone_reader();
+
+    let wnd = TestWindow::new_with_size(
+      fn_widget! {
+        @MockBox {
+          size: Size::zero(),
+          on_mounted: move |e| *$write(mounted_id) = Some(e.current_target()),
+          on_disposed: move |_| *$write(disposed) += 1,
+          on_disposing: move |e| *$write(keep) = Some(e.preserve().reinsert()),
+        }
+      },
+      Size::new(100., 100.),
+    );
+
+    wnd.draw_frame();
+    let id = mounted_id_reader
+      .read()
+      .expect("preserved child should mount before dispose");
+
+    id.dispose_subtree(wnd.tree_mut());
+    wnd.draw_frame();
+
+    assert!(keep_reader.read().is_some());
+    assert!(!id.is_dropped(wnd.tree()));
+    assert_eq!(*disposed_reader.read(), 0);
+
+    keep_writer.write().take();
+    wnd.draw_frame();
+
+    assert!(id.is_dropped(wnd.tree()));
+    assert_eq!(*disposed_reader.read(), 1);
   }
 
   #[test]

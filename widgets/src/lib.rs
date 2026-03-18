@@ -1,6 +1,8 @@
 #[macro_use]
 extern crate bitflags;
 
+use ribir_core::prelude::Provider;
+
 pub mod animation;
 pub mod avatar;
 pub mod badge;
@@ -29,18 +31,21 @@ pub mod tooltip;
 
 pub mod transform_box;
 
+/// Returns the default providers for widgets.
+///
+/// This function provides all necessary providers for widgets to function
+/// correctly, including tooltip support.
+pub fn default_providers() -> [Provider; 1] { [tooltip::default_tooltip_provider()] }
+
 #[doc(hidden)]
 pub use ribir_core as core;
 
-/// Re-export Follow from core since it requires internal APIs
-pub use crate::core::builtin_widgets::Follow;
-
 pub mod prelude {
   pub use super::{
-    Follow, animation::*, avatar::*, badge::*, buttons::*, checkbox::*, common_widget::*,
-    divider::*, grid_view::*, icon::*, input::*, label::*, layout::*, list::*, menu::*, overlay::*,
-    path::*, progress::*, radio::*, router::*, scrollbar::*, select_region::*, slider::*,
-    switch::*, tabs::*, tooltip::*, transform_box::*,
+    animation::*, avatar::*, badge::*, buttons::*, checkbox::*, common_widget::*, divider::*,
+    grid_view::*, icon::*, input::*, label::*, layout::*, list::*, menu::*, overlay::*, path::*,
+    progress::*, radio::*, router::*, scrollbar::*, select_region::*, slider::*, switch::*,
+    tabs::*, tooltip::*, transform_box::*,
   };
   pub use crate::{cases, transitions};
 }

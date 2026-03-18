@@ -54,35 +54,6 @@ pub struct PriorObserver<O, P> {
   priority: P,
 }
 
-/// This trait defines an Observable that can be assigned a priority. The
-/// `Priority` will collect the values and emitted in order by the priority.
-pub trait PriorityObservable: Observable + Sized {
-  /// The item type must be owned (`'static`) so it can be queued.
-  type Item: Clone + 'static;
-  type Err: Clone + 'static;
-
-  /// This method specifies a static priority to the Observable in the priority
-  /// queue of the window. A lower priority value indicates higher priority.
-  fn value_priority(
-    self, priority: i64, wnd_id: WindowId,
-  ) -> Self::With<PriorOp<Self::Inner, WindowPriority<impl FnMut() -> i64>>> {
-    self.fn_priority(move || priority, wnd_id)
-  }
-
-  /// The method defines the priority for the Observable in the window's
-  /// priority queue. The priority value is calculated for each emitted value by
-  /// the function `f`, with lower values indicating higher priority.
-  fn fn_priority(
-    self, f: impl FnMut() -> i64 + 'static, wnd_id: WindowId,
-  ) -> Self::With<PriorOp<Self::Inner, WindowPriority<impl FnMut() -> i64>>> {
-    self.priority(WindowPriority { wnd_id, priority: f })
-  }
-
-  fn priority<P: Priority + 'static>(self, priority: P) -> Self::With<PriorOp<Self::Inner, P>> {
-    self.transform(|source| PriorOp { source, priority })
-  }
-}
-
 /// This trait is used to determine the priority of a task and the queue used to
 /// collect these tasks.
 pub trait Priority {
@@ -98,6 +69,10 @@ pub struct WindowPriority<P> {
 
 impl<P> WindowPriority<P> {
   pub fn new(wnd_id: WindowId, priority: P) -> Self { Self { wnd_id, priority } }
+}
+
+impl<S, P> PriorOp<S, P> {
+  pub(super) fn new(source: S, priority: P) -> Self { Self { source, priority } }
 }
 
 impl<P: FnMut() -> i64> Priority for WindowPriority<P> {
@@ -117,16 +92,6 @@ impl Priority for Box<dyn Priority> {
   fn priority(&mut self) -> i64 { (**self).priority() }
 
   fn queue(&mut self) -> Option<&PriorityTaskQueue> { (**self).queue() }
-}
-
-impl<T> PriorityObservable for T
-where
-  T: Observable + Sized + 'static,
-  T::Err: Clone + 'static,
-  for<'a> T::Item<'a>: Clone + 'static,
-{
-  type Item = T::Item<'static>;
-  type Err = T::Err;
 }
 
 impl<S, P> ObservableType for PriorOp<S, P>

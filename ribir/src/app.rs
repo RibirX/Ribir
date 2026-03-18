@@ -380,10 +380,11 @@ impl Drop for AppRunGuard {
         #[cfg(feature = "widgets")]
         let root = {
           let root = root();
-          GenWidget::new(move || {
-            Providers::new([ribir_widgets::tooltip::default_tooltip_provider()])
-              .with_child(root.gen_widget())
-          })
+          providers! {
+            providers: ribir_widgets::default_providers(),
+            @ { root.clone() }
+          }
+          .r_into()
         };
 
         #[cfg(not(feature = "widgets"))]

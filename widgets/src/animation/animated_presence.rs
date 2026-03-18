@@ -222,7 +222,7 @@ where
       let pos = e.map_to_global(Point::zero());
       let running = animate_match.running_watcher();
       let ghost =
-        PinnedGhost::combine_child(Stateful::new(PinnedGhost { pos }), e.preserve().into_widget());
+        PinnedGhost::combine_child(Stateful::new(PinnedGhost { pos }), e.preserve().reinsert());
 
       // Mount the ghost to the window root.
       let handle = wnd.mount(ghost);
@@ -373,6 +373,57 @@ mod tests {
 
     let wnd = TestWindow::new(w, Size::new(200., 200.), WindowFlags::ANIMATIONS);
     wnd.draw_frame();
+  }
+
+  #[test]
+  fn enter_animation_starts_from_initial_case_on_mount() {
+    reset_test_env!();
+
+    let show = Stateful::new(false);
+    let c_show = show.clone_writer();
+    let animated_opacity = Stateful::new(0.0_f32);
+    let observed_opacity = Stateful::new(-1.0_f32);
+    let observed_opacity_reader = observed_opacity.clone_reader();
+
+    let w = fn_widget! {
+      let animated_opacity = animated_opacity.clone_writer();
+      let observed_opacity = observed_opacity.clone_writer();
+      pipe!(*$read(show)).map(move |visible| {
+        let animated_opacity = animated_opacity.clone_writer();
+        let observed_opacity = observed_opacity.clone_writer();
+        visible.then(move || {
+          @AnimatedPresence {
+            cases: cases! {
+              state: animated_opacity.clone_writer(),
+              true => 1.0,
+              false => 0.0,
+            },
+            enter: EasingTransition {
+              easing: easing::LINEAR,
+              duration: Duration::from_millis(100),
+            },
+            @MockBox {
+              size: Size::new(100., 30.),
+              opacity: pipe!(*$read(animated_opacity)),
+              on_performed_layout: move |_| *$write(observed_opacity) = *$read(animated_opacity),
+            }
+          }
+        })
+      })
+    };
+
+    let wnd = TestWindow::new(w, Size::new(200., 200.), WindowFlags::ANIMATIONS);
+    wnd.draw_frame();
+
+    *c_show.write() = true;
+    wnd.draw_frame();
+
+    assert!(
+      *observed_opacity_reader.read() <= 0.01,
+      "enter animation should start from an effectively hidden value on the first mounted frame, \
+       got {}",
+      *observed_opacity_reader.read()
+    );
   }
 
   #[test]

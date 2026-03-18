@@ -1,3 +1,4 @@
+mod ops;
 mod part_state;
 mod prior_op;
 mod stateful;
@@ -5,6 +6,7 @@ mod watcher;
 use std::{convert::Infallible, ops::DerefMut};
 pub mod state_cell;
 
+pub use ops::*;
 pub use part_state::*;
 pub use prior_op::*;
 use rxrust::observable::boxed::LocalBoxedObservableClone;

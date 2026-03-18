@@ -1,4 +1,4 @@
-use std::{cell::RefCell, mem};
+use std::cell::{Cell, RefCell};
 
 use ribir_algo::Rc;
 
@@ -9,47 +9,87 @@ class_names! {
   TOOLTIP,
 }
 
-/// A provider contract for overriding the default tooltip behavior.
-///
-/// `Tooltip` resolves this lazily during `compose_child`, so providers declared
-/// on the same node through `providers:` can override the built-in fallback.
-///
-/// The closure receives:
-/// - the host widget being wrapped
-/// - the tooltip text payload
-///
-/// It must return the wrapped widget together with the tooltip control object.
-type TooltipComposeFn =
-  Box<dyn for<'r> Fn(Widget<'r>, TextValue) -> (Widget<'r>, Box<dyn TooltipControl>) + 'static>;
+const TOOLTIP_SHOW_DELAY: Duration = Duration::from_millis(500);
+const TOOLTIP_HIDE_DELAY: Duration = Duration::from_millis(150);
 
-pub struct CustomTooltip(pub TooltipComposeFn);
-
-#[doc(hidden)]
-pub trait TooltipControl {
-  fn show(&mut self);
-  fn hide(&mut self);
-  fn is_showing(&self) -> bool;
+/// Tooltip content that can be rendered either as the default text bubble or
+/// as a custom widget tree such as a card.
+pub enum TooltipContent {
+  Text(TextValue),
+  Widget(Widget<'static>),
 }
 
-impl<T> TooltipControl for Rc<RefCell<T>>
-where
-  T: TooltipControl,
-{
-  fn show(&mut self) { self.borrow_mut().show(); }
-
-  fn hide(&mut self) { self.borrow_mut().hide(); }
-
-  fn is_showing(&self) -> bool { self.borrow().is_showing() }
+impl TooltipContent {
+  pub fn into_widget(self) -> Widget<'static> {
+    match self {
+      TooltipContent::Text(text) => text! { text, class: TOOLTIP }.into_widget(),
+      TooltipContent::Widget(widget) => widget,
+    }
+  }
 }
 
-enum TooltipInner {
-  Init(TextValue),
-  Ready(Box<dyn TooltipControl>),
-  Binding,
-}
+/// Trait for customizing tooltip behavior.
+///
+/// Core owns the orchestration lifecycle. Implementors override individual
+/// hooks to customize specific aspects without replacing the entire flow.
+pub trait CustomTooltip: 'static {
+  /// Builds the tooltip bubble widget.
+  ///
+  /// Override to customize the look, feel, or placement of the tooltip.
+  fn build_bubble(&self, host_track: TrackId, content: TooltipContent) -> Widget<'static> {
+    let mut bubble = Follow::declarer();
+    bubble
+      .with_target(host_track)
+      .with_x_align(AnchorX::center())
+      .with_y_align(AnchorY::above());
 
-impl Default for TooltipInner {
-  fn default() -> Self { Self::Init(PipeValue::Value(CowArc::default())) }
+    bubble
+      .finish()
+      .with_child(content.into_widget())
+      .into_widget()
+  }
+
+  /// Spawns a background task that listens to visibility changes and
+  /// mounts/unmounts the bubble accordingly.
+  ///
+  /// This does NOT immediately mount the bubble. Instead, it sets up a
+  /// subscription that watches the `visible` state and mounts the bubble when
+  /// `visible` becomes true, then unmounts it when `visible` becomes false.
+  ///
+  /// Returns a closure that stops the background task and performs cleanup.
+  fn spawn_bubble(
+    &self, bubble: Widget<'static>, visible: Stateful<bool>, host_track: TrackId,
+  ) -> Box<dyn FnOnce()> {
+    let reusable = Reusable::new(bubble);
+    let mounted: Rc<RefCell<Option<MountHandle>>> = Rc::default();
+    let sub = watch!(*$read(visible))
+      .distinct_until_changed()
+      .subscribe({
+        let mounted = mounted.clone();
+        let wnd = BuildCtx::get().window();
+        move |visible| {
+          let mut mounted = mounted.borrow_mut();
+          if visible && mounted.is_none() && host_track.get().is_some() {
+            *mounted = Some(wnd.mount(reusable.get_widget()));
+          } else if !visible && let Some(handle) = mounted.take() {
+            handle.close();
+          }
+        }
+      });
+
+    Box::new(move || {
+      if let Some(handle) = mounted.borrow_mut().take() {
+        handle.close();
+      }
+      sub.unsubscribe();
+    })
+  }
+
+  /// Whether core should set up the default hover/focus delay trigger.
+  ///
+  /// Return `false` to disable automatic triggering and rely solely on
+  /// `Tooltip::show()` / `Tooltip::hide()` for manual control.
+  fn auto_trigger(&self) -> bool { true }
 }
 
 /// Adds tooltip behavior to a widget declarer.
@@ -70,75 +110,26 @@ impl Default for TooltipInner {
 ///   tooltip: "I'm a tooltip!",
 /// };
 /// ```
-pub struct Tooltip(Rc<RefCell<TooltipInner>>);
+pub struct Tooltip {
+  content: Rc<RefCell<Option<TooltipContent>>>,
+  visible: Stateful<bool>,
+  bound: Rc<Cell<bool>>,
+}
 
 impl Default for Tooltip {
-  fn default() -> Self { Self::from_text(PipeValue::Value(CowArc::default())) }
+  fn default() -> Self {
+    Self::from_content(TooltipContent::Text(PipeValue::Value(CowArc::default())))
+  }
 }
 
 impl Clone for Tooltip {
-  fn clone(&self) -> Self { Self(self.0.clone()) }
-}
-
-struct FallbackTooltip {
-  reusable: Reusable,
-  mounted: Option<MountHandle>,
-  wnd: Rc<Window>,
-  host: TrackId,
-  hovered: Box<dyn StateWatcher<Value = bool>>,
-}
-
-impl FallbackTooltip {
-  fn new(tooltip: TextValue, wnd: Rc<Window>, host: TrackId) -> Self {
-    let mut root = Follow::declarer();
-    root
-      .with_target(host.clone())
-      .with_x_align(AnchorX::center())
-      .with_y_align(AnchorY::above());
-    let hovered = root.is_hovered().clone_boxed_watcher();
-
-    let root = root
-      .finish()
-      .with_child(text! {
-        text: tooltip,
-        class: TOOLTIP,
-      })
-      .into_widget();
-
-    Self { reusable: Reusable::new(root.into_widget()), mounted: None, wnd, host, hovered }
-  }
-
-  fn mount(&mut self, _id: WidgetId) {
-    if self.mounted.is_some() {
-      return;
-    }
-
-    self.mounted = Some(self.wnd.mount(self.reusable.get_widget()));
-  }
-
-  fn close(&mut self) {
-    if let Some(mounted) = self.mounted.take() {
-      mounted.close();
+  fn clone(&self) -> Self {
+    Self {
+      content: self.content.clone(),
+      visible: self.visible.clone_writer(),
+      bound: self.bound.clone(),
     }
   }
-
-  fn hovered_watcher(&self) -> Box<dyn StateWatcher<Value = bool>> {
-    self.hovered.clone_boxed_watcher()
-  }
-}
-
-impl TooltipControl for FallbackTooltip {
-  fn show(&mut self) {
-    if let Some(id) = self.host.get() {
-      self.mount(id);
-    } else {
-      self.close();
-    }
-  }
-
-  fn hide(&mut self) { self.close(); }
-
-  fn is_showing(&self) -> bool { self.mounted.is_some() }
 }
 
 impl Declare for Tooltip {
@@ -148,117 +139,106 @@ impl Declare for Tooltip {
 }
 
 impl Tooltip {
-  pub fn new<K: ?Sized>(text: impl RInto<TextValue, K>) -> Self { Self::from_text(text.r_into()) }
-
-  fn from_text(tooltip: TextValue) -> Self {
-    Self(Rc::new(RefCell::new(TooltipInner::Init(tooltip))))
+  pub fn new<K: ?Sized>(text: impl RInto<TextValue, K>) -> Self {
+    Self::from_content(TooltipContent::Text(text.r_into()))
   }
 
-  pub fn show(&self) { self.with_control(|c| c.show()); }
-
-  pub fn hide(&self) { self.with_control(|c| c.hide()); }
-
-  pub fn is_showing(&self) -> bool {
-    self
-      .with_control(|c| c.is_showing())
-      .unwrap_or(false)
+  pub fn from_widget<K>(widget: impl IntoWidget<'static, K>) -> Self {
+    Self::from_content(TooltipContent::Widget(widget.into_widget()))
   }
 
-  fn with_control<R>(&self, f: impl FnOnce(&mut dyn TooltipControl) -> R) -> Option<R> {
-    let mut inner = self.0.borrow_mut();
-    if let TooltipInner::Ready(control) = &mut *inner { Some(f(&mut **control)) } else { None }
+  fn from_content(content: TooltipContent) -> Self {
+    Self {
+      content: Rc::new(RefCell::new(Some(content))),
+      visible: Stateful::new(false),
+      bound: Rc::new(Cell::new(false)),
+    }
   }
 
-  fn compose_fallback<'c>(
-    child: Widget<'c>, text: TextValue,
-  ) -> (Widget<'c>, Box<dyn TooltipControl>) {
-    let wnd = BuildCtx::get().window();
-    let mut child = FatObj::new(child);
-    let control = Rc::new(RefCell::new(FallbackTooltip::new(text, wnd, child.track_id())));
-    let tooltip_hovered = control.borrow().hovered_watcher();
-    let child = Self::bind_hover_focus_with_tooltip(child, tooltip_hovered, control.clone());
-    (child, Box::new(control))
-  }
+  pub fn show(&self) { *self.visible.write() = true; }
 
-  /// Wire tooltip show/hide to the host's hover and focus state, and ensure
-  /// cleanup on dispose. Returns the wrapped host widget.
-  ///
-  /// This is the canonical wiring shared by all tooltip implementations.
-  pub fn bind_hover_focus<'c, T: TooltipControl + 'static>(
-    host: FatObj<Widget<'c>>, control: Rc<RefCell<T>>,
-  ) -> Widget<'c> {
-    Self::bind_hover_focus_with_tooltip(host, Box::new(Stateful::new(false)), control)
-  }
+  pub fn hide(&self) { *self.visible.write() = false; }
 
-  pub fn bind_hover_focus_with_tooltip<'c, T: TooltipControl + 'static>(
-    mut host: FatObj<Widget<'c>>, tooltip_hovered: Box<dyn StateWatcher<Value = bool>>,
-    control: Rc<RefCell<T>>,
-  ) -> Widget<'c> {
-    let subscription = watch!(
-      *$read(host.is_hovered()) || *$read(host.is_focused()) || *$read(tooltip_hovered)
-    )
-    .distinct_until_changed()
-    .subscribe({
-      let control = control.clone();
-      move |active| {
-        let mut control = control.borrow_mut();
-        if active {
-          control.show();
-        } else {
-          control.hide();
-        }
-      }
-    });
-
-    host.on_disposed({
-      let control = control.clone();
-      move |_| {
-        control.borrow_mut().hide();
-        subscription.unsubscribe();
-      }
-    });
-    host.into_widget()
-  }
+  pub fn is_visible(&self) -> bool { *self.visible.read() }
 }
 
 impl<T, K: ?Sized> RFrom<T, ValueKind<K>> for Tooltip
 where
   TextValue: RFrom<T, K>,
 {
-  fn r_from(value: T) -> Self { Self::from_text(TextValue::r_from(value)) }
+  fn r_from(value: T) -> Self { Self::new(TextValue::r_from(value)) }
 }
 
 impl<'c> ComposeChild<'c> for Tooltip {
   type Child = Widget<'c>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    let Ok(tooltip) = this.try_into_value() else {
-      panic!("Tooltip should be a stateless widget");
+    let f = move || {
+      let tooltip = match this.try_into_value() {
+        Ok(t) => t,
+        Err(_) => panic!("Tooltip should be a stateless widget"),
+      };
+
+      assert!(!tooltip.bound.get(), "A Tooltip instance can only be bound to one host.");
+      tooltip.bound.set(true);
+
+      let content = tooltip
+        .content
+        .borrow_mut()
+        .take()
+        .expect("Tooltip content already taken");
+
+      let visible = tooltip.visible.clone_writer();
+
+      struct FallbackTooltip;
+      impl CustomTooltip for FallbackTooltip {}
+
+      let provider = Provider::of::<Box<dyn CustomTooltip>>(BuildCtx::get());
+      let provider: &dyn CustomTooltip = match provider {
+        Some(ref boxed) => boxed.as_ref(),
+        None => &FallbackTooltip,
+      };
+
+      // 1. Collect host states
+      let mut host = FatObj::new(child);
+      let host_track = host.track_id();
+
+      // 2. Build and mount the bubble
+      let bubble = provider.build_bubble(host_track.clone(), content);
+      let mut bubble_obj = FatObj::new(bubble);
+
+      // 3. Setup trigger
+      let trigger_sub = provider.auto_trigger().then(|| {
+        watch!(
+          *$read(host.is_hovered())
+          || *$read(host.is_focused())
+          || *$read(bubble_obj.is_hovered())
+        )
+        .delay_bool(TOOLTIP_SHOW_DELAY, TOOLTIP_HIDE_DELAY)
+        .subscribe({
+          let visible = visible.clone_writer();
+          move |now_active| {
+            if *visible.read() != now_active {
+              *visible.write() = now_active;
+            }
+          }
+        })
+      });
+
+      let unmount =
+        provider.spawn_bubble(bubble_obj.into_widget(), visible.clone_writer(), host_track);
+      // 4. Cleanup on host disposal
+      host.on_disposed(move |_| {
+        if let Some(sub) = trigger_sub {
+          sub.unsubscribe();
+        }
+        unmount();
+        *visible.write() = false;
+      });
+      host.into_widget()
     };
 
-    fn_widget! {
-      let text = {
-        let mut inner = tooltip.0.borrow_mut();
-        match mem::replace(&mut *inner, TooltipInner::Binding) {
-          TooltipInner::Init(text) => text,
-          TooltipInner::Ready(control) => {
-            *inner = TooltipInner::Ready(control);
-            panic!("A Tooltip instance can only be bound to one host.");
-          }
-          TooltipInner::Binding => panic!("Tooltip binding re-entered unexpectedly."),
-        }
-      };
-
-      let custom = Provider::of::<CustomTooltip>(BuildCtx::get());
-      let (child, control) = if let Some(c) = custom {
-        (c.0)(child, text)
-      } else {
-        Tooltip::compose_fallback(child, text)
-      };
-      *tooltip.0.borrow_mut() = TooltipInner::Ready(control);
-      child
-    }
-    .into_widget()
+    FnWidget::new(f).into_widget()
   }
 }
 
@@ -268,25 +248,101 @@ mod tests {
 
   use crate::{prelude::*, reset_test_env, test_helper::*};
 
-  struct NoopTooltipControl;
+  const HOST_POINT: Point = Point::new(10., 10.);
+  const OUTSIDE_POINT: Point = Point::new(100., 70.);
 
-  impl TooltipControl for NoopTooltipControl {
-    fn show(&mut self) {}
+  fn wait_for_tooltip_show_delay() {
+    AppCtx::run_until(AppCtx::timer(super::TOOLTIP_SHOW_DELAY + Duration::from_millis(20)));
+    AppCtx::run_until_stalled();
+  }
 
-    fn hide(&mut self) {}
+  fn wait_for_tooltip_hide_delay() {
+    AppCtx::run_until(AppCtx::timer(super::TOOLTIP_HIDE_DELAY + Duration::from_millis(20)));
+    AppCtx::run_until_stalled();
+  }
 
-    fn is_showing(&self) -> bool { false }
+  fn tree_count(wnd: &TestWindow) -> usize { wnd.tree().count(wnd.tree().root()) }
+
+  fn move_cursor_and_draw(wnd: &TestWindow, point: Point) {
+    wnd.process_cursor_move(point);
+    wnd.draw_frame();
+  }
+
+  fn hover_and_show(wnd: &TestWindow, point: Point) -> usize {
+    move_cursor_and_draw(wnd, point);
+    wait_for_tooltip_show_delay();
+    wnd.draw_frame();
+    tree_count(wnd)
+  }
+
+  fn focus_host(wnd: &TestWindow, point: Point, after_focus: Point) {
+    wnd.process_cursor_move(point);
+    wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
+    wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
+    wnd.process_cursor_move(after_focus);
+    wnd.draw_frame();
+  }
+
+  fn fallback_bubble_id(wnd: &TestWindow) -> WidgetId {
+    let overlay_root = wnd
+      .children(wnd.root())
+      .last()
+      .expect("fallback tooltip should mount into root");
+    wnd
+      .children(overlay_root)
+      .last()
+      .unwrap_or(overlay_root)
+  }
+
+  fn fallback_bubble_rect(wnd: &TestWindow) -> (Point, Size) {
+    let bubble = fallback_bubble_id(wnd);
+    let pos = wnd
+      .widget_pos(bubble)
+      .expect("fallback tooltip should have layout position");
+    let size = wnd
+      .widget_size(bubble)
+      .expect("fallback tooltip should have layout size");
+    (pos, size)
+  }
+
+  fn fallback_bubble_center_global(wnd: &TestWindow) -> Point {
+    let bubble = fallback_bubble_id(wnd);
+    let global = wnd.map_to_global(Point::zero(), bubble);
+    let size = wnd
+      .widget_size(bubble)
+      .expect("fallback tooltip should have layout size");
+    Point::new(global.x + size.width / 2., global.y + size.height / 2.)
   }
 
   #[test]
-  fn tooltip_manual_control_is_noop_before_binding() {
-    let tooltip = Tooltip::new("tip");
+  fn tooltip_manual_control_mounts_bound_tooltip() {
+    reset_test_env!();
 
+    let tooltip = Tooltip::new("tip");
+    let tooltip_in_widget = tooltip.clone();
+    let wnd = TestWindow::new_with_size(
+      fn_widget! {
+        let tooltip = tooltip_in_widget.clone();
+        @MockBox {
+          size: Size::new(40., 20.),
+          tooltip,
+        }
+      },
+      Size::new(120., 80.),
+    );
+    wnd.draw_frame();
+
+    let before = tree_count(&wnd);
     tooltip.show();
-    assert!(!tooltip.is_showing());
+    wnd.draw_frame();
+    assert!(tooltip.is_visible());
+    let shown = tree_count(&wnd);
+    assert!(shown > before, "manual show should mount tooltip content");
 
     tooltip.hide();
-    assert!(!tooltip.is_showing());
+    wnd.draw_frame();
+    assert_eq!(tree_count(&wnd), before);
+    assert!(!tooltip.is_visible());
   }
 
   #[test]
@@ -304,41 +360,40 @@ mod tests {
     );
     wnd.draw_frame();
 
-    let before = wnd.tree().count(wnd.tree().root());
-    wnd.process_cursor_move(Point::new(10., 10.));
-    wnd.draw_frame();
-    let after = wnd.tree().count(wnd.tree().root());
+    let before = tree_count(&wnd);
+    let shown = hover_and_show(&wnd, HOST_POINT);
 
-    assert!(after > before, "tooltip should mount extra content when hovered");
+    assert!(shown > before, "tooltip should mount extra content when hovered");
 
-    wnd.process_cursor_move(Point::new(100., 70.));
+    move_cursor_and_draw(&wnd, OUTSIDE_POINT);
+    assert_eq!(tree_count(&wnd), shown);
+    wait_for_tooltip_hide_delay();
     wnd.draw_frame();
-    assert_eq!(wnd.tree().count(wnd.tree().root()), before);
-
-    wnd.process_cursor_move(Point::new(10., 10.));
-    wnd.draw_frame();
-    assert_eq!(wnd.tree().count(wnd.tree().root()), after);
+    assert_eq!(tree_count(&wnd), before);
   }
 
   #[test]
-  fn empty_tooltip_still_mounts() {
+  fn fallback_tooltip_does_not_mount_if_hover_ends_before_delay() {
     reset_test_env!();
 
     let wnd = TestWindow::new_with_size(
       fn_widget! {
         @MockBox {
           size: Size::new(40., 20.),
-          tooltip: "",
+          tooltip: "tip",
         }
       },
       Size::new(120., 80.),
     );
     wnd.draw_frame();
 
-    let before = wnd.tree().count(wnd.tree().root());
-    wnd.process_cursor_move(Point::new(10., 10.));
+    let before = tree_count(&wnd);
+    move_cursor_and_draw(&wnd, HOST_POINT);
+    move_cursor_and_draw(&wnd, OUTSIDE_POINT);
+    wait_for_tooltip_show_delay();
     wnd.draw_frame();
-    assert!(wnd.tree().count(wnd.tree().root()) > before);
+
+    assert_eq!(tree_count(&wnd), before);
   }
 
   #[test]
@@ -357,19 +412,17 @@ mod tests {
     );
     wnd.draw_frame();
 
-    let before = wnd.tree().count(wnd.tree().root());
-    wnd.process_cursor_move(Point::new(10., 10.));
-    wnd.draw_frame();
-    let shown = wnd.tree().count(wnd.tree().root());
+    let before = tree_count(&wnd);
+    let shown = hover_and_show(&wnd, HOST_POINT);
     assert!(shown > before, "tooltip should mount while hovered even when text is empty");
 
     *tooltip_text_writer.write() = "tip".into();
     wnd.draw_frame();
-    assert_eq!(wnd.tree().count(wnd.tree().root()), shown);
+    assert_eq!(tree_count(&wnd), shown);
 
     *tooltip_text_writer.write() = String::new();
     wnd.draw_frame();
-    assert_eq!(wnd.tree().count(wnd.tree().root()), shown);
+    assert_eq!(tree_count(&wnd), shown);
   }
 
   #[test]
@@ -388,21 +441,23 @@ mod tests {
     );
     wnd.draw_frame();
 
-    let before = wnd.tree().count(wnd.tree().root());
-    wnd.process_cursor_move(Point::new(10., 10.));
-    wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
-    wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
+    let before = tree_count(&wnd);
+    focus_host(&wnd, HOST_POINT, OUTSIDE_POINT);
+    wait_for_tooltip_show_delay();
     wnd.draw_frame();
-    let after_focus = wnd.tree().count(wnd.tree().root());
+    let after_focus = tree_count(&wnd);
     assert!(after_focus > before, "tooltip should mount when focused");
 
-    wnd.process_cursor_move(Point::new(100., 70.));
+    wnd.process_cursor_move(OUTSIDE_POINT);
     wnd
       .focus_mgr
       .borrow_mut()
       .blur(FocusReason::Other);
     wnd.draw_frame();
-    assert_eq!(wnd.tree().count(wnd.tree().root()), before);
+    assert_eq!(tree_count(&wnd), after_focus);
+    wait_for_tooltip_hide_delay();
+    wnd.draw_frame();
+    assert_eq!(tree_count(&wnd), before);
   }
 
   #[test]
@@ -420,35 +475,20 @@ mod tests {
     );
     wnd.draw_frame();
 
-    let before = wnd.tree().count(wnd.tree().root());
-    wnd.process_cursor_move(Point::new(10., 10.));
-    wnd.draw_frame();
-    let shown = wnd.tree().count(wnd.tree().root());
+    let before = tree_count(&wnd);
+    let shown = hover_and_show(&wnd, HOST_POINT);
     assert!(shown > before);
 
-    let overlay_root = wnd
-      .children(wnd.root())
-      .last()
-      .expect("fallback tooltip should mount into root");
-    let overlay_bubble = wnd
-      .children(overlay_root)
-      .last()
-      .unwrap_or(overlay_root);
-    let overlay_pos = wnd.map_to_global(Point::zero(), overlay_bubble);
-    let overlay_size = wnd
-      .widget_size(overlay_bubble)
-      .expect("fallback tooltip should have layout size");
-
-    wnd.process_cursor_move(Point::new(
-      overlay_pos.x + overlay_size.width / 2.,
-      overlay_pos.y + overlay_size.height / 2.,
-    ));
+    wnd.process_cursor_move(fallback_bubble_center_global(&wnd));
     wnd.draw_frame();
-    assert_eq!(wnd.tree().count(wnd.tree().root()), shown);
+    assert_eq!(tree_count(&wnd), shown);
 
-    wnd.process_cursor_move(Point::new(100., 70.));
+    wnd.process_cursor_move(OUTSIDE_POINT);
     wnd.draw_frame();
-    assert_eq!(wnd.tree().count(wnd.tree().root()), before);
+    assert_eq!(tree_count(&wnd), shown);
+    wait_for_tooltip_hide_delay();
+    wnd.draw_frame();
+    assert_eq!(tree_count(&wnd), before);
   }
 
   #[test]
@@ -468,23 +508,9 @@ mod tests {
     );
     wnd.draw_frame();
 
-    wnd.process_cursor_move(Point::new(110., 90.));
-    wnd.draw_frame();
+    hover_and_show(&wnd, Point::new(110., 90.));
 
-    let overlay_root = wnd
-      .children(wnd.root())
-      .last()
-      .expect("fallback tooltip should mount into root");
-    let overlay_bubble = wnd
-      .children(overlay_root)
-      .last()
-      .unwrap_or(overlay_root);
-    let overlay_pos = wnd
-      .widget_pos(overlay_bubble)
-      .expect("fallback tooltip should have layout position");
-    let overlay_size = wnd
-      .widget_size(overlay_bubble)
-      .expect("fallback tooltip should have layout size");
+    let (overlay_pos, overlay_size) = fallback_bubble_rect(&wnd);
 
     let host_center_x = 100. + 20.;
     let bubble_center_x = overlay_pos.x + overlay_size.width / 2.;
@@ -509,37 +535,51 @@ mod tests {
       Size::new(240., 200.),
     );
     wnd.draw_frame();
+    let before = tree_count(&wnd);
 
-    let bubble_rect = || {
-      let overlay_root = wnd
-        .children(wnd.root())
-        .last()
-        .expect("fallback tooltip should mount into root");
-      let overlay_bubble = wnd
-        .children(overlay_root)
-        .last()
-        .unwrap_or(overlay_root);
-      let pos = wnd
-        .widget_pos(overlay_bubble)
-        .expect("fallback bubble should have position");
-      let size = wnd
-        .widget_size(overlay_bubble)
-        .expect("fallback bubble should have size");
-      (pos, size)
+    let (first_pos, first_size) = {
+      hover_and_show(&wnd, Point::new(110., 90.));
+      fallback_bubble_rect(&wnd)
     };
 
-    wnd.process_cursor_move(Point::new(110., 90.));
+    move_cursor_and_draw(&wnd, HOST_POINT);
+    wait_for_tooltip_hide_delay();
     wnd.draw_frame();
-    let (first_pos, first_size) = bubble_rect();
-
-    wnd.process_cursor_move(Point::new(10., 10.));
-    wnd.draw_frame();
-    wnd.process_cursor_move(Point::new(110., 90.));
-    wnd.draw_frame();
-    let (second_pos, second_size) = bubble_rect();
+    assert_eq!(tree_count(&wnd), before);
+    let (second_pos, second_size) = {
+      hover_and_show(&wnd, Point::new(110., 90.));
+      fallback_bubble_rect(&wnd)
+    };
 
     assert_eq!(first_pos, second_pos);
     assert_eq!(first_size, second_size);
+  }
+
+  #[test]
+  fn fallback_tooltip_reenter_during_hide_delay_stays_visible() {
+    reset_test_env!();
+
+    let wnd = TestWindow::new_with_size(
+      fn_widget! {
+        @MockBox {
+          size: Size::new(40., 20.),
+          tooltip: "tip",
+        }
+      },
+      Size::new(120., 80.),
+    );
+    wnd.draw_frame();
+
+    let shown = hover_and_show(&wnd, HOST_POINT);
+
+    move_cursor_and_draw(&wnd, OUTSIDE_POINT);
+    assert_eq!(tree_count(&wnd), shown);
+
+    move_cursor_and_draw(&wnd, HOST_POINT);
+    wait_for_tooltip_hide_delay();
+    wnd.draw_frame();
+
+    assert_eq!(tree_count(&wnd), shown);
   }
 
   #[test]
@@ -551,11 +591,16 @@ mod tests {
 
     let wnd = TestWindow::new_with_size(
       fn_widget! {
+        struct HitTooltip { hit: Rc<Cell<usize>> }
+        impl CustomTooltip for HitTooltip {
+          fn build_bubble(&self, _: TrackId, _: TooltipContent) -> Widget<'static> {
+            self.hit.set(self.hit.get() + 1);
+            fn_widget! { @MockBox { size: Size::zero() } }.into_widget()
+          }
+          fn auto_trigger(&self) -> bool { false }
+        }
         let hit = hit_in_widget.clone();
-        let custom = CustomTooltip(Box::new(move |child, _| {
-          hit.set(hit.get() + 1);
-          (child, Box::new(NoopTooltipControl))
-        }));
+        let custom = Box::new(HitTooltip { hit }) as Box<dyn CustomTooltip>;
         @MockBox {
           size: Size::new(40., 20.),
           providers: [Provider::new(custom)],
@@ -570,7 +615,34 @@ mod tests {
   }
 
   #[test]
-  fn fallback_tooltip_can_be_manually_controlled() {
+  fn fallback_tooltip_supports_widget_content() {
+    reset_test_env!();
+
+    let tooltip = Tooltip::from_widget(fn_widget! {
+      @MockBox { size: Size::new(60., 24.) }
+    });
+    let tooltip_in_widget = tooltip.clone();
+    let wnd = TestWindow::new_with_size(
+      fn_widget! {
+        let tooltip = tooltip_in_widget.clone();
+        @MockBox {
+          size: Size::new(40., 20.),
+          tooltip,
+        }
+      },
+      Size::new(120., 80.),
+    );
+    wnd.draw_frame();
+
+    hover_and_show(&wnd, HOST_POINT);
+
+    let (_, overlay_size) = fallback_bubble_rect(&wnd);
+
+    assert_eq!(overlay_size, Size::new(60., 24.));
+  }
+
+  #[test]
+  fn fallback_tooltip_manual_visibility_yields_to_hover_updates() {
     reset_test_env!();
 
     let tooltip = Tooltip::new("tip");
@@ -580,55 +652,65 @@ mod tests {
         let tooltip = tooltip_in_widget.clone();
         @MockBox {
           size: Size::new(40., 20.),
-          tooltip: tooltip,
+          tooltip,
         }
       },
       Size::new(120., 80.),
     );
     wnd.draw_frame();
 
-    let before = wnd.tree().count(wnd.tree().root());
+    let before = tree_count(&wnd);
     tooltip.show();
     wnd.draw_frame();
-    let shown = wnd.tree().count(wnd.tree().root());
+    assert!(tooltip.is_visible());
+    let shown = tree_count(&wnd);
 
-    assert!(tooltip.is_showing());
     assert!(shown > before, "manual show should mount tooltip content");
 
-    wnd.process_cursor_move(Point::new(100., 70.));
-    wnd.draw_frame();
-    assert_eq!(wnd.tree().count(wnd.tree().root()), shown);
+    move_cursor_and_draw(&wnd, HOST_POINT);
+    assert_eq!(tree_count(&wnd), shown);
 
-    tooltip.hide();
+    move_cursor_and_draw(&wnd, OUTSIDE_POINT);
+    assert_eq!(tree_count(&wnd), shown);
+    wait_for_tooltip_hide_delay();
     wnd.draw_frame();
-    assert!(!tooltip.is_showing());
-    assert_eq!(wnd.tree().count(wnd.tree().root()), before);
+    assert!(!tooltip.is_visible());
+    assert_eq!(tree_count(&wnd), before);
   }
 
   #[test]
-  fn tooltip_wrapper_can_reuse_manual_control() {
+  fn custom_tooltip_can_disable_default_trigger() {
     reset_test_env!();
 
     let tooltip = Tooltip::new("tip");
     let tooltip_in_widget = tooltip.clone();
     let wnd = TestWindow::new_with_size(
       fn_widget! {
+        struct ManualOnlyTooltip;
+        impl CustomTooltip for ManualOnlyTooltip {
+          fn auto_trigger(&self) -> bool { false }
+        }
         let tooltip = tooltip_in_widget.clone();
-        @Tooltip {
-          tooltip: tooltip,
-          @MockBox { size: Size::new(40., 20.) }
+        let custom = Box::new(ManualOnlyTooltip) as Box<dyn CustomTooltip>;
+        @MockBox {
+          size: Size::new(40., 20.),
+          providers: [Provider::new(custom)],
+          tooltip,
         }
       },
       Size::new(120., 80.),
     );
     wnd.draw_frame();
 
-    let before = wnd.tree().count(wnd.tree().root());
+    let before = tree_count(&wnd);
+    move_cursor_and_draw(&wnd, HOST_POINT);
+    assert!(!tooltip.is_visible());
+    assert_eq!(tree_count(&wnd), before);
+
     tooltip.show();
     wnd.draw_frame();
-
-    assert!(wnd.tree().count(wnd.tree().root()) > before);
-    assert!(tooltip.is_showing());
+    assert!(tooltip.is_visible());
+    assert!(tree_count(&wnd) > before);
   }
 
   #[test]

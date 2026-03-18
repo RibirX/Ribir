@@ -298,8 +298,11 @@ mod tests {
     assert!(c_stagger.is_running());
     wnd.draw_frame();
 
-    std::thread::sleep(Duration::from_millis(100));
-    wnd.draw_frame();
+    let deadline = Instant::now() + Duration::from_secs(1);
+    while c_stagger.is_running() && Instant::now() < deadline {
+      std::thread::sleep(Duration::from_millis(10));
+      wnd.draw_frame();
+    }
     // animation is finished.
     assert!(!c_stagger.is_running());
   }

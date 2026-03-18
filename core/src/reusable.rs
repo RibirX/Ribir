@@ -65,17 +65,21 @@ impl ReuseHandleInner {
   }
 
   fn capture_recycled(&mut self, preserve: Preserve) {
-    let ReuseHandleState::InUse { host } = &self.state else {
-      return;
-    };
-    self.state = ReuseHandleState::Cached { host: host.clone(), preserve };
+    match &mut self.state {
+      ReuseHandleState::InUse { host } => {
+        self.state = ReuseHandleState::Cached { host: host.clone(), preserve };
+      }
+      ReuseHandleState::Cached { .. }
+      | ReuseHandleState::PendingMount
+      | ReuseHandleState::Released => {}
+    }
   }
 
   fn prepare_widget(&mut self) -> (PreserveHost, Option<Preserve>) {
     match std::mem::replace(&mut self.state, ReuseHandleState::Released) {
       ReuseHandleState::PendingMount => {
         self.state = ReuseHandleState::PendingMount;
-        panic!("Reusable widget not yet initialized. The initial widget must be placed first.");
+        panic!("Reusable widget not yet initialized. The initial widget must be placed first.")
       }
       ReuseHandleState::Released => panic!("Reusable widget has been released."),
       ReuseHandleState::InUse { host } => {
@@ -169,8 +173,7 @@ impl ReuseHandle {
     let state = self.0.clone();
     widget.on_build(move |id| {
       let host = PreserveHost::install(id, BuildCtx::get_mut().tree_mut());
-      let mut inner = state.borrow_mut();
-      inner.bind_host(host);
+      state.borrow_mut().bind_host(host);
     })
   }
 }
@@ -226,7 +229,8 @@ mod tests {
   use super::*;
   use crate::{
     builtin_widgets::MixBuiltin,
-    test_helper::{TestWindow, split_value},
+    test_helper::{MockBox, TestWindow, split_value},
+    window::UiEvent,
   };
 
   #[test]
@@ -413,5 +417,38 @@ mod tests {
     }));
 
     assert!(result.is_err());
+  }
+
+  #[test]
+  fn cached_reuse_handle_survives_window_close_cleanup() {
+    reset_test_env!();
+
+    let wnd = TestWindow::new_with_size(
+      fn_widget! { @MockBox { size: Size::zero() } },
+      Size::new(100., 100.),
+    );
+    let (tooltip, reusable) = ReuseHandle::new(Text::new("tip"));
+    let tooltip = Rc::new(RefCell::new(Some(tooltip.into_widget())));
+
+    let mount_tooltip = |x| {
+      let tooltip = tooltip
+        .borrow_mut()
+        .take()
+        .unwrap_or_else(|| reusable.get_widget());
+      let mut tooltip = FatObj::new(tooltip);
+      tooltip.with_x(x);
+      wnd.mount(tooltip.into_widget())
+    };
+
+    let handle = mount_tooltip(10.);
+    wnd.draw_frame();
+    assert!(reusable.is_in_use());
+
+    drop(handle);
+    wnd.draw_frame();
+    assert!(!reusable.is_in_use());
+
+    assert!(AppCtx::send_ui_event(UiEvent::CloseRequest { wnd_id: wnd.id() }));
+    AppCtx::run_until_stalled();
   }
 }
