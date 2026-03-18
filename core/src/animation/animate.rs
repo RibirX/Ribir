@@ -154,6 +154,8 @@ where
 
   fn init_window(&self, window_id: WindowId) { self.write().window_id = Some(window_id) }
 
+  fn window_id(&self) -> Option<WindowId> { self.read().window_id() }
+
   fn stop(&self) {
     let mut animate_ref = self.write();
     let this = &mut *animate_ref;

@@ -42,13 +42,7 @@ fn task_lists(
 ) -> GenWidget {
   fn_widget! {
     let editing = Stateful::new(None);
-    let stagger = Stagger::new(
-      Duration::from_millis(100),
-      EasingTransition {
-        easing: easing::EASE_IN_OUT,
-        duration: Duration::from_millis(250),
-      }
-    );
+    let stagger = Stagger::new(Duration::from_millis(100), vec![]);
     let c_stagger = stagger.clone_writer();
 
     @Scrollbar {
@@ -57,18 +51,21 @@ fn task_lists(
       },
       @ {
         pipe!($read(this);)
-          .map(move |_| fn_widget!{
+          .map(move |_| {
+          fn_widget!{
           let mut items = vec![];
           for id in $read(this).all_tasks() {
             if $read(this).get_task(id).map_or(false, cond) {
             let task = $writer(this).part_writer(
               format!("task {id:?}").into(),
               // task will always exist, if the task is removed,
-              // sthe widgets list will be rebuild.
+              // the widgets list will be rebuild.
               move |todos| PartMut::new(todos.get_task_mut(id).unwrap()),
             );
-            let item = distinct_pipe!(*$read(editing) == Some(id))
-              .map(move |b| fn_widget!{
+            let item = {
+              distinct_pipe!(*$read(editing) == Some(id))
+              .map(move |b| {
+                fn_widget!{
                 if b {
                   @Container {
                     clamp: BoxClamp::EXPAND_X.with_fixed_height(64.),
@@ -95,7 +92,8 @@ fn task_lists(
                     on_double_tap: move |_| *$write(editing) = Some(id)
                   }.into_widget()
                 }
-              });
+              }})
+            };
             items.push(@ListCustomItem {
               interactive: false,
               @{ item }
@@ -106,7 +104,7 @@ fn task_lists(
             select_mode: ListSelectMode::None,
             @ { items }
           }
-        })
+        }})
       }
     }
   }
@@ -142,7 +140,7 @@ fn input(
   .into_widget()
 }
 
-fn task_item_widget<S>(task: S, stagger: Stateful<Stagger>) -> Widget<'static>
+fn task_item_widget<S>(task: S, stagger: Stagger) -> Widget<'static>
 where
   S: StateWriter<Value = Task> + 'static,
 {
@@ -163,13 +161,17 @@ where
 
     let mut item = FatObj::new(item);
 
-    let mut stagger = $write(stagger);
     if !stagger.has_ever_run() {
       *$write(item.opacity()) = 0.;
-      let fly_in = stagger.push_state(
-        animate_state_pack!(item.transform(), item.opacity()),
-        animate_state_pack!(Transform::translation(0., 64.), 0.),
-      );
+      let fly_in = @Animate {
+        transition: EasingTransition {
+          easing: easing::EASE_IN_OUT,
+          duration: Duration::from_millis(250),
+        },
+        state: animate_state_pack!(item.transform(), item.opacity()),
+        from: animate_state_pack!(Transform::translation(0., 64.), 0.),
+      };
+      stagger.push_animation(fly_in.clone_writer());
       watch!($read(fly_in).is_running()).filter(|v| *v).take(1).subscribe(move |_| {
         *$write(item.opacity()) = 1.;
       });
