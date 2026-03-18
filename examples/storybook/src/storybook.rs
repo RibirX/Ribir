@@ -1,6 +1,37 @@
 use ribir::prelude::*;
 use webbrowser::{Browser, open_browser};
 
+fn section_title(title: &'static str) -> GenWidget {
+  row! {
+    clamp: BoxClamp::fixed_height(30.),
+    @Text { text: title }
+    @Icon { @svg_registry::get_or_default("info") }
+  }
+  .r_into()
+}
+
+fn section_card(title: &'static str, background: Color, content: GenWidget) -> GenWidget {
+  let palette = Palette::of(BuildCtx::get());
+
+  self::column! {
+    align_items: Align::Center,
+    @section_title(title)
+    @Flex {
+      direction: Direction::Vertical,
+      item_gap: 20.,
+      padding: EdgeInsets::new(20., 40., 20., 40.),
+      background,
+      radius: Radius::all(4.),
+      border: Border::all(BorderSide {
+        color: palette.primary().into(),
+        width: 1.,
+      }),
+      @ { content.clone() }
+    }
+  }
+  .r_into()
+}
+
 fn header() -> Widget<'static> {
   text! {
     margin: EdgeInsets::vertical(22.),
@@ -10,112 +41,81 @@ fn header() -> Widget<'static> {
 }
 
 fn content() -> Widget<'static> {
-  fn actions_show() -> GenWidget {
-    scrollbar! {
-      clamp: BoxClamp::EXPAND_X,
-      @Stack {
-        x: AnchorX::center(),
-        @Column {
+  fn action_buttons_show() -> GenWidget {
+    fn_widget! {
+      let palette = Palette::of(BuildCtx::get());
+      @Scrollbar {
+        clamp: BoxClamp::EXPAND_X,
+        @Stack {
           x: AnchorX::center(),
-          align_items: Align::Center,
           @Column {
+            x: AnchorX::center(),
             align_items: Align::Center,
-            @Row {
-              clamp: BoxClamp::fixed_height(30.),
-              @Text { text: "Common buttons" }
-              @Icon { @ { svg_registry::get_or_default("info") } }
-            }
-            @Flex {
-              direction: Direction::Vertical,
-              item_gap: 20.,
-              padding: EdgeInsets::new(20., 40., 20., 40.),
-              background: Palette::of(BuildCtx::get()).surface_container_low(),
-              radius: Radius::all(4.),
-              border: Border::all(BorderSide {
-                color: Palette::of(BuildCtx::get()).primary().into(),
-                width: 1.,
-              }),
-              @Flex {
+            @section_card(
+              "Common buttons",
+              palette.surface_container_low(),
+              flex! {
+                direction: Direction::Vertical,
                 item_gap: 20.,
-                @FilledButton { @ {"Filled" } }
-                @FilledButton {
-                  @Icon { @{ svg_registry::get_or_default("settings") } }
-                  @ { "Icon" }
+                @Flex {
+                  item_gap: 20.,
+                  @FilledButton { @ { "Filled" } }
+                  @FilledButton {
+                    @Icon { @svg_registry::get_or_default("settings") }
+                    @ { "Icon" }
+                  }
+                }
+                @Flex {
+                  item_gap: 20.,
+                  @Button { @ { "Outlined" } }
+                  @Button {
+                    @Icon { @svg_registry::get_or_default("search") }
+                    @ { "Icon" }
+                  }
+                }
+                @Flex {
+                  item_gap: 20.,
+                  @TextButton { @ { "Text" } }
+                  @TextButton {
+                    @Icon { @svg_registry::get_or_default("add") }
+                    @ { "Icon" }
+                  }
                 }
               }
-              @Flex {
+              .r_into()
+            )
+            @section_card(
+              "Floating action buttons",
+              palette.surface_container_lowest(),
+              flex! {
+                direction: Direction::Vertical,
                 item_gap: 20.,
-                @Button { @ { "Outlined" } }
-                @Button {
-                  @Icon { @Icon { @ { svg_registry::get_or_default("search") } } }
-                  @ { "Icon" }
+                @Flex {
+                  item_gap: 20.,
+                  @Fab { @Icon { @svg_registry::get_or_default("add") } }
+                  @Fab {
+                    @Icon { @svg_registry::get_or_default("add") }
+                    @ { "Create" }
+                  }
                 }
               }
-              @Flex {
+              .r_into()
+            )
+            @section_card(
+              "Icon buttons",
+              palette.surface_container_lowest(),
+              flex! {
+                direction: Direction::Vertical,
                 item_gap: 20.,
-                @TextButton { @ { "Text" } }
-                @TextButton {
-                  @Icon { @ { svg_registry::get_or_default("add") } }
-                  @ { "Icon" }
+                @Flex {
+                  item_gap: 20.,
+                  @TextButton { @Icon { @svg_registry::get_or_default("settings") } }
+                  @FilledButton { @Icon { @svg_registry::get_or_default("settings") } }
+                  @Button { @Icon { @svg_registry::get_or_default("settings") } }
                 }
               }
-            }
-          }
-          @Column {
-            align_items: Align::Center,
-            @ConstrainedBox {
-              clamp: BoxClamp::fixed_height(30.),
-              @Row {
-                @Text { text: "Floating action buttons" }
-                @Icon { @ { svg_registry::get_or_default("info") } }
-              }
-            }
-            @Flex {
-              direction: Direction::Vertical,
-              item_gap: 20.,
-              padding: EdgeInsets::new(20., 40., 20., 40.),
-              background: Palette::of(BuildCtx::get()).surface_container_lowest(),
-              radius: Radius::all(4.),
-              border: Border::all(BorderSide {
-                color: Palette::of(BuildCtx::get()).primary().into(),
-                width: 1.,
-              }),
-              @Flex {
-                item_gap: 20.,
-                @Fab { @Icon { @ { svg_registry::get_or_default("add") } } }
-                @Fab {
-                  @Icon { @ { svg_registry::get_or_default("add") } }
-                  @ { "Create" }
-                }
-              }
-            }
-          }
-          @Column {
-            align_items: Align::Center,
-            @ConstrainedBox {
-              clamp: BoxClamp::fixed_height(30.),
-              @Row {
-                @Text { text: "Icon buttons" }
-                @Icon { @ { svg_registry::get_or_default("info") } }
-              }
-            }
-            @Flex {
-              direction: Direction::Vertical,
-              item_gap: 20.,
-              padding: EdgeInsets::new(20., 40., 20., 40.),
-              background: Palette::of(BuildCtx::get()).surface_container_lowest(),
-              radius: Radius::all(4.),
-              border: Border::all(BorderSide {
-                color: Palette::of(BuildCtx::get()).primary().into(),
-                width: 1.,
-              }),
-              @Flex {
-                item_gap: 20.,
-                @TextButton { @Icon { @ { svg_registry::get_or_default("settings") } } }
-                @FilledButton { @Icon { @ { svg_registry::get_or_default("settings") } } }
-                @Button { @Icon{ @ { svg_registry::get_or_default("settings") } } }
-              }
-            }
+              .r_into()
+            )
           }
         }
       }
@@ -124,48 +124,41 @@ fn content() -> Widget<'static> {
   }
 
   fn tabs_show() -> GenWidget {
-    fn_widget! {
-      @Tabs {
-        @Tab {
-          @ { "Videos" }
-          @Icon { @ { svg_registry::get_or_default("home") } }
-          @void! {}
-        }
-        @Tab {
-          @ { "Photos" }
-          @Icon { @ { svg_registry::get_or_default("home") } }
-          @void! {}
-        }
-        @Tab {
-          @ { "Audio" }
-          @Icon { @ { svg_registry::get_or_default("home") } }
-          @void! {}
-        }
+    tabs! {
+      @Tab {
+        @ { "Videos" }
+        @Icon { @svg_registry::get_or_default("home") }
+        @void! {}
+      }
+      @Tab {
+        @ { "Photos" }
+        @Icon { @svg_registry::get_or_default("home") }
+        @void! {}
+      }
+      @Tab {
+        @ { "Audio" }
+        @Icon { @svg_registry::get_or_default("home") }
+        @void! {}
       }
     }
     .r_into()
   }
 
   fn containment_show() -> GenWidget {
-    fn_widget! {
-      @Column {
-        @ConstrainedBox {
-          clamp: BoxClamp::fixed_height(30.),
-          @Row {
-            x: AnchorX::center(),
-            @Text { text: "Divider" }
-            @Icon {
-              @ { svg_registry::get_or_default("info") }
-            }
-          }
-        }
-        @Divider {}
-      }
+    self::column! {
+      @section_title("Divider")
+      @Divider {}
     }
     .r_into()
   }
 
   fn lists_show() -> GenWidget {
+    fn open_ribir_homepage() {
+      if let Err(err) = open_browser(Browser::Default, "https://ribir.org") {
+        println!("Failed to open browser: {}", err);
+      }
+    }
+
     fn_widget! {
       @Column {
         margin: EdgeInsets::all(20.),
@@ -173,38 +166,34 @@ fn content() -> Widget<'static> {
           margin: EdgeInsets::only_top(20.),
           @ListItem {
             interactive: true,
-            on_tap: move |_| {
-              if let Err(err) = open_browser(Browser::Default, "https://ribir.org") {
-                println!("Failed to open browser: {}", err);
-              }
-            },
-            @Icon { @{ svg_registry::get_or_default("check") } }
+            on_tap: move |_| open_ribir_homepage(),
+            @Icon { @svg_registry::get_or_default("check") }
             @ListItemHeadline { @ { "One line list item" } }
-            @ListItemSupporting { @ { "One line supporting text"}}
+            @ListItemSupporting { @ { "One line supporting text" } }
           }
           @Divider { indent: DividerIndent::Start }
           @ListItem {
-            @Icon { @ { svg_registry::get_or_default("menu") } }
-            @ListItemHeadline { @{ "One line list item"} }
-            @ListItemTrailingSupporting { @{ "100+" } }
+            @Icon { @svg_registry::get_or_default("menu") }
+            @ListItemHeadline { @ { "One line list item" } }
+            @ListItemTrailingSupporting { @ { "100+" } }
           }
           @Divider { indent: DividerIndent::Start }
           @ListItem {
             @Avatar {
               @Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-1.png")))
             }
-            @ListItemHeadline { @ { "Two lines list item" }}
+            @ListItemHeadline { @ { "Two lines list item" } }
             @ListItemSupporting {
               lines: 2usize,
               @ { "Two lines supporting text \rTwo lines supporting text" }
             }
-            @Trailing { @Icon {  @ { svg_registry::get_or_default("check") } } }
+            @Trailing { @Icon { @svg_registry::get_or_default("check") } }
           }
           @Divider { indent: DividerIndent::Start }
           @ListItem {
             @Avatar { @ { "A" } }
-            @ListItemHeadline{ @ { "One lines list item" } }
-            @ListItemSupporting{ @ { "One lines supporting text" }}
+            @ListItemHeadline { @ { "One lines list item" } }
+            @ListItemSupporting { @ { "One lines supporting text" } }
             @ListItemTrailingSupporting { @ { "100+" } }
           }
           @Divider { indent: DividerIndent::Start }
@@ -227,45 +216,43 @@ fn content() -> Widget<'static> {
       margin: EdgeInsets::all(20.),
       @List {
         @ListItem {
-          @Checkbox { }
-          @ListItemHeadline { @{ "Option1"  } }
+          @Checkbox {}
+          @ListItemHeadline { @ { "Option1" } }
         }
         @ListItem {
-          @Checkbox { }
-          @ListItemHeadline { @{ "Option2"  } }
+          @Checkbox {}
+          @ListItemHeadline { @ { "Option2" } }
         }
         @ListItem {
-          @Checkbox { }
-          @ListItemHeadline { @{ "Option3"  } }
+          @Checkbox {}
+          @ListItemHeadline { @ { "Option3" } }
         }
       }
     }
     .r_into()
   }
 
-  fn_widget! {
-    @Tabs {
-      providers: [Provider::new(TabPos::Bottom)],
-      @Tab {
-        @ { "Actions" }
-        @actions_show()
-      }
-      @Tab {
-        @ { "Tabs" }
-        @tabs_show()
-      }
-      @Tab {
-        @ { "Containment" }
-        @containment_show()
-      }
-      @Tab {
-        @ { "Lists" }
-        @lists_show()
-      }
-      @Tab {
-        @ { "Selections" }
-        @checkbox_show()
-      }
+  tabs! {
+    providers: [Provider::new(TabPos::Bottom)],
+    @Tab {
+      @ { "Actions" }
+      @action_buttons_show()
+    }
+    @Tab {
+      @ { "Tabs" }
+      @tabs_show()
+    }
+    @Tab {
+      @ { "Containment" }
+      @containment_show()
+    }
+    @Tab {
+      @ { "Lists" }
+      @lists_show()
+    }
+    @Tab {
+      @ { "Selections" }
+      @checkbox_show()
     }
   }
   .into_widget()
@@ -277,7 +264,7 @@ pub fn storybook() -> Widget<'static> {
     align_items: Align::Center,
     background: Palette::of(BuildCtx::get()).surface_container_low(),
     @header()
-    @Expanded { @ { content() } }
+    @Expanded { @content() }
   }
   .into_widget()
 }

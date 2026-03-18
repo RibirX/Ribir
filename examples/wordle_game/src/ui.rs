@@ -6,22 +6,22 @@ pub fn wordle_game() -> Widget<'static> { Wordle::new(5, 5).into_widget() }
 
 impl Wordle {
   fn chars_key<const N: usize>(
-    this: &impl StateWriter<Value = Wordle>, chars: [char; N],
+    game: &impl StateWriter<Value = Wordle>, chars: [char; N],
   ) -> impl Iterator<Item = Widget<'static>> + 'static {
     chars.into_iter().map({
-      let this = this.clone_writer();
-      move |c| Wordle::char_key(&this, c)
+      let game = game.clone_writer();
+      move |c| Wordle::char_key(&game, c)
     })
   }
 
-  fn char_key(this: &impl StateWriter<Value = Wordle>, key: char) -> Widget<'static> {
+  fn char_key(game: &impl StateWriter<Value = Wordle>, key: char) -> Widget<'static> {
     let palette = Palette::of(BuildCtx::get());
     let base = palette.base_of(&palette.surface_variant());
     let success = palette.success();
     let warning = palette.warning();
     let error = palette.error();
     let (color, u) = Stateful::from_pipe(pipe! {
-      $read(this).key_hint(key).map_or(
+      $read(game).key_hint(key).map_or(
         base,
         |s| match s {
           CharHint::Correct => success,
@@ -32,7 +32,7 @@ impl Wordle {
 
     filled_button! {
       providers: [Provider::writer(color, None)],
-      on_tap: move |_| $write(this).guessing.enter_char(key),
+      on_tap: move |_| $write(game).guessing.enter_char(key),
       on_disposed:  move |_| u.unsubscribe(),
       @ { key.to_string() }
     }
@@ -40,10 +40,11 @@ impl Wordle {
   }
 
   fn keyboard(
-    this: impl StateWriter<Value = Wordle>, state_bar: Stateful<Text>,
+    game: impl StateWriter<Value = Wordle>, status: impl StateWriter<Value = Text>,
   ) -> Widget<'static> {
     let palette = Palette::of(BuildCtx::get());
     let gray = palette.base_of(&palette.surface_variant());
+
     flex! {
       y: AnchorY::center(),
       direction: Direction::Vertical,
@@ -54,13 +55,13 @@ impl Wordle {
         item_gap: 5.,
         align_items: Align::Center,
         justify_content: JustifyContent::Start,
-        @Wordle::chars_key(&this, ['Q', 'W', 'E', 'R','T', 'Y', 'U', 'I','O', 'P'])
+        @Wordle::chars_key(&game, ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'])
       }
       @Flex {
         item_gap: 5.,
         align_items: Align::Center,
         justify_content: JustifyContent::Start,
-        @Wordle::chars_key(&this, ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L' ])
+        @Wordle::chars_key(&game, ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'])
       }
       @Flex {
         item_gap: 5.,
@@ -68,16 +69,16 @@ impl Wordle {
         justify_content: JustifyContent::Start,
         @FilledButton {
           providers: [Provider::new(gray)],
-          on_tap: move |_| $write(this).guessing.delete_back_char(),
+          on_tap: move |_| $write(game).guessing.delete_back_char(),
           @ { "Del" }
         }
-        @Wordle::chars_key(&this, ['Z', 'X', 'C', 'V', 'B', 'N', 'M' ])
+        @Wordle::chars_key(&game, ['Z', 'X', 'C', 'V', 'B', 'N', 'M'])
 
         @FilledButton {
           providers: [Provider::new(gray)],
-          on_tap: move |_| match $write(this).guess() {
-            Ok(status) => state_bar.write().text = status.state_message().into(),
-            Err(e) => state_bar.write().text = e.message().into(),
+          on_tap: move |_| match $write(game).guess() {
+            Ok(s) => $write(status).text = s.state_message().into(),
+            Err(e) => $write(status).text = e.message().into(),
           },
           @ { "Enter" }
         }
@@ -86,28 +87,27 @@ impl Wordle {
     .into_widget()
   }
 
-  fn chars_grid(this: &impl StateWriter<Value = Wordle>) -> Widget<'static> {
-    fn_widget! {
-      @Flex {
-        y: AnchorY::center(),
-        direction: Direction::Vertical,
-        item_gap: 5.,
-        align_items: Align::Center,
-        justify_content: JustifyContent::Start,
-        @ {
-          (0..$read(this).max_rounds()).map(move |row| {
-            @Flex {
-              y: AnchorY::center(),
-              item_gap: 5.,
-              align_items: Align::Center,
-              justify_content: JustifyContent::Start,
-              @pipe! {
-                (0..$read(this).len_hint())
-                  .map(move |col| fn_widget! { $read(this).char_grid(row, col) })
-              }
+  fn chars_grid(game: &impl StateWriter<Value = Wordle>) -> Widget<'static> {
+    flex! {
+      y: AnchorY::center(),
+      direction: Direction::Vertical,
+      item_gap: 5.,
+      align_items: Align::Center,
+      justify_content: JustifyContent::Start,
+      @ {
+        let rows = $read(game).max_rounds();
+        (0..rows).map(move |row| {
+          @Flex {
+            y: AnchorY::center(),
+            item_gap: 5.,
+            align_items: Align::Center,
+            justify_content: JustifyContent::Start,
+            @pipe! {
+              let cols = $read(game).len_hint();
+              (0..cols).map(move |col| $read(game).char_grid(row, col))
             }
-          })
-        }
+          }
+        })
       }
     }
     .into_widget()
@@ -142,25 +142,25 @@ impl Wordle {
     let char_hint = self.char_hint(row, col);
     let c = char_hint.map(|c| c.char).unwrap_or('\0');
     let hint = char_hint.and_then(|c| c.hint);
+    let palette = Palette::of(BuildCtx::get());
+    let background = palette.container_of(&hint_color(hint));
+    let foreground = palette.on_container_of(&background);
+    let text_style = TypographyTheme::of(BuildCtx::get())
+      .display_small
+      .text
+      .clone();
 
-    fn_widget! {
-      let color = hint_color(hint);
-      let palette = Palette::of(BuildCtx::get());
-
-      let color = palette.container_of(&color);
-      let font_color = palette.on_container_of(&color);
-      @Container {
-        width: 56.,
-        height: 56.,
-        background: color,
-        radius: Radius::all(4.),
-        @Text {
-          text_style: TypographyTheme::of(BuildCtx::get()).display_small.text.clone(),
-          foreground: font_color,
-          x: AnchorX::center(),
-          y: AnchorY::center(),
-          text: c.to_string(),
-        }
+    container! {
+      width: 56.,
+      height: 56.,
+      background,
+      radius: Radius::all(4.),
+      @Text {
+        text_style,
+        foreground,
+        x: AnchorX::center(),
+        y: AnchorY::center(),
+        text: c.to_string(),
       }
     }
     .into_widget()
@@ -171,7 +171,7 @@ impl Compose for Wordle {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
       let state_bar = @Text { text: "" };
-      let keyboard = Wordle::keyboard($writer(this), state_bar.clone_writer());
+      let keyboard = Wordle::keyboard($writer(this), $writer(state_bar));
 
       let give_up = @Button {
         on_tap: move |_| {
@@ -215,7 +215,7 @@ impl Compose for Wordle {
           justify_content: JustifyContent::Start,
           item_gap: 5.,
           @H1 { text: "Wordle" }
-          @Divider { }
+          @Divider {}
           @Wordle::chars_grid(&this)
           @ { state_bar }
           @ { keyboard }

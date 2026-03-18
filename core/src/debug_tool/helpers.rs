@@ -5,6 +5,7 @@ use std::{
   sync::{LazyLock, RwLock},
 };
 
+use ribir_algo::CowArc;
 use ribir_geom::{Point, Rect};
 use ribir_painter::Color;
 use serde_json::{Value, json};
@@ -12,7 +13,7 @@ use serde_json::{Value, json};
 use super::types::*;
 use crate::{prelude::WidgetId, widget_tree::WidgetTree};
 
-pub(crate) struct OriginWidgetName(pub &'static str);
+pub(crate) struct OriginWidgetName(pub CowArc<str>);
 
 const DEBUG_NAME_BLACKLIST: &[&str] =
   &["Widget", "SingleKind", "MultiKind", "Pair", "SinglePair", "MultiPair", "PairOf", "XChild"];

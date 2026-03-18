@@ -160,4 +160,9 @@ src/
 ## 9. Common Pitfalls
 - **Deadlocks/Panics**: Calling `$write(s)` while a `$read(s)` is active in the same scope (RefCell borrow conflict).
 - **Infinite Loops**: A `pipe!` that modifies the same state it reads from.
-- **Orphan Widgets**: Forgetting to call `.into_widget()` when returning a widget from a function that isn't `fn_widget!`.
+
+## 10. Modular Skills & Domain Knowledge
+
+Specialized domain knowledge and expert workflows are modularized in the `./skills/` directory. Each subdirectory contains a `SKILL.md` defining specific best practices.
+
+**Instruction for Agents**: Before starting a task, **always list the contents of the `./skills/` directory**. If a subdirectory name matches your current task (e.g., `ribir-style`, `animation`, `testing`), read its `SKILL.md` to ensure you follow the latest project-specific conventions.
