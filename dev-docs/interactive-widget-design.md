@@ -312,13 +312,13 @@ You can also specify a type if the setter accepts a transformed value: `#[declar
 
 For complex container widgets like `Tabs`, `List`, and `Menu`, widget implementers **should not** provide dynamic item manipulation APIs (e.g., `addItem()`, `removeItem()`).
 
-**Update Strategy**: Use `pipe!` to wrap the **entire widget**. When the underlying data changes, the whole widget re-renders. Ribir's reconciliation engine, powered by `key`/`reuse_id`, handles efficient diffing and instance reuse automatically.
+**Update Strategy**: Use `pipe!` to wrap the **entire widget**. When the underlying data changes, the whole widget re-renders. Ribir's reconciliation engine, powered by `key`/`reuse`, handles efficient diffing and instance reuse automatically.
 
 ```rust
 // ✅ Correct: Pipe wraps the entire widget
 @pipe! {
     @Tabs {
-        reuse_id: "tabs_xxx",
+        reuse: ReuseKey::local("tabs_xxx"),
         @ {
             $read(data).tabs.iter().map(|tab| @Tab {
                 key: tab.id,  // Enables efficient reconciliation
@@ -331,32 +331,32 @@ For complex container widgets like `Tabs`, `List`, and `Menu`, widget implemente
 ```
 
 > [!NOTE]
-> **`reuse_id` vs `key`**:
-> - `reuse_id`: The **framework-level** reconciliation mechanism. Use it to preserve widget identity and internal state across re-renders.
-> - `key`: A **widget-level** convenience prop that some widgets may provide. It maps to `reuse_id` internally for easier usage in dynamic lists.
+> **`reuse` vs `key`**:
+> - `reuse`: The **framework-level** reconciliation mechanism. Use it with `ReuseKey::local(...)` or `ReuseKey::global(...)` to preserve widget identity and internal state across re-renders.
+> - `key`: A **widget-level** convenience prop that some widgets may provide. It usually maps to framework reuse internally for easier usage in dynamic lists.
 
 **Benefits**:
 - **Simpler mental model**: No imperative add/remove APIs to learn.
 - **Consistency**: Widget state always reflects data state.
 - **Automatic optimization**: Framework handles diffing, reordering, and instance reuse.
 
-### Widget Reuse (`reuse_id`)
+### Widget Reuse (`reuse`)
 In dynamic lists (`pipe! { @List }`), Ribir recreates widgets by default when data changes. This destroys focus, selection, and scroll state.
 
-**Solution**: Use `reuse_id` with a stable identifier.
+**Solution**: Use `reuse` with a stable `ReuseKey`.
 
 ```rust
 @pipe! {
     @List {
         reuse_id: "list_xxx",
-        @ {
+            reuse: ReuseKey::local("list_xxx"),
             $read(data).items.iter().map(|item| @ListItem {
                 reuse_id: item.id, // Keeps the widget instance alive
-                content: item.name,
+                    reuse: ReuseKey::local(item.id), // Keeps the widget instance alive
             })
         }
     }
 }
 ```
-*   **Without `reuse_id`**: Focus is lost every time the list updates.
-*   **With `reuse_id`**: Focus, cursor position, and animation state are preserved.
+    *   **Without `reuse`**: Focus is lost every time the list updates.
+    *   **With `reuse`**: Focus, cursor position, and animation state are preserved.

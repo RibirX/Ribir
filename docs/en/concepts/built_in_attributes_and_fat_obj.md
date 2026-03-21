@@ -144,7 +144,26 @@ These attributes are used to control the appearance and layout of Widgets.
     *   `disabled`: Disables interaction for Widget and its children.
     *   `providers`: Sets provider context for the widget.
     *   `class`: Applies style classes.
-    *   `reuse`: Reuse Widget by setting the reuse attribute. For local reuse, can be used with (LocalWidgets).
+    *   `reuse`: Reuse a Widget by setting the `reuse` attribute. Combine it with `ReuseScope` for scoped reuse, or use `ReuseKey::global(...)` for outward lookup to the root scope.
+
+`ReuseKey` also exposes two public helper methods:
+
+*   `key.resolve()`: Create a resolve-only `Reuse` expression for the current binding. It is equivalent to `@Reuse { reuse: key }`; it does not generate a new widget.
+*   `key.leave(ctx)`: Evict the binding currently resolved by this key from the current scope context. Live targets stop resolving immediately; cached targets are removed immediately.
+
+Example:
+
+```rust
+let header = ReuseKey::local("header");
+
+@ReuseScope {
+  defs: [reuse_def(header.clone(), || header_widget())],
+  @header.resolve()
+  on_tap: move |e| {
+    let _ = header.leave(e);
+  },
+}
+```
 
 ### 2. Events
 

@@ -5,8 +5,8 @@ use crate::prelude::*;
 /// A high-level reusable widget for the common `'static` owned path.
 ///
 /// `Reusable` owns the initial widget and lazily creates its underlying
-/// [`ReuseHandle`] when the widget is first built. Subsequent builds reuse the
-/// same preserved subtree through that handle.
+/// low-level reuse handle when the widget is first built. Subsequent builds
+/// reuse the same preserved subtree through that handle.
 #[derive(Clone)]
 pub struct Reusable(std::rc::Rc<RefCell<ReusableInner>>);
 
@@ -19,8 +19,8 @@ enum ReusableInner {
 /// A low-level handle that enables efficient reuse of widget instances across
 /// multiple placements.
 ///
-/// Prefer using [`ReuseId`] for widget reuse between scopes instead of manually
-/// managing reuse.
+/// Prefer using [`ReuseKey`] and [`ReuseScope`] for scope-based reuse instead
+/// of manually managing reuse.
 ///
 /// This handle maintains a widget that can be recycled when removed from the
 /// widget tree, allowing subsequent reuse through `get_widget()`. The widget is
@@ -43,7 +43,7 @@ enum ReusableInner {
 /// - Calling `get_widget()` after `release()`
 /// - Calling `get_widget()` before placing the initial widget
 #[derive(Clone)]
-pub struct ReuseHandle(std::rc::Rc<RefCell<ReuseHandleInner>>);
+pub(crate) struct ReuseHandle(std::rc::Rc<RefCell<ReuseHandleInner>>);
 
 struct ReuseHandleInner {
   track_id: TrackId,
@@ -107,16 +107,18 @@ impl ReuseHandle {
   ///
   /// Returns `(Widget, ReuseHandle)`. The returned Widget MUST be placed in the
   /// tree before the `ReuseHandle` can be used to retrieve it again.
-  pub fn new<'a, K>(w: impl IntoWidget<'a, K>) -> (Widget<'a>, Self) {
+  pub(crate) fn new<'a, K>(w: impl IntoWidget<'a, K>) -> (Widget<'a>, Self) {
     let mut obj = FatObj::new(w);
     let this = Self(std::rc::Rc::new(RefCell::new(ReuseHandleInner {
       track_id: obj.track_id(),
       state: ReuseHandleState::PendingMount,
     })));
 
-    let state = this.0.clone();
+    let state = std::rc::Rc::downgrade(&this.0);
     obj.on_event(move |event| {
-      if let Event::Disposing(e) = event {
+      if let Event::Disposing(e) = event
+        && let Some(state) = state.upgrade()
+      {
         let mut inner = state.borrow_mut();
         if inner.should_capture_recycled(e.current_target()) {
           inner.capture_recycled(e.preserve());
@@ -128,7 +130,7 @@ impl ReuseHandle {
   }
 
   /// Returns true if the managed widget is currently active in the UI.
-  pub fn is_in_use(&self) -> bool {
+  pub(crate) fn is_in_use(&self) -> bool {
     let inner = self.0.borrow();
     inner.is_in_use()
   }
@@ -142,7 +144,7 @@ impl ReuseHandle {
   /// # Panics
   /// - If called after `release()`
   /// - If called before the initial widget is placed
-  pub fn get_widget(&self) -> Widget<'static> {
+  pub(crate) fn get_widget(&self) -> Widget<'static> {
     let this = self.clone();
     fn_widget! { this.gen_widget() }.into_widget()
   }
@@ -164,14 +166,15 @@ impl ReuseHandle {
   /// Permanently disposes of the managed widget and associated resources.
   ///
   /// Subsequent calls to `get_widget()` will panic.
-  pub fn release(&self) {
+  pub(crate) fn release(&self) {
     let mut inner = self.0.borrow_mut();
     inner.release();
   }
 
   fn bind_host<'a>(&self, widget: Widget<'a>) -> Widget<'a> {
-    let state = self.0.clone();
+    let state = std::rc::Rc::downgrade(&self.0);
     widget.on_build(move |id| {
+      let Some(state) = state.upgrade() else { return };
       let host = PreserveHost::install(id, BuildCtx::get_mut().tree_mut());
       state.borrow_mut().bind_host(host);
     })
@@ -450,5 +453,67 @@ mod tests {
 
     assert!(AppCtx::send_ui_event(UiEvent::CloseRequest { wnd_id: wnd.id() }));
     AppCtx::run_until_stalled();
+  }
+
+  #[test]
+  fn live_handle_state_drops_after_last_owner_is_released() {
+    reset_test_env!();
+
+    let show = Stateful::new(true);
+    let (widget, handle) = ReuseHandle::new(Text::new("tip"));
+    let weak = std::rc::Rc::downgrade(&handle.0);
+    let owner = Rc::new(RefCell::new(Some(handle)));
+    let first = Rc::new(RefCell::new(Some(widget.into_widget())));
+
+    let wnd = TestWindow::from_widget(fn_widget! {
+      let first = first.clone();
+      @ {
+        pipe!(*$read(show)).map(move |show| {
+          show.then(|| first.borrow_mut().take().unwrap())
+        })
+      }
+    });
+
+    wnd.draw_frame();
+    assert!(weak.upgrade().is_some());
+
+    owner.borrow_mut().take();
+    assert!(weak.upgrade().is_none());
+  }
+
+  #[test]
+  fn cached_handle_state_drops_after_last_owner_is_released() {
+    reset_test_env!();
+
+    let show = Stateful::new(true);
+    let (widget, handle) = ReuseHandle::new(Text::new("tip"));
+    let weak = std::rc::Rc::downgrade(&handle.0);
+    let owner = Rc::new(RefCell::new(Some(handle)));
+    let first = Rc::new(RefCell::new(Some(widget.into_widget())));
+
+    let wnd = TestWindow::from_widget(fn_widget! {
+      let first = first.clone();
+      @ {
+        pipe!(*$read(show)).map(move |show| {
+          show.then(|| first.borrow_mut().take().unwrap())
+        })
+      }
+    });
+
+    wnd.draw_frame();
+    assert!(weak.upgrade().is_some());
+
+    *show.write() = false;
+    wnd.draw_frame();
+    assert!(
+      owner
+        .borrow()
+        .as_ref()
+        .is_some_and(|handle| !handle.is_in_use())
+    );
+    assert!(weak.upgrade().is_some());
+
+    owner.borrow_mut().take();
+    assert!(weak.upgrade().is_none());
   }
 }

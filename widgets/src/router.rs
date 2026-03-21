@@ -65,8 +65,8 @@ use smallvec::SmallVec;
 ///
 /// The router uses lazy initialization for route widgets, requiring all routed
 /// content to be [`GenWidget`] types. To reuse existing widget instances
-/// instead of rebuilding on navigation, wrap content with [`ReuseId`] in
-/// appropriate scopes.
+/// instead of rebuilding on navigation, wrap content with [`Reuse`] or assign
+/// stable `reuse` keys inside appropriate [`ReuseScope`] boundaries.
 
 #[declare]
 pub struct Router {
