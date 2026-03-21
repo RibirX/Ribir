@@ -124,12 +124,50 @@ Both use the same API:
 - `keyframes!`: Script precise intermediate waypoints.
 - `Stagger`: Offset start times for multiple elements (e.g., cascading lists).
 
+### Position & Size Smoothing: `SmoothLayout` & `SmoothGlobal`
+
+Ribir provides layout-integrated smoothing widgets that automatically animate geometry transitions (position and size). Unlike `@Animate`, which requires explicitly binding to a property, these widgets intercept the layout pipeline to interpolate from the old geometry toward the new target.
+
+#### `SmoothLayout`
+The primary widget for animating local position and size within the parent's coordinate space.
+
+```rust ignore
+@SmoothLayout {
+  pos_axes: PosAxes::Pos,      // Animate X and Y
+  size_axes: SizeAxes::Size,   // Animate Width and Height
+  transition: EasingTransition {
+    easing: easing::EASE_OUT,
+    duration: Duration::from_millis(300),
+  },
+  // Entry animation starting values
+  init_x: AnchorX::left().offset(-100.), 
+  init_size: Size::splat(0.),
+  @MyWidget { ... }
+}
+```
+
+- **SizeMode**: Determines if the animated size affects the layout of surrounding widgets (`Layout`, default) or is purely visual (`Visual`).
+- **SizeEffect**: Choose between `Clip` (cropping the content, default) or `Scale` (stretching the content) during size transitions.
+
+#### `SmoothGlobal`
+A specialized widget for global position smoothing. It tracks the widget's position in window coordinates, ensuring continuity even if the widget moves across different parent containers or subtrees.
+
+```rust ignore
+@SmoothGlobal {
+  pos_axes: PosAxes::Pos,
+  @Child {}
+}
+```
+
+Useful for "shared element" style transitions where a widget needs to move smoothly between two different locations in the UI tree that don't share a common coordinate system.
+
 ---
 
 ## Summary Guide
 
 1. **Mount/Dispose animation?** → `AnimatedPresence` (or `AnimatedVisibility` if static).
 2. **Enum-driven visuals?** → `@AnimateMatch`.
-3. **Simple property glide?** → `transition(...)`.
-4. **Manual control?** → `@Animate`.
-5. **Complex timeline?** → `keyframes!` or `Stagger`.
+3. **Implicit layout/geometry transitions?** → `SmoothLayout` or `SmoothGlobal`.
+4. **Simple property glide?** → `transition(...)`.
+5. **Manual control?** → `@Animate`.
+6. **Complex timeline?** → `keyframes!` or `Stagger`.
