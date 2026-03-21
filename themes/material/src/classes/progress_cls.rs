@@ -70,7 +70,8 @@ pub(super) fn init(classes: &mut Classes) {
   });
   classes.insert(LINEAR_DETERMINATE_INDICATOR, move |host| {
     smooth_layout! {
-      axes: SmoothAxes::WIDTH,
+      pos_axes: PosAxes::None,
+      size_axes: SizeAxes::Width,
       transition: DETERMINATE_TRANS,
       init_width: 0.,
       @md_base_linear_indicator(host)

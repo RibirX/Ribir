@@ -265,8 +265,8 @@ fn indicator(pos: &TabPos) -> Widget<'static> {
     }
 
 
-    let smooth = @SmoothLayout {
-      axes: SmoothAxes::POS,
+    let smooth = @SmoothGlobal {
+      pos_axes: PosAxes::Pos,
       transition: EasingTransition {
         easing: md::easing::EMPHASIZED_DECELERATE,
         duration: md::easing::duration::MEDIUM1,
