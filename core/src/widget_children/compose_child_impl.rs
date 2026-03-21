@@ -268,7 +268,7 @@ mod tests {
 
     let _pipe_child = fn_widget! {
       let state = Stateful::new(0usize);
-      @PipeParent {  @ { pipe!(*$read(state)) } }
+      @PipeParent { @pipe!(*$read(state)) }
     };
   }
 

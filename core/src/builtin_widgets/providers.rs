@@ -149,6 +149,7 @@ use rxrust::observable::boxed::LocalBoxedObservableClone;
 use smallvec::SmallVec;
 use widget_id::RenderQueryable;
 
+use super::ReuseScope;
 use crate::prelude::*;
 
 /// The widget that provides data to its descendants. See the
@@ -190,6 +191,7 @@ pub trait ProviderRestore {
 #[derive(Default)]
 pub struct ProviderCtx {
   data: ahash::AHashMap<TypeInfo, Box<dyn Query>>,
+  reuse_scopes: Vec<ReuseScope>,
   /// The stack is used to temporarily store the providers that are set up and
   /// will be popped and restored when the scope is exited.
   setup_providers: Vec<(WidgetId, *const Providers)>,
@@ -562,6 +564,12 @@ impl ProviderCtx {
     }
   }
 
+  pub(crate) fn push_reuse_scope(&mut self, scope: ReuseScope) { self.reuse_scopes.push(scope); }
+
+  pub(crate) fn pop_reuse_scope(&mut self) -> Option<ReuseScope> { self.reuse_scopes.pop() }
+
+  pub(crate) fn visible_reuse_scopes(&self) -> &[ReuseScope] { &self.reuse_scopes }
+
   pub(crate) fn remove_raw_provider(&mut self, info: &TypeInfo) -> Option<Box<dyn Query>> {
     self.data.remove(info)
   }
@@ -671,6 +679,7 @@ impl Drop for ProviderCtx {
   fn drop(&mut self) {
     while self.pop_providers().is_some() {}
 
+    assert!(self.reuse_scopes.is_empty());
     assert!(
       self.data.is_empty(),
       "Some providers may not be restored if you create an independent `Providers` instead of \

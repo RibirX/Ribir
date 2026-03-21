@@ -880,7 +880,7 @@ mod tests {
     fn_widget! {
       let progress = progress.clone();
       @Reuse {
-        reuse_id: GlobalId::new("smooth_global_reuse"),
+        reuse: ReuseKey::global("smooth_global_reuse"),
         @SmoothGlobal {
           on_mounted: move |e| *$write(tracker) = Some(e.current_target()),
           pos_axes: PosAxes::X,

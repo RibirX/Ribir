@@ -142,8 +142,29 @@ fn example() -> Widget<'static> {
     *   `disabled`: 禁用 Widget 及其子项的交互。
     *   `providers`: 为 Widget 设置提供者上下文。
     *   `class`: 应用样式类。
-    *   `reuse`: 通过设置 reuse 属性，可以重用 Widget。如果是局部的复用，可结合 `LocalWidgets` 使用。
+    *   `reuse`: 通过设置 `reuse` 属性，可以重用 Widget。局部复用可结合 `ReuseScope` 使用，跨 scope 共享可使用 `ReuseKey::global(...)`。
 
+`ReuseKey` 还提供两个公开辅助方法：
+
+*   `key.resolve()`：为当前 binding 构造一个 resolve-only 的 `Reuse` 表达式，等价于 `@Reuse { reuse: key }`；它不会生成新的 widget。
+*   `key.leave(ctx)`：将这个 key 在当前 scope 上下文中命中的 binding 移出解析面。live target 会立即停止被 resolve；cached target 会立即从 scope 中移除。
+
+示例：
+
+```rust
+use ribir::prelude::*;
+
+fn reuse_example() -> Widget<'static> {
+    let header = ReuseKey::local("header");
+    reuse_scope! {
+        defs: [reuse_def(header.clone(), || void!{}.into_widget())],
+        on_tap: move |e| {
+            let _ = $clone(header).leave(e);
+        },
+        @ { header.resolve() }
+    }.into_widget()
+}
+```
 ### 2. 事件
 
 这些属性用于处理用户交互。所有事件回调都会接收一个事件对象。

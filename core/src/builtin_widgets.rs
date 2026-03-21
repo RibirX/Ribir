@@ -7,13 +7,13 @@
 
 mod painting_style;
 use std::ops::DerefMut;
-pub mod reuse_id;
-pub use reuse_id::*;
-pub mod widget_scope;
+pub mod reuse;
+pub use reuse::*;
+pub mod reuse_scope;
 pub use painting_style::*;
 mod text_align;
+pub use reuse_scope::*;
 pub use text_align::*;
-pub use widget_scope::*;
 pub mod image;
 
 pub use image::{DecodedFrame, FrameIterator, Image, LoopCount};
@@ -933,9 +933,9 @@ impl<T> FatObj<T> {
     self
   }
 
-  pub fn with_reuse_id(&mut self, reuse_id: impl Into<ReuseId>) -> &mut Self {
+  pub fn with_reuse(&mut self, reuse: impl Into<ReuseKey>) -> &mut Self {
     assert!(self.reuse.is_none());
-    self.reuse = Some(Reuse { reuse_id: reuse_id.into() });
+    self.reuse = Some(Reuse { reuse: reuse.into() });
     self
   }
 

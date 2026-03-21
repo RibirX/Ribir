@@ -75,7 +75,7 @@ impl WidgetTree {
     let (mut providers, child) = Theme::preprocess_before_compose(theme, child);
     let location = Location::stateful();
     providers.push(Provider::writer(location.clone_writer(), None));
-    providers.push(Provider::writer(Stateful::new(GlobalWidgets::default()), None));
+    providers.push(ReuseScope::root_provider());
 
     let mut root = FatObj::new(child);
     root
@@ -474,18 +474,16 @@ mod tests {
     let c_p = parent.clone_writer();
     let c_c = child.clone_writer();
     let w = fn_widget! {
-      @ {
-        pipe!(*$read(parent)).map(move |p| fn_widget!{
-          if p {
-            @MockBox {
-              size: Size::zero(),
-              @ { pipe!($read(child).then(|| fn_widget!{ @Void {}})) }
-            }.into_widget()
-          } else {
-            Void::default().into_widget()
-          }
-        })
-      }
+      @pipe!(*$read(parent)).map(move |p| fn_widget!{
+        if p {
+          @MockBox {
+            size: Size::zero(),
+            @pipe!($read(child).then(|| fn_widget!{ @Void {}}))
+          }.into_widget()
+        } else {
+          Void::default().into_widget()
+        }
+      })
     };
 
     let wnd = TestWindow::from_widget(w);
