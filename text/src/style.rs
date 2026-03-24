@@ -68,6 +68,7 @@ pub enum TextOverflow {
   #[default]
   Overflow,
   AutoWrap,
+  Ellipsis,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
@@ -136,7 +137,7 @@ pub fn single_style_paragraph_style(
   ParagraphStyle {
     text_align,
     wrap: match text_style.overflow {
-      TextOverflow::Overflow => TextWrap::NoWrap,
+      TextOverflow::Overflow | TextOverflow::Ellipsis => TextWrap::NoWrap,
       TextOverflow::AutoWrap => TextWrap::Wrap,
     },
   }
@@ -184,5 +185,14 @@ mod tests {
   #[test]
   fn bare_f32_maps_to_px_line_height() {
     assert_eq!(LineHeight::from(24.), LineHeight::Px(24.));
+  }
+
+  #[test]
+  fn ellipsis_overflow_uses_no_wrap_paragraph_style() {
+    let style = TextStyle::default().with_overflow(TextOverflow::Ellipsis);
+
+    let paragraph = single_style_paragraph_style(&style, TextAlign::Start);
+
+    assert_eq!(paragraph.wrap, TextWrap::NoWrap);
   }
 }
