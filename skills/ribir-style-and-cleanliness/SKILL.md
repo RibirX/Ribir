@@ -192,6 +192,9 @@ When dealing with long lists or deep UI trees, consider using `part_writer` for 
 ### 2.2 Reactive Streams
 - Prefer `distinct_pipe!` over `pipe!` unless you specifically need to process duplicate values (helps reduce redundant UI updates).
 
+### 2.3 Lightweight Smart Pointers
+- When a weak count is not needed, prioritize using the repository's internal `Rc` and `Arc` smart pointers (re-exported from `rclite` in `ribir_algo`) instead of `std::rc::Rc` or `std::sync::Arc`. They are more lightweight and have better performance as they do not support weak counts.
+
 ## 3. Debuggability
 
 ### 3.1 Recommendation for `debug_name`
