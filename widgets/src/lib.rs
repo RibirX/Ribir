@@ -22,6 +22,7 @@ pub mod overlay;
 pub mod path;
 pub mod progress;
 pub mod radio;
+pub mod rich_text;
 pub mod router;
 pub mod scrollbar;
 pub mod select_region;
@@ -45,8 +46,8 @@ pub mod prelude {
   pub use super::{
     animation::*, avatar::*, badge::*, buttons::*, checkbox::*, common_widget::*, divider::*,
     grid_view::*, icon::*, input::*, label::*, layout::*, list::*, menu::*, navigation_rail::*,
-    overlay::*, path::*, progress::*, radio::*, router::*, scrollbar::*, select_region::*,
-    slider::*, switch::*, tabs::*, tooltip::*, transform_box::*,
+    overlay::*, path::*, progress::*, radio::*, rich_text::*, router::*, scrollbar::*,
+    select_region::*, slider::*, switch::*, tabs::*, tooltip::*, transform_box::*,
   };
   pub use crate::{cases, transitions};
 }

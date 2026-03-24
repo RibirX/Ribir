@@ -10,6 +10,7 @@ pub trait RenderProxy {
   fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized>;
 }
 pub(crate) struct PureRender<R: Render>(pub R);
+pub(crate) struct ReaderRender<R>(pub R);
 
 impl<R: Render> Query for PureRender<R> {
   fn query_all<'q>(&'q self, _: &QueryId, _: &mut SmallVec<[QueryHandle<'q>; 1]>) {}
@@ -25,6 +26,11 @@ impl<R: Render> Query for PureRender<R> {
 
 impl<R: Render> RenderProxy for PureRender<R> {
   fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { &self.0 }
+}
+
+impl<R: StateReader<Value: Render>> RenderProxy for ReaderRender<R> {
+  #[inline(always)]
+  fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self.0.read() }
 }
 
 impl<T> Render for T

@@ -7,6 +7,7 @@
 
 mod painting_style;
 use std::ops::DerefMut;
+
 use crate::text::LineHeight;
 pub mod reuse;
 pub use reuse::*;
