@@ -1,3 +1,17 @@
+//! # Ribir Widgets
+//!
+//! A collection of standard UI widgets for the Ribir framework.
+//!
+//! ## Widget Design Philosophy
+//!
+//! All widgets in this crate follow a strict set of design principles to ensure
+//! consistency, responsiveness, and performance.
+//!
+//! - **How to implement widgets**: See the [Custom Widgets Tutorial](docs/en/advanced/custom_widgets.md) for structural patterns.
+//! - **Interaction & Data Flow**: See the [Interactive Widget Design Standard](docs/en/concepts/interactive-widget-design.md) for principles like Single Source of Truth and Controlled Interaction.
+//!
+//! For more implementation details, check the documentation of individual modules.
+
 #[macro_use]
 extern crate bitflags;
 

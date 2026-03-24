@@ -25,7 +25,8 @@ Cargo.lock
 /test_cases/**/*_diff.png
 
 # Agent configurations
-.gemini/
+.gemini/*
+!.gemini/skills/
 .claude/
 .claude.json
 *.skill
