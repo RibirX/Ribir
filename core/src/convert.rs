@@ -1,4 +1,7 @@
-use crate::{prelude::*, render_helper::PureRender};
+use crate::{
+  prelude::*,
+  render_helper::{PureRender, ReaderRender},
+};
 
 /// Reciprocal conversion trait with explicit kind marker
 ///
@@ -147,13 +150,6 @@ impl<R: Render + 'static> RFrom<R, OtherWidget<dyn Render>> for Widget<'static> 
   fn r_from(widget: R) -> Self { Widget::from_render(Box::new(PureRender(widget))) }
 }
 
-// State reader render proxy implementation
-struct ReaderRender<T>(T);
-impl<R: StateReader<Value: Render>> crate::render_helper::RenderProxy for ReaderRender<R> {
-  #[inline(always)]
-  fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self.0.read() }
-}
-
 macro_rules! impl_into_x_widget_for_state_reader {
   (<$($generics:ident $(: $bounds:ident)?),* > $ty:ty $(where $($t: tt)*)?) => {
     impl<$($generics $(:$bounds)?,)*> RFrom<$ty, OtherWidget<dyn Render>> for Widget<'static>
@@ -195,6 +191,8 @@ impl_into_x_widget_for_state_reader!(
   <O, M> PartReader<O, M>
   where PartReader<O, M>: StateReader<Value: Render + Sized>
 );
+impl_into_x_widget_for_state_watcher!(<R: Render> Box<dyn StateWatcher<Value = R>>);
+impl_into_x_widget_for_state_watcher!(<R: Render> Box<dyn StateWriter<Value = R>>);
 impl_into_x_widget_for_state_watcher!(<R: Render> Stateful<R>);
 impl_into_x_widget_for_state_watcher!(
   <W, WM> PartWriter<W, WM>
@@ -281,4 +279,60 @@ where
   C: RFrom<T, K>,
 {
   fn r_into(self) -> C { C::r_from(self) }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::test_helper::*;
+
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+  #[test]
+  fn boxed_state_writer_can_be_used_as_fat_obj_host() {
+    crate::reset_test_env!();
+
+    let state = Stateful::new(MockBox { size: Size::new(100., 100.) });
+    let writer: Box<dyn StateWriter<Value = MockBox>> = Box::new(state.clone_writer());
+
+    let wnd = TestWindow::from_widget(fn_widget! {
+      @FatObj {
+        @ { writer.clone_writer() }
+      }
+    });
+
+    wnd.draw_frame();
+    wnd.assert_root_size(Size::new(100., 100.));
+
+    state.write().size = Size::new(50., 50.);
+    AppCtx::run_until_stalled();
+    assert!(wnd.tree().is_dirty());
+
+    wnd.draw_frame();
+    wnd.assert_root_size(Size::new(50., 50.));
+  }
+
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+  #[test]
+  fn boxed_state_watcher_can_be_used_as_fat_obj_host() {
+    crate::reset_test_env!();
+
+    let state = Stateful::new(MockBox { size: Size::new(100., 100.) });
+    let watcher: Box<dyn StateWatcher<Value = MockBox>> = state.clone_boxed_watcher();
+
+    let wnd = TestWindow::from_widget(fn_widget! {
+      @FatObj {
+        @ { watcher.clone_watcher() }
+      }
+    });
+
+    wnd.draw_frame();
+    wnd.assert_root_size(Size::new(100., 100.));
+
+    state.write().size = Size::new(50., 50.);
+    AppCtx::run_until_stalled();
+    assert!(wnd.tree().is_dirty());
+
+    wnd.draw_frame();
+    wnd.assert_root_size(Size::new(50., 50.));
+  }
 }

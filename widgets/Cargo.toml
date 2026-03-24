@@ -36,4 +36,4 @@ ribir = { path = "../ribir", features = ["material"] }
 
 [features]
 default = []
-debug = ["ribir_core/debug", "serde_json"]
+debug = ["ribir_core/debug", "dep:serde_json"]
