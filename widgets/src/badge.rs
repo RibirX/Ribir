@@ -9,6 +9,43 @@ use crate::prelude::*;
 #[derive(Clone)]
 pub struct BadgeColor(pub Color);
 
+/// Semantic content model for a badge.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum BadgeContent {
+  /// Hide the badge entirely.
+  #[default]
+  Hidden,
+  /// Render a small dot badge.
+  Dot,
+  /// Render text inside the badge.
+  Text(CowArc<str>),
+}
+
+impl BadgeContent {
+  fn visible(&self) -> bool { !matches!(self, Self::Hidden) }
+
+  fn text(&self) -> CowArc<str> {
+    match self {
+      Self::Text(text) => text.clone(),
+      Self::Hidden | Self::Dot => CowArc::default(),
+    }
+  }
+
+  fn class(&self) -> ClassName {
+    match self {
+      Self::Text(_) => BADGE_LARGE,
+      Self::Hidden | Self::Dot => BADGE_SMALL,
+    }
+  }
+}
+
+impl<T> From<T> for BadgeContent
+where
+  CowArc<str>: From<T>,
+{
+  fn from(value: T) -> Self { Self::Text(CowArc::from(value)) }
+}
+
 /// The `Badge` widget is used to show notifications, counts, or status
 /// information on top of another widget.
 ///
@@ -19,29 +56,30 @@ pub struct BadgeColor(pub Color);
 /// # use ribir_widgets::prelude::*;
 ///
 /// let _badge = badge! {
-///   content: Some(CowArc::from("New")),
+///   content: "New",
 ///   @Text { text: "Child widget" }
 /// };
 ///
 /// let _dot_badge = badge! {
-///   content: Some(CowArc::from("")),
+///   content: BadgeContent::Dot,
 ///   @Text { text: "Child widget" }
 /// };
 ///
 /// let _color_badge = badge! {
 ///   providers: [Provider::new(BadgeColor(Color::GREEN))],
-///   content: Some(CowArc::from("New")),
+///   content: "New",
 ///   @Text { text: "Child widget" }
 /// };
 /// ```
 #[derive(Clone, Declare, PartialEq)]
 pub struct Badge {
   /// The content to display inside the badge.
-  /// - `Some("text")`: Display the text.
-  /// - `Some("")`: Display a small dot.
-  /// - `None`: Hide the badge.
+  /// Values accepted by `CowArc<str>` become `BadgeContent::Text(...)`.
+  /// - `"text"` / `BadgeContent::Text("text".into())`: Display the text.
+  /// - `BadgeContent::Dot`: Display a small dot.
+  /// - `BadgeContent::Hidden`: Hide the badge.
   #[declare(default)]
-  pub content: Option<CowArc<str>>,
+  pub content: BadgeContent,
   /// The offset to adjust the badge's position relative to the bounding
   /// rectangle of the child widget.
   #[declare(default = Anchor::right_top(0., 0.))]
@@ -57,19 +95,19 @@ pub struct Badge {
 /// # use ribir_widgets::prelude::*;
 ///
 /// let _num_badge = num_badge! {
-///   count: Some(5),
+///   count: 5,
 ///   @Text { text: "Child widget" }
 /// };
 ///
 /// let _overflow_badge = num_badge! {
-///   count: Some(100),
+///   count: 100,
 ///   max_count: 99u32,
 ///   @Text { text: "Child widget" }
 /// };
 ///
 /// let _color_badge = num_badge! {
 ///   providers: [Provider::new(BadgeColor(Color::GREEN))],
-///   count: Some(5),
+///   count: 5,
 ///   @Text { text: "Child widget" }
 /// };
 /// ```
@@ -105,17 +143,11 @@ impl<'a> ComposeChild<'a> for Badge {
       @ { child }
       @ InParentLayout {
         @Text {
-          visible: pipe!($read(this).content.is_some()),
+          visible: pipe!($read(this).content.visible()),
           x: pipe!($read(this).offset.x.clone().unwrap_or_default()),
           y: pipe!($read(this).offset.y.clone().unwrap_or_default()),
-          text: pipe!($read(this).content.clone().unwrap_or_default()),
-          class: pipe! {
-            if $read(this).content.as_ref().map_or(true, |s| s.is_empty()) {
-              BADGE_SMALL
-            } else {
-              BADGE_LARGE
-            }
-          }
+          text: pipe!($read(this).content.text()),
+          class: pipe!($read(this).content.class()),
         }
       }
     }
@@ -129,12 +161,12 @@ impl<'a> ComposeChild<'a> for NumBadge {
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'a> {
     badge! {
       content: pipe!($read(this).count).map(move |v| {
-        v.map(|count| {
-            let max = $read(this).max_count;
-            if count > max {
-            format!("{}+", max).into()
+        v.map_or(BadgeContent::Hidden, |count| {
+          let max = $read(this).max_count;
+          if count > max {
+            BadgeContent::Text(format!("{}+", max).into())
           } else {
-            count.to_string().into()
+            BadgeContent::Text(count.to_string().into())
           }
         })
       }),
@@ -152,15 +184,33 @@ mod tests {
 
   use super::*;
 
+  #[test]
+  fn badge_content_shorthand_wraps_some() {
+    reset_test_env!();
+    let mut badge = Badge::declarer();
+    badge.with_content("error!");
+    let badge = badge.finish();
+    assert_eq!(badge.read().content, BadgeContent::Text("error!".into()));
+  }
+
+  #[test]
+  fn badge_content_hidden_keeps_hidden() {
+    reset_test_env!();
+    let mut badge = Badge::declarer();
+    badge.with_content(BadgeContent::Hidden);
+    let badge = badge.finish();
+    assert_eq!(badge.read().content, BadgeContent::Hidden);
+  }
+
   widget_image_tests!(
     badge,
     WidgetTester::new(self::column! {
       @Badge {
-        content: Some("".into()),
+        content: BadgeContent::Dot,
         @Container { size: Size::new(40., 40.), background: Color::GRAY }
       }
       @Badge {
-        content: Some("error!".into()),
+        content: "error!",
         offset: Anchor::right(-14.),
         @Container { size: Size::new(40., 40.)}
       }
