@@ -18,6 +18,7 @@ ribir_dev_helper = { path = "../../dev-helper" }
 
 [features]
 wgpu = ["ribir/wgpu"]
+debug = ["ribir/debug"]
 
 [[bin]]
 name = "gallery"

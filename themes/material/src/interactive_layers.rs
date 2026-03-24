@@ -6,6 +6,9 @@ use crate::{focus_indicator::*, ripple::*, state_layer::*};
 /// layers (including ripple, hover layer and focus indicator).
 pub struct DisableInteractiveLayer;
 
+/// A provider used to hint widgets in the subtree to disable the ripple layer.
+pub struct DisableRippleLayer;
+
 /// A widget that provides material design interactive visual layers for its
 /// child.
 ///
@@ -61,25 +64,32 @@ impl<'c> ComposeChild<'c> for InteractiveLayers {
   type Child = Widget<'c>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    if Provider::of::<DisableInteractiveLayer>(BuildCtx::get()).is_some() {
-      return child;
-    }
-
-    let mut child = FatObj::new(child);
-    let hover_layer = StateLayer::created_for(LayerArea::FullContent, &mut child);
-    let Self { ripple, ring_outer_offset } = this
-      .try_into_value()
-      .unwrap_or_else(|_| panic!("InteractiveLayers shouldn't be a stateless widget"));
-
-    rdl! {
-      @(ripple) {
-        @(hover_layer) {
-          @FocusIndicator {
-            ring_outer_offset: ring_outer_offset,
-            @ { child }
-          }
-        }
+    fn_widget! {
+      let ctx = BuildCtx::get();
+      if Provider::of::<DisableInteractiveLayer>(ctx).is_some() {
+        return child;
       }
+
+      let disable_ripple = Provider::of::<DisableRippleLayer>(ctx).is_some();
+
+      let mut child = FatObj::new(child);
+      let hover_layer = StateLayer::created_for(LayerArea::FullContent, &mut child);
+      let Self { ripple, ring_outer_offset } = this
+        .try_into_value()
+        .unwrap_or_else(|_| panic!("InteractiveLayers shouldn't be a stateless widget"));
+
+      let mut content = @(hover_layer) {
+        @FocusIndicator {
+          ring_outer_offset: ring_outer_offset,
+          @ { child }
+        }
+      }.into_widget();
+
+      if !disable_ripple {
+        content = @(ripple) { @ { content } }.into_widget();
+      }
+
+      content
     }
     .into_widget()
   }

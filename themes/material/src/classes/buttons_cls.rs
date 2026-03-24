@@ -122,6 +122,9 @@ fn fab_init(classes: &mut Classes) {
     let background = color.clone().into_container_color(ctx);
     let foreground = color.on_this_container_color(ctx);
     let shadow_color = Palette::of(ctx).shadow();
+    let elevation = Provider::of::<FabElevation>(ctx)
+      .map(|e| *e)
+      .unwrap_or_default();
     let fab_size = fab_size();
 
     let btn_height = match fab_size {
@@ -144,7 +147,7 @@ fn fab_init(classes: &mut Classes) {
       .with_clamp(BoxClamp::min_width(btn_height).with_fixed_height(btn_height))
       .with_radius(radius)
       .with_box_shadow(pipe! {
-        let level = if *$read(is_hovered) { 4 } else { 3 };
+        let level = if *$read(is_hovered) { elevation.hovered } else { elevation.resting };
         md::elevation_shadow(level, shadow_color)
       });
     // Add transition animation to box_shadow, matching HoverLayer behavior

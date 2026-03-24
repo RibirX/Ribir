@@ -17,6 +17,7 @@ pub mod label;
 pub mod layout;
 pub mod list;
 pub mod menu;
+pub mod navigation_rail;
 pub mod overlay;
 pub mod path;
 pub mod progress;
@@ -43,9 +44,9 @@ pub use ribir_core as core;
 pub mod prelude {
   pub use super::{
     animation::*, avatar::*, badge::*, buttons::*, checkbox::*, common_widget::*, divider::*,
-    grid_view::*, icon::*, input::*, label::*, layout::*, list::*, menu::*, overlay::*, path::*,
-    progress::*, radio::*, router::*, scrollbar::*, select_region::*, slider::*, switch::*,
-    tabs::*, tooltip::*, transform_box::*,
+    grid_view::*, icon::*, input::*, label::*, layout::*, list::*, menu::*, navigation_rail::*,
+    overlay::*, path::*, progress::*, radio::*, router::*, scrollbar::*, select_region::*,
+    slider::*, switch::*, tabs::*, tooltip::*, transform_box::*,
   };
   pub use crate::{cases, transitions};
 }

@@ -54,7 +54,7 @@ pub mod motion {
   /// - Use explicit scheme tokens when needed:
   ///   - `md::motion::spring::scheme::expressive::*`
   ///   - `md::motion::spring::scheme::standard::*`
-
+  ///
   /// Motion schemes from Material Expressive.
   ///
   /// Expressive is the default scheme and should be used for most products.
@@ -164,7 +164,6 @@ pub mod motion {
     /// - `scheme::{expressive, standard}`: canonical per-scheme token values
     /// - `duration::{expressive, standard}`: scheme-specific spring durations
     /// - `{spatial,effects}`: runtime facade based on current scheme
-
     pub mod duration {
       pub mod expressive {
         use crate::Duration;
@@ -458,6 +457,7 @@ pub const RADIUS_10: Radius = Radius::all(10.);
 pub const RADIUS_12: Radius = Radius::all(12.);
 pub const RADIUS_16: Radius = Radius::all(16.);
 pub const RADIUS_20: Radius = Radius::all(20.);
+pub const RADIUS_28: Radius = Radius::all(28.);
 
 pub const RADIUS_1: Radius = Radius::all(1.);
 pub const RADIUS_2: Radius = Radius::all(2.);
@@ -511,6 +511,110 @@ pub const EDGES_VER_12: EdgeInsets = EdgeInsets::vertical(12.);
 
 pub const EDGES_VER_14: EdgeInsets = EdgeInsets::vertical(14.);
 
+pub const ICON_SIZE: f32 = 24.;
+pub const ICON_BTN_SIZE: Size = Size::new(40., 40.);
+
+pub(crate) mod nav_rail {
+  use super::*;
+
+  pub mod common {
+    use super::*;
+
+    pub mod item {
+      pub const HEIGHT: f32 = 56.;
+      pub const MIN_WIDTH: f32 = 56.;
+    }
+    pub const LEADING_ICON_CENTER_X: f32 = 48.;
+    pub const CONTAINER_PADDING: EdgeInsets = EdgeInsets::only_bottom(4.);
+    pub const HEADER_MARGIN: EdgeInsets = EdgeInsets::only_top(44.).with_bottom(40.);
+    pub const CONTENT_TOP_MARGIN_NO_HEADER: EdgeInsets = EdgeInsets::only_top(44.);
+    pub const ACTION_WITH_MENU_MARGIN: EdgeInsets = EdgeInsets::only_top(24.);
+  }
+
+  pub mod collapsed {
+    use super::*;
+
+    pub const WIDTH: f32 = 96.;
+    pub const SIDE_PADDING: f32 = 10.;
+    pub const MENU_MARGIN: EdgeInsets =
+      EdgeInsets::only_left(common::LEADING_ICON_CENTER_X - ICON_BTN_SIZE.width / 2.);
+    pub const FOOTER_MARGIN: EdgeInsets =
+      EdgeInsets::only_left(common::LEADING_ICON_CENTER_X - ICON_BTN_SIZE.width / 2.);
+    pub const INDICATOR_SIZE: Size = Size::new(56., 32.);
+    pub const INDICATOR_RADIUS: Radius = Radius::all(INDICATOR_SIZE.height / 2.);
+    pub const ACTION_MARGIN: EdgeInsets =
+      EdgeInsets::only_left(common::LEADING_ICON_CENTER_X - common::item::MIN_WIDTH / 2.);
+
+    pub mod item {
+      use super::*;
+
+      pub const SLOT_WIDTH: f32 = WIDTH - SIDE_PADDING * 2.;
+      pub const PADDING: EdgeInsets = EdgeInsets::vertical(4.);
+      pub const MARGIN: EdgeInsets =
+        EdgeInsets::only_left(common::LEADING_ICON_CENTER_X - SLOT_WIDTH / 2.).with_bottom(4.);
+      pub const LABEL_MARGIN: EdgeInsets = EdgeInsets::only_top(6.).with_bottom(2.);
+
+      pub fn text_style() -> TextStyle {
+        TypographyTheme::of(BuildCtx::get())
+          .label_medium
+          .text
+          .clone()
+      }
+    }
+  }
+
+  pub mod expanded {
+    use super::*;
+
+    pub const MIN_WIDTH: f32 = 220.;
+    pub const MAX_WIDTH: f32 = 360.;
+    pub const LEFT_SPACING: f32 = common::LEADING_ICON_CENTER_X - ICON_SIZE / 2.;
+    pub const MENU_MARGIN: EdgeInsets =
+      EdgeInsets::only_left(LEFT_SPACING - (ICON_BTN_SIZE.width - ICON_SIZE) / 2.);
+    pub const ACTION_MARGIN: EdgeInsets = item::MARGIN;
+    pub const FOOTER_MARGIN: EdgeInsets = EdgeInsets::horizontal(LEFT_SPACING);
+    pub const INDICATOR_SIZE: DimensionSize = DimensionSize {
+      width: Dimension::Fixed(Measure::Unit(1.)),
+      height: Dimension::Fixed(Measure::Unit(common::item::HEIGHT)),
+    };
+
+    pub mod item {
+      use super::*;
+
+      pub const VERTICAL_SPACING: f32 = 0.;
+      pub const HORIZONTAL_PADDING: f32 = 16.;
+      pub const RADIUS: Radius = Radius::all(common::item::HEIGHT / 2.);
+      pub const PADDING: EdgeInsets = EdgeInsets::horizontal(HORIZONTAL_PADDING);
+      pub const MARGIN: EdgeInsets = EdgeInsets::only_left(LEFT_SPACING - HORIZONTAL_PADDING)
+        .with_top(VERTICAL_SPACING / 2.)
+        .with_bottom(VERTICAL_SPACING / 2.);
+      pub const LABEL_MARGIN: EdgeInsets = EdgeInsets::only_left(8.);
+
+      pub fn text_style() -> TextStyle {
+        TypographyTheme::of(BuildCtx::get())
+          .label_large
+          .text
+          .clone()
+      }
+    }
+
+    pub mod section {
+      use super::*;
+
+      pub const MARGIN: EdgeInsets = EdgeInsets::horizontal(LEFT_SPACING)
+        .with_top(12.)
+        .with_bottom(8.);
+
+      pub fn text_style() -> TextStyle {
+        TypographyTheme::of(BuildCtx::get())
+          .title_small
+          .text
+          .clone()
+      }
+    }
+  }
+}
+
 pub const EDGES_16: EdgeInsets = EdgeInsets::all(16.);
 pub const EDGES_HOR_16: EdgeInsets = EdgeInsets::horizontal(16.);
 pub const EDGES_VER_16: EdgeInsets = EdgeInsets::vertical(16.);
@@ -519,8 +623,12 @@ pub const EDGES_RIGHT_16: EdgeInsets = EdgeInsets::only_right(16.);
 pub const EDGES_TOP_16: EdgeInsets = EdgeInsets::only_top(16.);
 pub const EDGES_BOTTOM_16: EdgeInsets = EdgeInsets::only_bottom(16.);
 
+pub const EDGES_LEFT_20: EdgeInsets = EdgeInsets::only_left(20.);
+
 pub const EDGES_HOR_24: EdgeInsets = EdgeInsets::horizontal(24.);
 pub const EDGES_LEFT_24: EdgeInsets = EdgeInsets::only_left(24.);
+
+pub const EDGES_HOR_28: EdgeInsets = EdgeInsets::horizontal(28.);
 
 pub const EDGES_HOR_32: EdgeInsets = EdgeInsets::horizontal(32.);
 pub const EDGES_HOR_36: EdgeInsets = EdgeInsets::horizontal(36.);

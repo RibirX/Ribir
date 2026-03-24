@@ -136,10 +136,30 @@ macro_rules! named_styles_impl {
 /// This macro takes a list of class implementations and returns a closure
 /// that applies each implementation sequentially to a `Widget`.
 ///
-/// The first implementation in the list runs first, and the last one is
-/// applied last (closest to the widget). Therefore, the last implementation
-/// has the highest visual priority (e.g. `[BASE, SELECTED]` ->
-/// `BASE(SELECTED(child))`).
+/// Classes are applied from left to right, forming an outer-to-inner nesting:
+/// `[OUTER, INNER]` produces `OUTER(INNER(child))`.
+///
+/// ## Priority by Position
+///
+/// | Position | Layout Priority | Visual Priority | Data Flow |
+/// |----------|-----------------|-----------------|-----------|
+/// | First (outer) | Higher | Lower | Can provide to inner |
+/// | Last (inner) | Lower | Higher | Receives from outer |
+///
+/// ## Ordering for Base + Specific
+///
+/// Given a `base` class and a `specific` class (e.g., selected state):
+///
+/// - **`[specific, base]` — Layout coordination**
+///   - Use when `specific` needs to control layout or provide theme data to
+///     `base`
+///   - `specific` is outer: sets constraints, provides context via Provider
+///   - `base` is inner: renders visuals, may read context from `specific`
+///
+/// - **`[base, specific]` — Visual override**
+///   - Use when `specific` should override `base`'s visual styles
+///   - `base` is outer: provides default layout and visuals
+///   - `specific` is inner: overrides colors, backgrounds, etc.
 ///
 /// # Example
 /// ```
