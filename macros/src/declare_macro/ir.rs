@@ -84,10 +84,11 @@ impl<'a> Declarer<'a> {
 pub struct DeclareField<'a> {
   pub(crate) attr: Option<DeclareAttr>,
   pub(crate) field: &'a syn::Field,
+  pub(crate) name: Ident,
 }
 
 impl<'a> DeclareField<'a> {
-  pub fn member(&self) -> &Ident { self.field.ident.as_ref().unwrap() }
+  pub fn member(&self) -> &Ident { &self.name }
 
   pub(crate) fn attr(&self) -> Option<&DeclareAttr> { self.attr.as_ref() }
 
@@ -95,10 +96,7 @@ impl<'a> DeclareField<'a> {
 
   pub fn is_strict(&self) -> bool { self.attr().is_some_and(|a| a.strict.is_some()) }
 
-  pub fn set_method_name(&self) -> Ident {
-    let name = self.field.ident.as_ref().unwrap();
-    declare_init_method(name)
-  }
+  pub fn set_method_name(&self) -> Ident { declare_init_method(&self.name) }
 
   pub fn need_set_method(&self) -> bool {
     self
@@ -137,10 +135,11 @@ fn collect_fields<'a>(
   fields
     .enumerate()
     .map(|(idx, f)| {
-      if f.ident.is_none() {
-        f.ident = Some(Ident::new(&format!("v_{idx}"), f.span()))
-      }
-      Ok(DeclareField { attr: take_build_attr(f)?, field: f })
+      let name = f
+        .ident
+        .clone()
+        .unwrap_or_else(|| Ident::new(&format!("v_{idx}"), f.span()));
+      Ok(DeclareField { attr: take_build_attr(f)?, field: f, name })
     })
     .collect()
 }

@@ -1,4 +1,4 @@
-# Ribir Interactive Widget Design Standard (v2.4)
+# Ribir Interactive Widget Design Standard
 
 This document defines the standard design paradigm for all interactive widgets in the Ribir framework.
 
@@ -312,7 +312,7 @@ You can also specify a type if the setter accepts a transformed value: `#[declar
 
 For complex container widgets like `Tabs`, `List`, and `Menu`, widget implementers **should not** provide dynamic item manipulation APIs (e.g., `addItem()`, `removeItem()`).
 
-**Update Strategy**: Use `pipe!` to wrap the **entire widget**. When the underlying data changes, the whole widget re-renders. Ribir's reconciliation engine, powered by `key`/`reuse`, handles efficient diffing and instance reuse automatically.
+**Update Strategy**: Use `pipe!` to wrap the **entire widget**. When the underlying data changes, the whole widget re-renders. Ribir's reconciliation engine, powered by `reuse`, handles efficient diffing and instance reuse automatically.
 
 ```rust
 // ✅ Correct: Pipe wraps the entire widget
@@ -321,7 +321,7 @@ For complex container widgets like `Tabs`, `List`, and `Menu`, widget implemente
         reuse: ReuseKey::local("tabs_xxx"),
         @ {
             $read(data).tabs.iter().map(|tab| @Tab {
-                key: tab.id,  // Enables efficient reconciliation
+                reuse: tab.id,  // Framework-level: enables widget reuse
                 label: tab.name.clone(),
                 @ { tab.content.clone() }
             })
@@ -331,16 +331,48 @@ For complex container widgets like `Tabs`, `List`, and `Menu`, widget implemente
 ```
 
 > [!NOTE]
-> **`reuse` vs `key`**:
-> - `reuse`: The **framework-level** reconciliation mechanism. Use it with `ReuseKey::local(...)` or `ReuseKey::global(...)` to preserve widget identity and internal state across re-renders.
-> - `key`: A **widget-level** convenience prop that some widgets may provide. It usually maps to framework reuse internally for easier usage in dynamic lists.
+> **Understanding `reuse` vs Widget-Level `key`**:
+> 
+> **`reuse` (Framework-Level)**:
+> - **Purpose**: Widget instance lifecycle management and reconciliation
+> - **Scope**: Framework-wide mechanism (defined in `core/builtin_widgets/reuse.rs`)
+> - **Use for**: Preserving widget identity and internal state across re-renders
+> - **Example**: `reuse: item.id` keeps the widget instance alive when data changes
+> 
+> **`key` (Widget-Level Business Identifier)**:
+> - **Purpose**: Business logic identification (e.g., selection state matching)
+> - **Scope**: Widget-specific property (e.g., `NavigationRail`, `Menu`)
+> - **Use for**: Tracking which item is selected, event handling, application state
+> - **Example**: `key: "settings"` identifies this navigation item for selection
+> 
+> **They Are Independent**:
+> ```rust
+> @RailItem {
+>   key: "profile",           // Business: "This is the profile section"
+>   reuse: user.id,        // Framework: "Reuse this widget for this user"
+>   label: user.name,
+> }
+> ```
+> 
+> **When to Use Each**:
+> 
+> | Use Case | `reuse` | Widget `key` |
+> |----------|------------|--------------|
+> | Preserve focus/scroll state in dynamic lists | ✅ Required | ❌ Not needed |
+> | Track selected item in navigation | ❌ Not needed | ✅ Required |
+> | Optimize rendering performance | ✅ Helpful | ❌ Not relevant |
+> | Persist selection to storage | ❌ Not suitable | ✅ Ideal |
+> | Match business logic conditions | ❌ Not intended | ✅ Designed for this |
+> 
+> **Common Pattern**: Container widgets (like `NavigationRail`) may provide a `key` property for business logic while relying on framework `reuse` for performance.
 
 **Benefits**:
 - **Simpler mental model**: No imperative add/remove APIs to learn.
 - **Consistency**: Widget state always reflects data state.
 - **Automatic optimization**: Framework handles diffing, reordering, and instance reuse.
 
-### Widget Reuse (`reuse`)
+### 5.2 Widget Reuse (`reuse`)
+
 In dynamic lists (`pipe! { @List }`), Ribir recreates widgets by default when data changes. This destroys focus, selection, and scroll state.
 
 **Solution**: Use `reuse` with a stable `ReuseKey`.
@@ -348,15 +380,65 @@ In dynamic lists (`pipe! { @List }`), Ribir recreates widgets by default when da
 ```rust
 @pipe! {
     @List {
-        reuse_id: "list_xxx",
-            reuse: ReuseKey::local("list_xxx"),
-            $read(data).items.iter().map(|item| @ListItem {
-                reuse_id: item.id, // Keeps the widget instance alive
-                    reuse: ReuseKey::local(item.id), // Keeps the widget instance alive
+        reuse: ReuseKey::local("list_xxx"),
+        $read(data).items.iter().map(|item| @ListItem {
+            reuse: ReuseKey::local(item.id), // Keeps the widget instance alive
+        })
+    }
+}
+```
+*   **Without `reuse`**: Focus is lost every time the list updates.
+*   **With `reuse`**: Focus, cursor position, and animation state are preserved.
+
+### 5.3 Container Widgets with Business Keys
+
+Some container widgets (like `NavigationRail`, `Menu`) provide a `key` property separate from `reuse` for business logic purposes.
+
+**Design Pattern**: Use `key` for selection state and business logic, use `reuse` for performance optimization.
+
+```rust
+// Example: NavigationRail with both key and reuse
+@pipe! {
+    @NavigationRail {
+        selected: TwoWay::new(app.current_section),
+        reuse: "main_nav",  // Framework: reuse this widget instance
+        
+        on_select: move |e| {
+            // Business logic using key
+            match e.to.as_deref() {
+                Some("settings") => navigate("/settings"),
+                Some("profile") => navigate("/profile"),
+                _ => {}
+            }
+        },
+        
+        @ {
+            sections.iter().map(|section| @RailItem {
+                key: section.id,           // Business: selection matching
+                reuse: section.id,      // Framework: widget reuse (can be same)
+                label: section.name,
             })
         }
     }
 }
 ```
-    *   **Without `reuse`**: Focus is lost every time the list updates.
-    *   **With `reuse`**: Focus, cursor position, and animation state are preserved.
+
+**When `key` and `reuse` Should Differ**:
+
+```rust
+// Scenario: User-specific navigation item
+@RailItem {
+    key: "profile",  // Business: always represents "profile section"
+    
+    // Framework: different instance per user (avoids data pollution)
+    reuse: pipe!($current_user.map(|u| format!("profile_{}", u.id))),
+    
+    label: pipe!($current_user.map(|u| u.name)),
+}
+```
+
+**Key Principles**:
+- **`key`**: Stable business identifier for application logic
+- **`reuse`**: Widget instance identity for framework optimization
+- **Independence**: They serve different purposes and can have different values
+- **Optional**: Both are optional; use only when needed

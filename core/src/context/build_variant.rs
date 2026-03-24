@@ -265,6 +265,17 @@ impl<V: 'static> Variant<V> {
     }
   }
 
+  /// Converts this variant directly to a provider.
+  pub fn into_provider(self) -> Provider
+  where
+    V: Sized + 'static,
+  {
+    match self {
+      Variant::Watcher(w) => Provider::watcher(w),
+      Variant::Value(v) => Provider::new(v),
+    }
+  }
+
   /// Maps a value to another value using a function.
   pub fn map<F, U>(self, map: F) -> VariantMap<Variant<V>, F>
   where
@@ -383,6 +394,24 @@ where
     U: Clone,
   {
     (self.map)(&self.source.snapshot())
+  }
+}
+
+impl<V, F, U> VariantMap<Variant<V>, F>
+where
+  V: 'static,
+  U: Sized + 'static,
+  F: Fn(&V) -> U + Clone + 'static,
+{
+  /// Converts a mapped `Variant` directly to a provider.
+  pub fn into_provider(self) -> Provider {
+    let VariantMap { source, map } = self;
+    match source {
+      Variant::Value(v) => Provider::new(map(&v)),
+      Variant::Watcher(w) => {
+        Provider::watcher(w.part_watcher(move |v| PartRef::from_value(map(v))))
+      }
+    }
   }
 }
 

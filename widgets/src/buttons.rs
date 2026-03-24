@@ -28,7 +28,7 @@
 //!
 //! // button with both label and icon
 //! let _ = button! {
-//!   @Icon { @Icon { @SpinnerProgress {} } }
+//!   @Icon { @SpinnerProgress {} }
 //!   @ { "Label" }
 //! };
 //! ```
@@ -192,6 +192,24 @@ pub enum FabSize {
   Large,
 }
 
+/// Elevation profile provider for [`Fab`].
+///
+/// This lets container components adapt FAB prominence to their surface while
+/// keeping the default standalone FAB behavior unchanged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FabElevation {
+  pub resting: u8,
+  pub hovered: u8,
+}
+
+impl FabElevation {
+  pub const fn new(resting: u8, hovered: u8) -> Self { Self { resting, hovered } }
+}
+
+impl Default for FabElevation {
+  fn default() -> Self { Self::new(3, 4) }
+}
+
 /// The template child for buttons indicating the possible label and
 /// icon types the button can have.
 #[derive(Template)]
@@ -321,6 +339,10 @@ impl<'c> ComposeChild<'c> for Fab {
 }
 
 impl<'c> ButtonChild<'c> {
+  pub fn new(icon: Option<PositionChild<Widget<'c>>>, label: Option<TextValue>) -> Self {
+    Self { label, icon }
+  }
+
   /// Convert the button child into a widget by a horizontal layout and assign
   /// the specified class name to it.
   ///

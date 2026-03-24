@@ -303,6 +303,8 @@ impl Anchor {
     Self { x: Some(AnchorX::left().offset(x)), y: Some(AnchorY::top().offset(y)) }
   }
 
+  pub fn center() -> Self { Self { x: Some(AnchorX::center()), y: Some(AnchorY::center()) } }
+
   pub fn left(x: impl Into<Measure>) -> Self {
     Self { x: Some(AnchorX::left().offset(x)), y: None }
   }
