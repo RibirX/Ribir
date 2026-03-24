@@ -10,6 +10,51 @@ For older versions:
 
 <!-- next-header -->
 
+## [0.4.0-alpha.62](https://github.com/RibirX/Ribir/releases/tag/v0.4.0-alpha.62) - 2026-03-24
+
+### 🎨 Features
+
+- **core**: enhance Animation trait with window\_id and IntoAnimation support (\#920 @M-Adoo)
+- **core**: introduce SmoothGlobal for window-global position smoothing (\#921 @M-Adoo)
+- **core**: overhaul widget reuse with unified ReuseKey and ReuseScope system (\#922 @M-Adoo)
+- **widgets**: add duplicate rate support to KeyFrames for step animations (\#920 @M-Adoo)
+- **widgets**: enhance Tooltip with widget content support and manual visibility control (\#918 @M-Adoo)
+- **widgets**: support tuple states and values in keyframes\! macro (\#920 @M-Adoo)
+
+### 🐛 Fixed
+
+- **core**: improve Animate precision and Follow coordinate mapping accuracy (\#918 @M-Adoo)
+
+### 🔄 Changed
+
+- **core**: rename ContentMotion to SizeEffect and its variants in SmoothLayout (\#921 @M-Adoo)
+- **core**: rename is\_in\_used to is\_in\_use for naming consistency (\#918 @M-Adoo)
+- **core**: support dynamic debug\_name using CowArc\<str\> (\#919 @M-Adoo)
+- **examples**: refactor storybook and wordle\_game to align with idiomatic DSL usage (\#919 @M-Adoo)
+
+### 📚 Documentation
+
+- add ribir-style-and-cleanliness skill for DSL best practices (\#919 @M-Adoo)
+- **core**: update advanced animation guide to reflect the new smoothing widgets (\#921 @M-Adoo)
+
+### 💥 Breaking
+
+- **core,widgets**: move KeyFrames and keyframes\! from core to widgets crate (\#920 @M-Adoo)
+- **core**: move Overlay and Follow widgets to the widgets crate (\#918 @M-Adoo)
+- **core**: overhaul SmoothLayout API, replacing axes with pos\_axes and size\_axes (\#921 @M-Adoo)
+- **core**: rename reuse\_id DSL attribute to reuse and remove legacy ReuseId and WidgetScope types (\#922 @M-Adoo)
+- **core**: rename tooltips attribute to tooltip and adopt provider-based architecture (\#918 @M-Adoo)
+- **core**: replace PriorityObservable with RibirObservable and add delay\_bool operator (\#918 @M-Adoo)
+- **core**: restructure Reusable into high-level and low-level handles; Reusable::new now returns a single instance (\#918 @M-Adoo)
+- **widgets**: overhaul Stagger API, removing push\_state in favor of push\_animation (\#920 @M-Adoo)
+
+<details>
+<summary>🔧 Internal</summary>
+
+- build(deps): update criterion requirement from 0.7.0 to 0.8.1 (#819 @app/dependabot)
+
+</details>
+
 ## [0.4.0-alpha.61](https://github.com/RibirX/Ribir/releases/tag/v0.4.0-alpha.61) - 2026-03-17
 
 ### 🎨 Features
@@ -26,7 +71,7 @@ For older versions:
 <details>
 <summary>🔧 Internal</summary>
 
-- core: synchronize Stateful completion with pending modifications (#917 @M-Adoo)
+- core: synchronize Stateful completion with pending modifications (\#917 @M-Adoo)
 
 </details>
 
