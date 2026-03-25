@@ -1,6 +1,6 @@
 use std::{
   rc::Rc,
-  sync::{Arc, OnceLock, RwLock},
+  sync::{OnceLock, RwLock},
 };
 
 // TODO: Remove this macOS fallback scan after upgrading to a parley release
@@ -44,7 +44,8 @@ use parley::{
     TextWrapMode,
   },
 };
-use ribir_geom::{BoxClamp, Point, Rect, Size, Vector};
+use ribir_algo::Arc;
+use ribir_types::{BoxClamp, Point, Rect, Size, Vector};
 use swash::FontRef;
 
 use self::macos_font_patch::{MacosLibraryFonts, named_font_family_variants};
@@ -54,9 +55,9 @@ use crate::{
   paint::{DrawGlyph, DrawGlyphRun, DrawTextDecoration, GlyphId, TextDrawPayload},
   paragraph::{
     Caret, CaretAffinity, CaretMotion, ClusterIndex, LineIndex, Paragraph, ParagraphLayout,
-    TextByteIndex, TextHitResult, TextRange, TextSpan, VisualPosition,
+    ParagraphLayoutRef, TextByteIndex, TextHitResult, TextRange, TextSpan, VisualPosition,
   },
-  raster::{GlyphRasterSource, RasterBitmap, RasterBitmapFormat},
+  raster::{GlyphRasterSource, GlyphRasterSourceRef, RasterBitmap, RasterBitmapFormat},
   style::{Color, LineHeight, ParagraphStyle, TextAlign, TextDecoration, TextStyle, TextWrap},
 };
 
@@ -69,8 +70,8 @@ where
   Rc::new(ParleyParagraph { source, engine, faces })
 }
 
-fn build_text_raster_source(faces: ParleyFaces) -> Arc<dyn GlyphRasterSource + Send + Sync> {
-  Arc::new(ParleyGlyphRasterSource { faces })
+fn build_text_raster_source(faces: ParleyFaces) -> GlyphRasterSourceRef {
+  Arc::new(Box::new(ParleyGlyphRasterSource { faces }))
 }
 
 struct ParleyParagraph<Brush> {
@@ -513,14 +514,14 @@ where
 
   fn layout(
     &self, text_style: &TextStyle, paragraph_style: &ParagraphStyle, clamp: BoxClamp,
-  ) -> Arc<dyn ParagraphLayout<Brush>> {
-    Arc::new(self.engine.borrow_mut().build_layout(
+  ) -> ParagraphLayoutRef<Brush> {
+    Arc::new(Box::new(self.engine.borrow_mut().build_layout(
       &self.source,
       text_style,
       paragraph_style,
       clamp,
       &self.faces,
-    ))
+    )))
   }
 }
 
@@ -530,26 +531,12 @@ where
 {
   fn size(&self) -> Size { self.logical_size }
 
-  fn aligned(
-    self: Arc<Self>, text_align: TextAlign, size: Size,
-  ) -> Arc<dyn ParagraphLayout<Brush>> {
-    let line_offsets = line_alignment_offsets(self.layout.as_ref(), size.width, text_align);
-    if size == self.logical_size
-      && line_offsets
-        .iter()
-        .all(|offset| offset.abs() <= f32::EPSILON)
-    {
-      return self;
-    }
-
-    let payload = shift_payload_by_line_offsets(&self.payload, self.layout.as_ref(), &line_offsets);
-    Arc::new(Self {
-      layout: self.layout.clone(),
-      logical_size: size,
-      payload,
-      line_offsets,
-      line_positions: OnceLock::new(),
-    })
+  fn aligned(&self, text_align: TextAlign, size: Size) -> ParagraphLayoutRef<Brush> {
+    Arc::new(Box::new(
+      self
+        .clone_for_alignment()
+        .with_alignment(text_align, size),
+    ))
   }
 
   fn draw_payload(&self) -> &TextDrawPayload<Brush> { &self.payload }
@@ -679,6 +666,16 @@ impl<Brush> ParleyParagraphLayout<Brush>
 where
   Brush: Clone + PartialEq + 'static,
 {
+  fn clone_for_alignment(&self) -> Self {
+    Self {
+      layout: self.layout.clone(),
+      logical_size: self.logical_size,
+      payload: self.payload.clone(),
+      line_offsets: self.line_offsets.clone(),
+      line_positions: OnceLock::new(),
+    }
+  }
+
   fn with_alignment(self, text_align: TextAlign, size: Size) -> Self {
     let line_offsets = line_alignment_offsets(self.layout.as_ref(), size.width, text_align);
     if size == self.logical_size
@@ -1376,9 +1373,7 @@ impl FontSystem for ParleyFontSystem {
       .map(|face| face.metrics)
   }
 
-  fn raster_source(&self) -> Arc<dyn GlyphRasterSource + Send + Sync> {
-    build_text_raster_source(self.faces.clone())
-  }
+  fn raster_source(&self) -> GlyphRasterSourceRef { build_text_raster_source(self.faces.clone()) }
 }
 
 #[cfg(test)]
@@ -1486,7 +1481,7 @@ mod tests {
     register_test_font(services.as_ref());
 
     let source = crate::AttributedText::from_parts(
-      Arc::<str>::from("AB"),
+      ribir_algo::CowArc::from("AB"),
       vec![
         crate::TextSpan {
           range: crate::TextRange::new(0, 1),

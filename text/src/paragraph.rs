@@ -1,10 +1,9 @@
-use std::sync::Arc;
-
-use ribir_geom::{Point, Rect, Size};
+use ribir_algo::Arc;
+use ribir_types::{BoxClamp, Point, Rect, Size};
 
 use crate::{
   paint::TextDrawPayload,
-  style::{ParagraphStyle, SpanStyle, TextStyle},
+  style::{ParagraphStyle, SpanStyle, TextAlign, TextStyle},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, PartialOrd, Ord)]
@@ -77,6 +76,9 @@ pub struct TextSpan<Brush> {
   pub style: SpanStyle<Brush>,
 }
 
+pub type LayoutClamp = BoxClamp;
+pub type ParagraphLayoutRef<Brush> = Arc<Box<dyn ParagraphLayout<Brush>>>;
+
 pub trait Paragraph<Brush> {
   fn source_len(&self) -> TextByteIndex;
 
@@ -85,12 +87,14 @@ pub trait Paragraph<Brush> {
   fn max_intrinsic_width(&self, text_style: &TextStyle, paragraph_style: &ParagraphStyle) -> f32;
 
   fn layout(
-    &self, text_style: &TextStyle, paragraph_style: &ParagraphStyle, max_size: Size,
-  ) -> Arc<dyn ParagraphLayout<Brush>>;
+    &self, text_style: &TextStyle, paragraph_style: &ParagraphStyle, clamp: BoxClamp,
+  ) -> ParagraphLayoutRef<Brush>;
 }
 
 pub trait ParagraphLayout<Brush> {
   fn size(&self) -> Size;
+
+  fn aligned(&self, text_align: TextAlign, size: Size) -> ParagraphLayoutRef<Brush>;
 
   fn draw_payload(&self) -> &TextDrawPayload<Brush>;
 

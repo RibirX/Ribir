@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use ribir_geom::DeviceSize;
+use ribir_types::DeviceSize;
 use serde::{Deserialize, Serialize};
 
 #[cfg(any(feature = "jpeg", feature = "png"))]

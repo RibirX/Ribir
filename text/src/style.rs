@@ -1,6 +1,62 @@
 use derive_more::{Add, AddAssign, Mul, Neg, Sub, SubAssign};
+pub use ribir_types::Color;
 
 use crate::{FontFace, FontRequest};
+
+bitflags::bitflags! {
+  #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+  pub struct TextDecoration: u8 {
+    const NONE = 0;
+    /// Draw a line underneath each line of text.
+    const UNDERLINE = 0b0001;
+    /// Draw a line above each line of text.
+    const OVERLINE = 0b0010;
+    /// Draw a line through each line of text.
+    const THROUGHLINE = 0b0100;
+  }
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct TextDecorationStyle {
+  pub decoration: TextDecoration,
+  pub decoration_color: Option<Color>,
+}
+
+impl TextDecorationStyle {
+  #[inline]
+  pub fn new(decoration: TextDecoration) -> Self { decoration.into() }
+
+  #[inline]
+  pub fn with_color(decoration: TextDecoration, color: impl Into<Color>) -> Self {
+    (decoration, color).into()
+  }
+
+  #[inline]
+  pub fn color(color: impl Into<Color>) -> Self {
+    Self { decoration: TextDecoration::NONE, decoration_color: Some(color.into()) }
+  }
+
+  #[inline]
+  pub fn with_decoration_color(mut self, color: impl Into<Color>) -> Self {
+    self.decoration_color = Some(color.into());
+    self
+  }
+}
+
+impl From<TextDecoration> for TextDecorationStyle {
+  #[inline]
+  fn from(decoration: TextDecoration) -> Self { Self { decoration, decoration_color: None } }
+}
+
+impl<B> From<(TextDecoration, B)> for TextDecorationStyle
+where
+  B: Into<Color>,
+{
+  #[inline]
+  fn from((decoration, color): (TextDecoration, B)) -> Self {
+    Self { decoration, decoration_color: Some(color.into()) }
+  }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum LineHeight {
@@ -52,6 +108,7 @@ pub struct SpanStyle<Brush> {
   pub letter_spacing: Option<f32>,
   pub line_height: Option<LineHeight>,
   pub brush: Option<Brush>,
+  pub decoration: Option<TextDecorationStyle>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -143,13 +200,16 @@ pub fn single_style_paragraph_style(
   }
 }
 
-pub fn single_style_span_style<Brush>(text_style: &TextStyle) -> SpanStyle<Brush> {
+pub fn single_style_span_style<Brush>(
+  text_style: &TextStyle, decoration: Option<TextDecorationStyle>,
+) -> SpanStyle<Brush> {
   SpanStyle {
     font: Some(crate::FontRequest { face: text_style.font_face.clone() }),
     font_size: Some(text_style.font_size),
     letter_spacing: Some(text_style.letter_space),
     line_height: None,
     brush: None,
+    decoration,
   }
 }
 
@@ -194,5 +254,29 @@ mod tests {
     let paragraph = single_style_paragraph_style(&style, TextAlign::Start);
 
     assert_eq!(paragraph.wrap, TextWrap::NoWrap);
+  }
+
+  #[test]
+  fn text_decoration_style_converts_from_decoration() {
+    let style = TextDecorationStyle::from(TextDecoration::UNDERLINE);
+
+    assert_eq!(style.decoration, TextDecoration::UNDERLINE);
+    assert_eq!(style.decoration_color, None);
+  }
+
+  #[test]
+  fn text_decoration_style_converts_from_tuple() {
+    let style = TextDecorationStyle::from((TextDecoration::UNDERLINE, Color::from_u32(7)));
+
+    assert_eq!(style.decoration, TextDecoration::UNDERLINE);
+    assert_eq!(style.decoration_color, Some(Color::from_u32(7)));
+  }
+
+  #[test]
+  fn text_decoration_style_color_constructor_keeps_empty_decoration() {
+    let style = TextDecorationStyle::color(Color::from_u32(9));
+
+    assert!(style.decoration.is_empty());
+    assert_eq!(style.decoration_color, Some(Color::from_u32(9)));
   }
 }

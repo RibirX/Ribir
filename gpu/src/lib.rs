@@ -3,8 +3,8 @@ pub mod error;
 use std::ops::Range;
 
 pub use gpu_backend::Texture;
-use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
 use ribir_painter::{Color, ColorFormat, GradientStop, VertexBuffers};
+use ribir_types::{DevicePoint, DeviceRect, DeviceSize};
 mod gpu_backend;
 use zerocopy::AsBytes;
 

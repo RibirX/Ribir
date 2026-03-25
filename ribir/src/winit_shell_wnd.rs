@@ -34,7 +34,7 @@ pub enum ShellCmd {
     viewport: Rect,
     surface_color: Color,
     commands: Vec<PaintCommand>,
-    glyph_provider: Arc<dyn GlyphRasterSource + Send + Sync>,
+    glyph_provider: GlyphRasterSourceRef,
   },
   Close {
     id: WindowId,
@@ -152,7 +152,7 @@ impl WinitShellWnd {
             viewport,
             &Transform::scale(scale_factor, scale_factor),
             &commands,
-            glyph_provider.as_ref(),
+            glyph_provider.as_ref().as_ref(),
           );
 
           #[cfg(feature = "debug")]

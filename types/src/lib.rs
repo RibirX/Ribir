@@ -1,3 +1,8 @@
+mod box_clamp;
+mod color;
+pub use box_clamp::*;
+pub use color::*;
+
 /// The tag for device unit system to prevent mixing values from different
 /// system.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]

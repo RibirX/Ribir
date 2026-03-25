@@ -70,8 +70,8 @@ use std::{
 
 use image_webp::{DecodingError, WebPDecoder};
 use ribir_algo::Resource;
-use ribir_geom::DeviceSize;
 use ribir_painter::{ColorFormat, PixelImage};
+use ribir_types::DeviceSize;
 
 use crate::prelude::*;
 

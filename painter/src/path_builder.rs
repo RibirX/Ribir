@@ -4,7 +4,7 @@ use lyon_algorithms::path::{
   geom::{Arc, LineSegment},
   path::Builder as LyonBuilder,
 };
-use ribir_geom::{Angle, Point, Rect, Vector};
+use ribir_types::{Angle, Point, Rect, Vector};
 
 use crate::{Path, PathKind, Radius};
 

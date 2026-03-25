@@ -1070,9 +1070,9 @@ async fn handle_command(cmd: DebugCommand) {
 
 fn resolve_injected_click_pos(
   wnd: &Window, x: Option<f32>, y: Option<f32>, id: Option<String>,
-) -> Result<Option<ribir_geom::Point>, String> {
+) -> Result<Option<ribir_types::Point>, String> {
   match (x, y) {
-    (Some(px), Some(py)) => return Ok(Some(ribir_geom::Point::new(px, py))),
+    (Some(px), Some(py)) => return Ok(Some(ribir_types::Point::new(px, py))),
     (Some(_), None) | (None, Some(_)) => {
       return Err("click/double_click requires both x and y when using coordinates".into());
     }
@@ -1104,7 +1104,7 @@ fn resolve_injected_click_pos(
     None => layout.pos,
   };
 
-  Ok(Some(ribir_geom::Point::new(global_pos.x + size.width / 2., global_pos.y + size.height / 2.)))
+  Ok(Some(ribir_types::Point::new(global_pos.x + size.width / 2., global_pos.y + size.height / 2.)))
 }
 
 fn mouse_button(button: InjectMouseButton) -> MouseButtons {
@@ -1220,7 +1220,7 @@ fn injected_to_ui_events(wnd: &Window, event: InjectedUiEvent) -> Result<Vec<UiE
   let ui_events = match event {
     InjectedUiEvent::Delay { .. } => unreachable!("Delay should be handled before conversion"),
     InjectedUiEvent::CursorMoved { x, y } => {
-      vec![UiEvent::CursorMoved { wnd_id: window_id, pos: ribir_geom::Point::new(x, y) }]
+      vec![UiEvent::CursorMoved { wnd_id: window_id, pos: ribir_types::Point::new(x, y) }]
     }
     InjectedUiEvent::CursorLeft => vec![UiEvent::CursorLeft { wnd_id: window_id }],
     InjectedUiEvent::MouseWheel { delta_x, delta_y } => {

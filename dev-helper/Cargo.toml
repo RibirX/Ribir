@@ -15,7 +15,7 @@ version.workspace = true
 
 [dependencies]
 futures.workspace = true
-ribir_geom = { workspace = true }
+ribir_types = { workspace = true }
 ribir_gpu = { workspace = true }
 ribir_painter = { workspace = true, features = ["png"] }
 image.workspace = true

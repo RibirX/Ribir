@@ -17,6 +17,8 @@ pub use painting_style::*;
 mod text_align;
 pub use reuse_scope::*;
 pub use text_align::*;
+mod text_decoration;
+pub use text_decoration::*;
 pub mod image;
 
 pub use image::{DecodedFrame, FrameIterator, Image, LoopCount};
@@ -168,6 +170,7 @@ pub struct FatObj<T> {
   anchor: Option<Stateful<Anchor>>,
   painting_style: Option<Stateful<PaintingStyleWidget>>,
   text_align: Option<Stateful<TextAlignWidget>>,
+  text_decoration: Option<Stateful<TextDecorationWidget>>,
   text_style: Option<Stateful<TextStyleWidget>>,
   tooltip: Option<Tooltip>,
   disabled: Option<Stateful<Disabled>>,
@@ -222,6 +225,7 @@ impl<T> FatObj<T> {
       painting_style: self.painting_style,
       text_style: self.text_style,
       text_align: self.text_align,
+      text_decoration: self.text_decoration,
       visibility: self.visibility,
       opacity: self.opacity,
       tooltip: self.tooltip,
@@ -263,6 +267,7 @@ impl<T> FatObj<T> {
       && self.class.is_none()
       && self.painting_style.is_none()
       && self.text_style.is_none()
+      && self.text_decoration.is_none()
       && self.visibility.is_none()
       && self.opacity.is_none()
       && self.tooltip.is_none()
@@ -647,6 +652,20 @@ impl<T> FatObj<T> {
     &mut self, v: impl RInto<PipeValue<TextAlign>, K>,
   ) -> &mut Self {
     init_sub_widget!(self, text_align, text_align, v)
+  }
+
+  pub fn with_text_decoration<K: ?Sized>(
+    &mut self, v: impl RInto<PipeValue<TextDecorationStyle>, K>,
+  ) -> &mut Self {
+    let mix = self
+      .mix_builtin
+      .get_or_insert_with(MixBuiltin::default);
+    let text_decoration = self
+      .text_decoration
+      .get_or_insert_with(|| Stateful::new(TextDecorationWidget::inherit_widget()));
+
+    mix.init_sub_widget(v, text_decoration, move |widget, v| widget.text_decoration = v);
+    self
   }
 
   /// Initializes the text style of this widget.
@@ -1151,6 +1170,12 @@ impl<T> FatObj<T> {
     part_writer!(&mut text_align.text_align)
   }
 
+  /// Returns a state writer for modifying the complete text decoration style.
+  pub fn text_decoration(&mut self) -> impl StateWriter<Value = TextDecorationStyle> + use<T> {
+    let text_decoration = self.text_decoration_widget();
+    part_writer!(&mut text_decoration.text_decoration)
+  }
+
   /// Returns a state writer for modifying the complete text style.
   /// Provides comprehensive control over font properties, colors, and text
   /// rendering.
@@ -1393,6 +1418,12 @@ impl<T> FatObj<T> {
       .text_style
       .get_or_insert_with(|| Stateful::new(TextStyleWidget::inherit_widget()))
   }
+
+  fn text_decoration_widget(&mut self) -> &Stateful<TextDecorationWidget> {
+    self
+      .text_decoration
+      .get_or_insert_with(|| Stateful::new(TextDecorationWidget::inherit_widget()))
+  }
 }
 
 macro_rules! sub_widget {
@@ -1474,6 +1505,7 @@ impl<'a> FatObj<Widget<'a>> {
     consume_providers_widget!(host, + [
       painting_style: PaintingStyleWidget,
       text_style: TextStyleWidget,
+      text_decoration: TextDecorationWidget,
       text_align: TextAlignWidget
     ]);
 

@@ -20,7 +20,7 @@ lyon_algorithms = {version = "1.0.3", features = ["serialization"]}
 lyon_tessellation = {version = "1.0.3", features = ["serialization"], optional = true}
 material-colors = {workspace = true}
 ribir_algo = { workspace = true }
-ribir_geom = { workspace = true }
+ribir_types = { workspace = true }
 ribir_text = { workspace = true }
 serde = {version = "1.0", features = ["derive"]}
 serde_json.workspace = true

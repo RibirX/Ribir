@@ -22,11 +22,14 @@ pub type AttributedTextBuilder = ribir_text::AttributedTextBuilder<Brush>;
 pub type SpanStyle = ribir_text::SpanStyle<Brush>;
 pub type TextSpan = ribir_text::TextSpan<Brush>;
 pub type DrawGlyph = ribir_text::DrawGlyph;
+pub type DrawTextDecoration = ribir_text::DrawTextDecoration<Brush>;
 pub type GlyphId = ribir_text::GlyphId;
 pub type DrawGlyphRun = ribir_text::DrawGlyphRun<Brush>;
 pub type TextDrawPayload = ribir_text::TextDrawPayload<Brush>;
 pub type Paragraph = dyn ribir_text::Paragraph<Brush>;
 pub type ParagraphLayout = dyn ribir_text::ParagraphLayout<Brush>;
+pub type ParagraphLayoutRef = ribir_text::ParagraphLayoutRef<Brush>;
+pub type GlyphRasterSourceRef = ribir_text::GlyphRasterSourceRef;
 pub type TextServices = dyn ribir_text::TextServices<Brush>;
 
 pub use ribir_text::{single_style_paragraph_style, single_style_span_style};

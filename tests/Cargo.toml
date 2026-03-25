@@ -17,7 +17,7 @@ version.workspace = true
 paste.workspace = true
 ribir = {path = "../ribir", features = ["material", "widgets"]}
 ribir_dev_helper = {path = "../dev-helper"}
-ribir_geom = {path = "../geom"}
+ribir_types = {path = "../types"}
 ribir_painter = {path = "../painter"}
 ribir_core = {path = "../core", features=["test-utils"]}
 winit.workspace = true

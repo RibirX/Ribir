@@ -1,7 +1,7 @@
 use std::{cell::RefCell, error::Error, io::Read, vec};
 
 use ribir_algo::Resource;
-use ribir_geom::{Point, Rect, Size, Transform};
+use ribir_types::{Point, Rect, Size, Transform};
 use serde::{Deserialize, Serialize};
 use usvg::{Options, Stop, Tree};
 

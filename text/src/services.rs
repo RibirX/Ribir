@@ -1,18 +1,18 @@
-use std::{cell::RefCell, path::Path, rc::Rc, sync::Arc};
+use std::{cell::RefCell, path::Path, rc::Rc};
 
 use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
 
 use crate::{
-  AttributedText, FontSystem,
+  AttributedText, FontSystem, GlyphRasterSourceRef,
   font::{FontFaceId, FontFaceMetrics, FontLoadError},
   paragraph::Paragraph,
   parley_backend::ParleyFontSystem,
-  raster::GlyphRasterSource,
+  style::Color,
 };
 
 pub fn new_text_services<Brush>() -> Box<dyn TextServices<Brush>>
 where
-  Brush: Clone + PartialEq + 'static,
+  Brush: Clone + From<Color> + PartialEq + 'static,
 {
   Box::new(ParleyTextServices::default())
 }
@@ -26,7 +26,7 @@ pub trait TextServices<Brush> {
 
   fn paragraph(&self, source: AttributedText<Brush>) -> Rc<dyn Paragraph<Brush>>;
 
-  fn raster_source(&self) -> Arc<dyn GlyphRasterSource + Send + Sync>;
+  fn raster_source(&self) -> GlyphRasterSourceRef;
 }
 
 pub trait TextBuffer {
@@ -129,7 +129,7 @@ impl Default for ParleyTextServices {
 
 impl<Brush> TextServices<Brush> for ParleyTextServices
 where
-  Brush: Clone + PartialEq + 'static,
+  Brush: Clone + From<Color> + PartialEq + 'static,
 {
   fn register_font_bytes(&self, data: Vec<u8>) -> Result<(), FontLoadError> {
     self
@@ -153,7 +153,5 @@ where
     self.font_system.borrow().paragraph(source)
   }
 
-  fn raster_source(&self) -> Arc<dyn GlyphRasterSource + Send + Sync> {
-    self.font_system.borrow().raster_source()
-  }
+  fn raster_source(&self) -> GlyphRasterSourceRef { self.font_system.borrow().raster_source() }
 }

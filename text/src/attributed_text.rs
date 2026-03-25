@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use ribir_algo::CowArc;
 
 use crate::{
@@ -11,7 +9,7 @@ use crate::{
 /// ranges.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AttributedText<Brush> {
-  pub text: Arc<str>,
+  pub text: CowArc<str>,
   pub spans: Box<[TextSpan<Brush>]>,
 }
 
@@ -21,12 +19,12 @@ impl<Brush> Default for AttributedText<Brush> {
 
 impl<Brush> AttributedText<Brush> {
   #[inline]
-  pub fn plain(text: impl Into<Arc<str>>) -> Self {
+  pub fn plain(text: impl Into<CowArc<str>>) -> Self {
     Self { text: text.into(), spans: Vec::new().into_boxed_slice() }
   }
 
   #[inline]
-  pub fn styled(text: impl Into<Arc<str>>, style: SpanStyle<Brush>) -> Self {
+  pub fn styled(text: impl Into<CowArc<str>>, style: SpanStyle<Brush>) -> Self {
     let text = text.into();
     let spans = if text.is_empty() {
       Default::default()
@@ -37,7 +35,9 @@ impl<Brush> AttributedText<Brush> {
   }
 
   #[inline]
-  pub fn from_parts(text: impl Into<Arc<str>>, spans: impl Into<Box<[TextSpan<Brush>]>>) -> Self {
+  pub fn from_parts(
+    text: impl Into<CowArc<str>>, spans: impl Into<Box<[TextSpan<Brush>]>>,
+  ) -> Self {
     Self { text: text.into(), spans: spans.into() }
   }
 
@@ -127,14 +127,9 @@ impl<Brush> From<AttributedTextBuilder<Brush>> for AttributedText<Brush> {
   fn from(value: AttributedTextBuilder<Brush>) -> Self { value.build() }
 }
 
-impl<Brush> From<Arc<str>> for AttributedText<Brush> {
-  #[inline]
-  fn from(value: Arc<str>) -> Self { Self::plain(value) }
-}
-
 impl<Brush> From<CowArc<str>> for AttributedText<Brush> {
   #[inline]
-  fn from(value: CowArc<str>) -> Self { Self::plain(value.as_ref()) }
+  fn from(value: CowArc<str>) -> Self { Self::plain(value) }
 }
 
 impl<Brush> From<String> for AttributedText<Brush> {
@@ -144,7 +139,7 @@ impl<Brush> From<String> for AttributedText<Brush> {
 
 impl<Brush> From<&str> for AttributedText<Brush> {
   #[inline]
-  fn from(value: &str) -> Self { Self::plain(value) }
+  fn from(value: &str) -> Self { Self::plain(value.to_owned()) }
 }
 
 #[cfg(test)]
@@ -159,7 +154,7 @@ mod tests {
       .append(AttributedText::styled("!", SpanStyle { brush: Some(9_u8), ..Default::default() }))
       .build();
 
-    assert_eq!(rich.text.as_ref(), "Hello Ribir!");
+    assert_eq!(&*rich.text, "Hello Ribir!");
     assert_eq!(rich.spans.len(), 2);
     assert_eq!(rich.spans[0].range, TextRange::new(6, 11));
     assert_eq!(rich.spans[1].range, TextRange::new(11, 12));
@@ -177,7 +172,7 @@ mod tests {
 
     let rich = AttributedText::from_parts("A", spans.clone());
 
-    assert_eq!(rich.text.as_ref(), "A");
+    assert_eq!(&*rich.text, "A");
     assert_eq!(rich.spans, spans);
   }
 }

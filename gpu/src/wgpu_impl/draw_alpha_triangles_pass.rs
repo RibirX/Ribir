@@ -1,7 +1,7 @@
 use std::{mem::size_of, ops::Range};
 
-use ribir_geom::DeviceRect;
 use ribir_painter::{Vertex, VertexBuffers};
+use ribir_types::DeviceRect;
 use wgpu::include_wgsl;
 
 use super::{uniform::Uniform, vertex_buffer::VerticesBuffer};

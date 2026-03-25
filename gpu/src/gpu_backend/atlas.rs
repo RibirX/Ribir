@@ -1,8 +1,8 @@
 use std::hash::Hash;
 
 use guillotiere::{Allocation, AtlasAllocator};
-use ribir_geom::{DeviceRect, DeviceSize};
 use ribir_painter::ColorFormat;
+use ribir_types::{DeviceRect, DeviceSize};
 use slab::Slab;
 
 use super::Texture;

@@ -1,4 +1,5 @@
-use ribir_geom::Point;
+use ribir_algo::Arc;
+use ribir_types::Point;
 
 use crate::{FontFaceId, FontFaceMetrics, paint::GlyphId};
 
@@ -30,3 +31,5 @@ pub trait GlyphRasterSource {
 
   fn raster_svg(&self, face_id: FontFaceId, glyph_id: GlyphId) -> Option<String>;
 }
+
+pub type GlyphRasterSourceRef = Arc<Box<dyn GlyphRasterSource + Send + Sync>>;

@@ -1,4 +1,4 @@
-use std::{ops::Range, sync::Arc};
+use std::ops::Range;
 
 use ribir_core::prelude::*;
 
@@ -133,12 +133,12 @@ impl BaseText for InputText {
 }
 
 impl VisualText for InputText {
-  fn layout_glyphs(&self, clamp: BoxClamp, ctx: &MeasureCtx) -> Arc<ParagraphLayout> {
+  fn layout_glyphs(&self, clamp: BoxClamp, ctx: &MeasureCtx) -> ParagraphLayoutRef {
     self.0.layout_glyphs(clamp, ctx)
   }
 
   fn paint(
-    &self, painter: &mut Painter, style: PaintingStyle, glyphs: &Arc<ParagraphLayout>, rect: Rect,
+    &self, painter: &mut Painter, style: PaintingStyle, glyphs: &ParagraphLayoutRef, rect: Rect,
   ) {
     self.0.paint(painter, style, glyphs, rect);
   }

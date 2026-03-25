@@ -1,7 +1,7 @@
 use std::ptr::NonNull;
 
 use ribir_algo::Rc;
-use ribir_geom::{Point, Rect, Size};
+use ribir_types::{Point, Rect, Size};
 
 use crate::{
   prelude::ProviderCtx,
