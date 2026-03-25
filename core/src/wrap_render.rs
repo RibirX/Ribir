@@ -1,4 +1,4 @@
-use ribir_geom::{Point, Size, Transform};
+use ribir_types::{Point, Size, Transform};
 use smallvec::SmallVec;
 use widget_id::RenderQueryable;
 

@@ -41,9 +41,9 @@ pub enum Measure {
 
 pub mod prelude {
   pub use ribir_algo::*;
-  pub use ribir_geom::*;
   pub use ribir_macros::*;
   pub use ribir_painter::*;
+  pub use ribir_types::*;
   #[doc(hidden)]
   pub use rxrust::prelude::*;
   pub use smallvec;
@@ -68,7 +68,7 @@ pub mod prelude {
     ticker::{Duration, Instant},
     widget::*,
     widget_children::*,
-    widget_tree::{Anchor, AnchorX, AnchorY, BoxClamp, DirtyPhase, LayoutInfo, TrackId, WidgetId},
+    widget_tree::{Anchor, AnchorX, AnchorY, DirtyPhase, LayoutInfo, TrackId, WidgetId},
     window::{MountHandle, Window, WindowLevel},
   };
   pub use crate::*;

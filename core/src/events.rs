@@ -20,7 +20,7 @@ pub mod custom_event;
 pub use custom_event::*;
 mod pointers;
 pub use pointers::*;
-use ribir_geom::Point;
+use ribir_types::Point;
 mod keyboard;
 pub use keyboard::*;
 mod character;

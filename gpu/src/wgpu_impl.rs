@@ -5,8 +5,8 @@ use std::{
 };
 
 use ahash::HashSet;
-use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
 use ribir_painter::{Color, ColorFormat, PixelImage, VertexBuffers};
+use ribir_types::{DevicePoint, DeviceRect, DeviceSize};
 use tokio::sync::oneshot;
 use tracing::debug;
 use wgpu::TextureFormat;

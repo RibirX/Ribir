@@ -10,7 +10,7 @@ members = [
   "widgets",
   "ribir",
   "themes/*",
-  "geom",
+  "types",
   "tests",
   "dev-helper",
   "examples/*",
@@ -28,7 +28,7 @@ default-members = [
   "widgets",
   "ribir",
   "themes/*",
-  "geom",
+  "types",
   "tests",
   "dev-helper",
   "examples/*",
@@ -62,7 +62,7 @@ rust-version = "1.92.0"
 ribir_algo = { path = "algo", version = "0.4.0-alpha.62" }
 ribir_core = { path = "core", version = "0.4.0-alpha.62", default-features = false }
 ribir_gpu = { path = "gpu", version = "0.4.0-alpha.62" }
-ribir_geom = { path = "geom", version = "0.4.0-alpha.62" }
+ribir_types = { path = "types", version = "0.4.0-alpha.62" }
 ribir_macros = { path = "macros", version = "0.4.0-alpha.62" }
 ribir_painter = { path = "painter", version = "0.4.0-alpha.62" }
 ribir_text = { path = "text", version = "0.4.0-alpha.62" }

@@ -538,7 +538,7 @@ mod tests {
     LayoutCase::new(&[0, 1])
       .with_size(Size::new(200., 20.))
       .with_x(200.),
-    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(0., 20., 200., 20.))
+    LayoutCase::new(&[0, 2]).with_rect(ribir_types::rect(0., 20., 200., 20.))
   );
 
   widget_layout_test!(
@@ -552,9 +552,9 @@ mod tests {
     })
     .with_wnd_size(Size::new(500., 500.)),
     LayoutCase::default().with_size(Size::new(400., 40.)),
-    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(200., 20., 200., 20.)),
-    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(0., 20., 200., 20.)),
-    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(0., 0., 200., 20.))
+    LayoutCase::new(&[0, 0]).with_rect(ribir_types::rect(200., 20., 200., 20.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_types::rect(0., 20., 200., 20.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_types::rect(0., 0., 200., 20.))
   );
 
   widget_layout_test!(
@@ -568,9 +568,9 @@ mod tests {
       }
     })
     .with_wnd_size(Size::new(500., 500.)),
-    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 120., 20.)),
-    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(135., 0., 80., 20.)),
-    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(230., 0., 30., 20.))
+    LayoutCase::new(&[0, 0]).with_rect(ribir_types::rect(0., 0., 120., 20.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_types::rect(135., 0., 80., 20.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_types::rect(230., 0., 30., 20.))
   );
 
   widget_layout_test!(
@@ -585,9 +585,9 @@ mod tests {
       }
     })
     .with_wnd_size(Size::new(500., 500.)),
-    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(140., 0., 120., 20.)),
-    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(45., 0., 80., 20.)),
-    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(0., 0., 30., 20.))
+    LayoutCase::new(&[0, 0]).with_rect(ribir_types::rect(140., 0., 120., 20.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_types::rect(45., 0., 80., 20.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_types::rect(0., 0., 30., 20.))
   );
 
   widget_layout_test!(
@@ -610,11 +610,11 @@ mod tests {
       }
     })
     .with_wnd_size(Size::new(500., 500.)),
-    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 120., 20.)),
-    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(135., 0., 70., 20.)),
-    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(220., 0., 80., 20.)),
-    LayoutCase::new(&[0, 3]).with_rect(ribir_geom::rect(315., 0., 140., 20.)),
-    LayoutCase::new(&[0, 4]).with_rect(ribir_geom::rect(470., 0., 30., 20.))
+    LayoutCase::new(&[0, 0]).with_rect(ribir_types::rect(0., 0., 120., 20.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_types::rect(135., 0., 70., 20.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_types::rect(220., 0., 80., 20.)),
+    LayoutCase::new(&[0, 3]).with_rect(ribir_types::rect(315., 0., 140., 20.)),
+    LayoutCase::new(&[0, 4]).with_rect(ribir_types::rect(470., 0., 30., 20.))
   );
 
   widget_layout_test!(
@@ -628,10 +628,10 @@ mod tests {
       }
     })
     .with_wnd_size(Size::new(500., 500.)),
-    LayoutCase::default().with_rect(ribir_geom::rect(0., 0., 400., 50.)),
-    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 200., 20.)),
-    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(200., 0., 200., 20.)),
-    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(0., 30., 200., 20.))
+    LayoutCase::default().with_rect(ribir_types::rect(0., 0., 400., 50.)),
+    LayoutCase::new(&[0, 0]).with_rect(ribir_types::rect(0., 0., 200., 20.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_types::rect(200., 0., 200., 20.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_types::rect(0., 30., 200., 20.))
   );
 
   fn cross_align(align: Align) -> WidgetTester {
@@ -651,36 +651,36 @@ mod tests {
     cross_align(Align::Start),
     LayoutCase::default().with_size(Size::new(300., 40.)),
     LayoutCase::default().with_size(Size::new(300., 40.)),
-    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 100., 20.)),
-    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(100., 0., 100., 30.)),
-    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(200., 0., 100., 40.))
+    LayoutCase::new(&[0, 0]).with_rect(ribir_types::rect(0., 0., 100., 20.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_types::rect(100., 0., 100., 30.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_types::rect(200., 0., 100., 40.))
   );
 
   widget_layout_test!(
     center_cross_align,
     cross_align(Align::Center),
     LayoutCase::default().with_size(Size::new(300., 40.)),
-    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 10., 100., 20.)),
-    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(100., 5., 100., 30.)),
-    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(200., 0., 100., 40.))
+    LayoutCase::new(&[0, 0]).with_rect(ribir_types::rect(0., 10., 100., 20.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_types::rect(100., 5., 100., 30.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_types::rect(200., 0., 100., 40.))
   );
 
   widget_layout_test!(
     end_cross_align,
     cross_align(Align::End),
     LayoutCase::default().with_size(Size::new(300., 40.)),
-    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 20., 100., 20.)),
-    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(100., 10., 100., 30.)),
-    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(200., 0., 100., 40.))
+    LayoutCase::new(&[0, 0]).with_rect(ribir_types::rect(0., 20., 100., 20.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_types::rect(100., 10., 100., 30.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_types::rect(200., 0., 100., 40.))
   );
 
   widget_layout_test!(
     stretch_cross_align,
     cross_align(Align::Stretch),
     LayoutCase::default().with_size(Size::new(300., 40.)),
-    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 100., 40.)),
-    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(100., 0., 100., 40.)),
-    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(200., 0., 100., 40.))
+    LayoutCase::new(&[0, 0]).with_rect(ribir_types::rect(0., 0., 100., 40.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_types::rect(100., 0., 100., 40.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_types::rect(200., 0., 100., 40.))
   );
 
   fn main_align(justify_content: JustifyContent) -> WidgetTester {
@@ -782,11 +782,11 @@ mod tests {
       }
     })
     .with_wnd_size(Size::new(500., 500.)),
-    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 500., 25.)),
-    LayoutCase::new(&[0, 0, 0]).with_rect(ribir_geom::rect(0., 0., 200., 25.)),
-    LayoutCase::new(&[0, 0, 1]).with_rect(ribir_geom::rect(200., 0., 100., 25.)),
-    LayoutCase::new(&[0, 0, 2]).with_rect(ribir_geom::rect(300., 0., 100., 20.)),
-    LayoutCase::new(&[0, 0, 3]).with_rect(ribir_geom::rect(400., 0., 100., 25.))
+    LayoutCase::new(&[0, 0]).with_rect(ribir_types::rect(0., 0., 500., 25.)),
+    LayoutCase::new(&[0, 0, 0]).with_rect(ribir_types::rect(0., 0., 200., 25.)),
+    LayoutCase::new(&[0, 0, 1]).with_rect(ribir_types::rect(200., 0., 100., 25.)),
+    LayoutCase::new(&[0, 0, 2]).with_rect(ribir_types::rect(300., 0., 100., 20.)),
+    LayoutCase::new(&[0, 0, 3]).with_rect(ribir_types::rect(400., 0., 100., 25.))
   );
 
   widget_layout_test!(
@@ -818,7 +818,7 @@ mod tests {
     })
     .with_wnd_size(Size::new(500., 500.)),
     LayoutCase::default().with_height(500.),
-    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 200., 100., 100.))
+    LayoutCase::new(&[0, 0]).with_rect(ribir_types::rect(0., 200., 100., 100.))
   );
 
   widget_layout_test!(
@@ -844,9 +844,9 @@ mod tests {
     })
     .with_wnd_size(Size::new(500., 500.)),
     LayoutCase::default().with_height(500.),
-    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 60., 500.)),
-    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(0., 500., 50., 0.)),
-    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(0., 500., 50., 140.))
+    LayoutCase::new(&[0, 0]).with_rect(ribir_types::rect(0., 0., 60., 500.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_types::rect(0., 500., 50., 0.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_types::rect(0., 500., 50., 140.))
   );
 
   widget_layout_test!(

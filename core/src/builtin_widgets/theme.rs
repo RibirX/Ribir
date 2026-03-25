@@ -216,7 +216,7 @@ fn typography_theme() -> TypographyTheme {
       },
       decoration: TextDecorationStyle {
         decoration: TextDecoration::NONE,
-        decoration_color: Color::BLACK.with_alpha(0.87).into(),
+        decoration_color: Some(Color::BLACK.with_alpha(0.87)),
       },
     }
   }

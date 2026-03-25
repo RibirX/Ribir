@@ -333,6 +333,7 @@ mod tests {
     wnd.draw_frame();
 
     let before = tree_count(&wnd);
+    wait_for_tooltip_hide_delay();
     tooltip.show();
     wnd.draw_frame();
     assert!(tooltip.is_visible());
@@ -433,7 +434,7 @@ mod tests {
       fn_widget! {
         @MockBox {
           size: Size::new(40., 20.),
-          tab_index: 0i16,
+          tab_index: 0_i16,
           tooltip: "tip",
         }
       },
@@ -660,6 +661,7 @@ mod tests {
     wnd.draw_frame();
 
     let before = tree_count(&wnd);
+    wnd.process_cursor_move(HOST_POINT);
     tooltip.show();
     wnd.draw_frame();
     assert!(tooltip.is_visible());

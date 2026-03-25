@@ -137,9 +137,9 @@ mod tests {
     .with_wnd_size(Size::new(500., 500.)),
     LayoutCase::default().with_size(Size::new(500., 50.)),
     LayoutCase::new(&[0, 0]).with_size(Size::new(100., 50.)),
-    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(100., 0., 100., 50.)),
-    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(200., 0., 100., 50.)),
-    LayoutCase::new(&[0, 3]).with_rect(ribir_geom::rect(300., 0., 200., 50.))
+    LayoutCase::new(&[0, 1]).with_rect(ribir_types::rect(100., 0., 100., 50.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_types::rect(200., 0., 100., 50.)),
+    LayoutCase::new(&[0, 3]).with_rect(ribir_types::rect(300., 0., 200., 50.))
   );
 
   widget_layout_test!(
@@ -170,14 +170,14 @@ mod tests {
       }
     })
     .with_wnd_size(Size::new(350., 500.)),
-    LayoutCase::default().with_rect(ribir_geom::rect(0., 0., 350., 150.)),
-    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 150., 50.)),
-    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(150., 0., 100., 50.)),
-    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(250., 0., 100., 50.)),
-    LayoutCase::new(&[0, 3]).with_rect(ribir_geom::rect(0., 50., 100., 50.)),
-    LayoutCase::new(&[0, 4]).with_rect(ribir_geom::rect(100., 50., 100., 50.)),
-    LayoutCase::new(&[0, 5]).with_rect(ribir_geom::rect(200., 50., 150., 50.)),
-    LayoutCase::new(&[0, 6]).with_rect(ribir_geom::rect(0., 100., 350., 50.))
+    LayoutCase::default().with_rect(ribir_types::rect(0., 0., 350., 150.)),
+    LayoutCase::new(&[0, 0]).with_rect(ribir_types::rect(0., 0., 150., 50.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_types::rect(150., 0., 100., 50.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_types::rect(250., 0., 100., 50.)),
+    LayoutCase::new(&[0, 3]).with_rect(ribir_types::rect(0., 50., 100., 50.)),
+    LayoutCase::new(&[0, 4]).with_rect(ribir_types::rect(100., 50., 100., 50.)),
+    LayoutCase::new(&[0, 5]).with_rect(ribir_types::rect(200., 50., 150., 50.)),
+    LayoutCase::new(&[0, 6]).with_rect(ribir_types::rect(0., 100., 350., 50.))
   );
 
   #[test]

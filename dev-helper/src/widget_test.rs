@@ -87,7 +87,8 @@ macro_rules! assert_widget_eq_image {
 
     let font_db = AppCtx::text_services();
     let glyph_provider = font_db.raster_source();
-    let img = $crate::wgpu_render_commands(&commands, viewport, surface, glyph_provider.as_ref());
+    let img =
+      $crate::wgpu_render_commands(&commands, viewport, surface, glyph_provider.as_ref().as_ref());
 
     let mut img_test = $crate::ImageTest::new(img, &img_path);
     if let Some(c) = $widget_tester.comparison {

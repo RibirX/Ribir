@@ -3,10 +3,10 @@ use std::{any::Any, cmp::Ordering, hash::Hash, ops::Range};
 use guillotiere::euclid::SideOffsets2D;
 use rayon::{prelude::ParallelIterator, slice::ParallelSlice};
 use ribir_algo::Resource;
-use ribir_geom::{DeviceRect, DeviceSize, Size, Transform, transform_to_device_rect};
 use ribir_painter::{
   ColorFormat, PaintPath, PaintingStyle, Path, PixelImage, StrokeOptions, Vertex, VertexBuffers,
 };
+use ribir_types::{DeviceRect, DeviceSize, Size, Transform, transform_to_device_rect};
 
 use super::{
   Texture,
@@ -569,8 +569,8 @@ pub mod tests {
   use std::borrow::Cow;
 
   use futures::executor::block_on;
-  use ribir_geom::*;
   use ribir_painter::Color;
+  use ribir_types::*;
 
   use super::*;
   use crate::{WgpuImpl, WgpuTexture};
@@ -687,7 +687,7 @@ pub mod tests {
     let img = Resource::new(PixelImage::new(Cow::Owned(pixels), 2, 2, ColorFormat::Rgba8));
 
     let slice = mgr.store_image(&img, &mut wgpu);
-    let bleed = guillotiere::euclid::SideOffsets2D::<_, ribir_geom::PhysicUnit>::new_all_same(
+    let bleed = guillotiere::euclid::SideOffsets2D::<_, ribir_types::PhysicUnit>::new_all_same(
       RGBA_BLEED_EDGE,
     );
     let atlas_rect = slice.rect.outer_rect(bleed);

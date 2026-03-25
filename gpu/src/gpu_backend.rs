@@ -3,15 +3,15 @@ use std::{borrow::Cow, error::Error};
 use ahash::HashMap;
 use guillotiere::euclid::Vector2D;
 use ribir_algo::Resource;
-use ribir_geom::{
-  DevicePoint, DeviceRect, DeviceSize, Point, Transform, Vector, rect_corners,
-  transform_to_device_rect,
-};
 use ribir_painter::{
   Color, ColorFormat, ColorMatrix, CommandBrush, FaceId, FilterComposite, FilterLayer, FilterOp,
   GlyphId, GlyphRasterSource, LineCap, LineJoin, PaintCommand, PaintPath, PaintPathAction,
-  PainterBackend, PaintingStyle, PathCommand, PathKind, PixelImage, RasterBitmapFormat,
+  PainterBackend, PaintingStyle, Path, PathCommand, PathKind, PixelImage, RasterBitmapFormat,
   StrokeOptions, Svg, TextCommand, Vertex, VertexBuffers, color::ColorFilterMatrix,
+};
+use ribir_types::{
+  DevicePoint, DeviceRect, DeviceSize, Point, Transform, Vector, rect_corners,
+  transform_to_device_rect,
 };
 
 use crate::{
@@ -163,7 +163,7 @@ where
   }
 
   fn normalize_round_rect_radii(
-    rect: &ribir_geom::Rect, radius: &ribir_painter::Radius,
+    rect: &ribir_types::Rect, radius: &ribir_painter::Radius,
   ) -> [f32; 4] {
     let mut tl = radius.top_left;
     let mut tr = radius.top_right;
@@ -499,6 +499,25 @@ where
         output,
       );
     }
+
+    for decoration in text_cmd.payload.decorations.iter() {
+      let brush = decoration
+        .brush
+        .clone()
+        .map(|brush| {
+          let mut brush = CommandBrush::from(brush);
+          brush.apply_color_filter(&text_cmd.color_filter);
+          brush
+        })
+        .unwrap_or_else(|| text_cmd.default_brush.clone());
+      let cmd = PaintCommand::Path(PathCommand {
+        path: PaintPath::Share(Resource::new(Path::rect(&decoration.rect))),
+        paint_bounds: text_matrix.outer_transformed_rect(&decoration.rect),
+        transform: text_matrix,
+        action: PaintPathAction::Paint { brush, painting_style: PaintingStyle::Fill },
+      });
+      self.draw_command(&cmd, &Transform::identity(), output_tex_size, output, glyph_provider);
+    }
   }
 
   #[allow(clippy::too_many_arguments)]
@@ -583,8 +602,8 @@ where
         let dst_h = img_h * s;
         let draw_x = baseline_origin.x + offset.x * s;
         let draw_y = baseline_origin.y + offset.y * s;
-        let dst_size = ribir_geom::Size::new(img_w * s, dst_h);
-        let dst_rect = ribir_geom::Rect::new(Point::new(draw_x, draw_y), dst_size);
+        let dst_size = ribir_types::Size::new(img_w * s, dst_h);
+        let dst_rect = ribir_types::Rect::new(Point::new(draw_x, draw_y), dst_size);
         let img_matrix = Transform::new(
           dst_rect.width() / img_w,
           0.,
@@ -776,7 +795,7 @@ where
 
     let mask_head = self.current_clip_mask_index();
     let device_rect = transform_to_device_rect(
-      &ribir_geom::Rect::from_size(ribir_geom::Size::new(img_w, img_h)),
+      &ribir_types::Rect::from_size(ribir_types::Size::new(img_w, img_h)),
       img_matrix,
     );
     let points = rect_corners(&device_rect.to_f32().cast_unit());
@@ -883,16 +902,16 @@ where
         PathKind::Rect { rect } => (1, rect, [0.; 4]),
         PathKind::Circle { center, radius } => (
           3,
-          ribir_geom::Rect::new(
+          ribir_types::Rect::new(
             Point::new(center.x - radius, center.y - radius),
-            ribir_geom::Size::new(radius * 2., radius * 2.),
+            ribir_types::Size::new(radius * 2., radius * 2.),
           ),
           [center.x, center.y, radius, 0.],
         ),
         PathKind::RoundRect { rect, radius } => {
           (2, rect, Self::normalize_round_rect_radii(&rect, &radius))
         }
-        PathKind::Complex => (0, ribir_geom::Rect::zero(), [0.; 4]),
+        PathKind::Complex => (0, ribir_types::Rect::zero(), [0.; 4]),
       };
 
       if kind > 0
@@ -1266,8 +1285,8 @@ mod tests {
   use ribir_algo::Resource;
   use ribir_core::prelude::AppCtx;
   use ribir_dev_helper::*;
-  use ribir_geom::*;
   use ribir_painter::{Brush, LineCap, LineJoin, Painter, Path, Radius, StrokeOptions, Svg};
+  use ribir_types::*;
 
   use super::*;
 

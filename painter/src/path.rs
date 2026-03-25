@@ -5,7 +5,7 @@ use lyon_algorithms::{
   measure::{PathMeasurements, SampleType},
   path::{Event, Path as LyonPath},
 };
-use ribir_geom::{Point, Rect, Transform, Vector};
+use ribir_types::{Point, Rect, Transform, Vector};
 use serde::{Deserialize, Serialize};
 
 use crate::path_builder::PathBuilder;

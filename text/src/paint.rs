@@ -1,6 +1,6 @@
-use ribir_geom::{Point, Rect, Vector};
+use ribir_types::{Point, Rect, Vector};
 
-use crate::{font::FontFaceId, paragraph::ClusterIndex};
+use crate::{font::FontFaceId, paragraph::ClusterIndex, style::TextDecoration};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct GlyphId(pub u16);
@@ -10,6 +10,7 @@ pub struct TextDrawPayload<Brush> {
   pub bounds: Rect,
   pub origin_offset: Vector,
   pub runs: Box<[DrawGlyphRun<Brush>]>,
+  pub decorations: Box<[DrawTextDecoration<Brush>]>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -26,4 +27,11 @@ pub struct DrawGlyph {
   pub cluster: ClusterIndex,
   pub baseline_origin: Point,
   pub advance: Vector,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DrawTextDecoration<Brush> {
+  pub decoration: TextDecoration,
+  pub brush: Option<Brush>,
+  pub rect: Rect,
 }

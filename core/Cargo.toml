@@ -24,7 +24,7 @@ lyon_geom.workspace = true
 paste.workspace = true
 pin-project-lite.workspace = true
 ribir_algo = { workspace = true }
-ribir_geom = { workspace = true }
+ribir_types = { workspace = true }
 ribir_macros = { workspace = true }
 ribir_painter = { workspace = true }
 ribir_text = { workspace = true }

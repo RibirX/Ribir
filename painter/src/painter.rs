@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use ribir_algo::Resource;
-use ribir_geom::{Angle, DeviceRect, Point, Rect, Size, Transform, Vector};
+use ribir_types::{Angle, DeviceRect, Point, Rect, Size, Transform, Vector};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
@@ -329,8 +329,8 @@ impl Painter {
   ///
   /// # Example
   /// ```
-  /// use ribir_geom::*;
   /// use ribir_painter::*;
+  /// use ribir_types::*;
   ///
   /// let mut painter = Painter::new(Rect::from_size(Size::splat(512.)));
   /// let mut overlay = painter.fork(); // Capture initial clear state
@@ -1351,7 +1351,7 @@ use invisible_return;
 
 #[cfg(test)]
 mod test {
-  use ribir_geom::rect;
+  use ribir_types::rect;
 
   use super::*;
 

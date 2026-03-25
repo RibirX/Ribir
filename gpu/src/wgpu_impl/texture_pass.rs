@@ -1,7 +1,7 @@
 use std::mem::size_of;
 
-use ribir_geom::{DevicePoint, DeviceRect, DeviceSize, rect_corners};
 use ribir_painter::Vertex;
+use ribir_types::{DevicePoint, DeviceRect, DeviceSize, rect_corners};
 use wgpu::{StoreOp, include_wgsl};
 use zerocopy::AsBytes;
 

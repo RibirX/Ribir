@@ -1,4 +1,4 @@
-use ribir_geom::Transform;
+use ribir_types::Transform;
 
 use super::WidgetCtxImpl;
 use crate::{

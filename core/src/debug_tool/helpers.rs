@@ -6,8 +6,8 @@ use std::{
 };
 
 use ribir_algo::CowArc;
-use ribir_geom::{Point, Rect};
 use ribir_painter::Color;
+use ribir_types::{Point, Rect};
 use serde_json::{Value, json};
 
 use super::types::*;

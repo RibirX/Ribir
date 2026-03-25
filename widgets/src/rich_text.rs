@@ -1,7 +1,6 @@
 use std::{
   any::Any,
   cell::{Ref, RefCell},
-  sync::Arc,
 };
 
 use ribir_core::{
@@ -41,6 +40,7 @@ pub struct Span {
   pub font_size: SpanStyleValue<f32>,
   pub letter_spacing: SpanStyleValue<f32>,
   pub text_line_height: SpanStyleValue<LineHeight>,
+  pub text_decoration: SpanStyleValue<TextDecorationStyle>,
   pub foreground: SpanStyleValue<Brush>,
 }
 
@@ -52,6 +52,7 @@ pub struct SpanDeclarer {
   font_size: SpanStyleValue<f32>,
   letter_spacing: SpanStyleValue<f32>,
   text_line_height: SpanStyleValue<LineHeight>,
+  text_decoration: SpanStyleValue<TextDecorationStyle>,
   foreground: SpanStyleValue<Brush>,
 }
 
@@ -77,6 +78,7 @@ impl ObjDeclarer for SpanDeclarer {
       font_size: self.font_size,
       letter_spacing: self.letter_spacing,
       text_line_height: self.text_line_height,
+      text_decoration: self.text_decoration,
       foreground: self.foreground,
     }
   }
@@ -128,6 +130,14 @@ impl SpanDeclarer {
   }
 
   #[inline]
+  pub fn with_text_decoration<K: ?Sized>(
+    &mut self, v: impl RInto<PipeValue<TextDecorationStyle>, K>,
+  ) -> &mut Self {
+    self.text_decoration = Some(v.r_into());
+    self
+  }
+
+  #[inline]
   pub fn with_foreground<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Brush>, K>) -> &mut Self {
     self.foreground = Some(v.r_into());
     self
@@ -142,6 +152,7 @@ struct SpanSnapshot {
   pub font_size: Option<f32>,
   pub letter_spacing: Option<f32>,
   pub text_line_height: Option<LineHeight>,
+  pub text_decoration: Option<TextDecorationStyle>,
   pub foreground: Option<Brush>,
 }
 
@@ -154,12 +165,22 @@ impl Span {
   fn push_fragment(
     self, this: &impl StateWriter<Value = RichText>, subscriptions: &mut RichTextSubscriptions,
   ) {
-    let Self { text, data, font, font_size, letter_spacing, text_line_height, foreground } = self;
+    let Self {
+      text,
+      data,
+      font,
+      font_size,
+      letter_spacing,
+      text_line_height,
+      text_decoration,
+      foreground,
+    } = self;
     let (text, text_stream) = text.unzip();
     let (font, font_stream) = unzip_optional_pipe(font);
     let (font_size, font_size_stream) = unzip_optional_pipe(font_size);
     let (letter_spacing, letter_spacing_stream) = unzip_optional_pipe(letter_spacing);
     let (text_line_height, text_line_height_stream) = unzip_optional_pipe(text_line_height);
+    let (text_decoration, text_decoration_stream) = unzip_optional_pipe(text_decoration);
     let (foreground, foreground_stream) = unzip_optional_pipe(foreground);
 
     let index = append_fragment(
@@ -171,6 +192,7 @@ impl Span {
         font_size,
         letter_spacing,
         text_line_height,
+        text_decoration,
         foreground,
       }),
     );
@@ -192,6 +214,13 @@ impl Span {
       text_line_height_stream,
       set_span_text_line_height,
     );
+    push_fragment_subscription(
+      subscriptions,
+      this,
+      index,
+      text_decoration_stream,
+      set_span_text_decoration,
+    );
     push_fragment_subscription(subscriptions, this, index, foreground_stream, set_span_foreground);
   }
 }
@@ -207,28 +236,66 @@ fn unzip_optional_pipe<T: 'static>(
 
 impl SpanSnapshot {
   #[inline]
-  fn has_style_override(&self) -> bool {
+  fn has_style_override(&self, inherited_decoration: Option<&TextDecorationStyle>) -> bool {
     self.font.is_some()
       || self.font_size.is_some()
       || self.letter_spacing.is_some()
       || self.text_line_height.is_some()
       || self.foreground.is_some()
+      || self
+        .decoration_style(inherited_decoration)
+        .is_some()
   }
 
   #[inline]
-  fn span_style(&self) -> SpanStyle {
+  fn decoration_style(
+    &self, inherited_decoration: Option<&TextDecorationStyle>,
+  ) -> Option<TextDecorationStyle> {
+    let decoration = self
+      .text_decoration
+      .as_ref()
+      .map(|style| {
+        if style.decoration.is_empty() {
+          inherited_decoration
+            .map(|style| style.decoration)
+            .unwrap_or_default()
+        } else {
+          style.decoration
+        }
+      })
+      .or_else(|| inherited_decoration.map(|style| style.decoration))
+      .unwrap_or_default();
+    if decoration.is_empty() {
+      return None;
+    }
+
+    Some(TextDecorationStyle {
+      decoration,
+      decoration_color: self
+        .text_decoration
+        .as_ref()
+        .and_then(|style| style.decoration_color)
+        .or_else(|| inherited_decoration.and_then(|style| style.decoration_color)),
+    })
+  }
+
+  #[inline]
+  fn span_style(&self, inherited_decoration: Option<&TextDecorationStyle>) -> SpanStyle {
     SpanStyle {
       font: self.font.clone().map(|face| FontRequest { face }),
       font_size: self.font_size,
       letter_spacing: self.letter_spacing,
       line_height: self.text_line_height,
       brush: self.foreground.clone(),
+      decoration: self.decoration_style(inherited_decoration),
     }
   }
 
-  fn append_to(&self, builder: &mut AttributedTextBuilder) {
-    if self.has_style_override() {
-      builder.write_styled_text(&*self.text, self.span_style());
+  fn append_to(
+    &self, builder: &mut AttributedTextBuilder, inherited_decoration: Option<&TextDecorationStyle>,
+  ) {
+    if self.has_style_override(inherited_decoration) {
+      builder.write_styled_text(&*self.text, self.span_style(inherited_decoration));
     } else {
       builder.write_text(&*self.text);
     }
@@ -323,6 +390,13 @@ fn set_span_text_line_height(fragment: &mut RichTextFragment, text_line_height: 
   }
 }
 
+fn set_span_text_decoration(fragment: &mut RichTextFragment, text_decoration: TextDecorationStyle) {
+  match fragment {
+    RichTextFragment::Span(span) => span.text_decoration = Some(text_decoration),
+    RichTextFragment::Text(_) => unreachable!("expected a span fragment"),
+  }
+}
+
 fn set_span_foreground(fragment: &mut RichTextFragment, foreground: Brush) {
   match fragment {
     RichTextFragment::Span(span) => span.foreground = Some(foreground),
@@ -355,7 +429,9 @@ fn fragments_from_children(
   subscriptions
 }
 
-fn append_declared_fragments(fragments: &[RichTextFragment]) -> AttributedText {
+fn append_declared_fragments(
+  fragments: &[RichTextFragment], default_decoration: Option<&TextDecorationStyle>,
+) -> AttributedText {
   if fragments.is_empty() {
     return AttributedText::default();
   }
@@ -365,9 +441,18 @@ fn append_declared_fragments(fragments: &[RichTextFragment]) -> AttributedText {
     .iter()
     .for_each(|fragment| match fragment {
       RichTextFragment::Text(text) => {
-        builder.write_text(&**text);
+        if let Some(default_decoration) =
+          default_decoration.filter(|style| !style.decoration.is_empty())
+        {
+          builder.write_styled_text(
+            &**text,
+            SpanStyle { decoration: Some(default_decoration.clone()), ..Default::default() },
+          );
+        } else {
+          builder.write_text(&**text);
+        }
       }
-      RichTextFragment::Span(span) => span.append_to(&mut builder),
+      RichTextFragment::Span(span) => span.append_to(&mut builder, default_decoration),
     });
   builder.build()
 }
@@ -438,7 +523,8 @@ impl RichTextFragment {
 /// Like [`Text`], `RichText` uses inherited `text_style`, `text_align`, and
 /// `foreground` built-in widgets for its paragraph defaults. Individual spans
 /// only override the specific fields they set. Content comes entirely from the
-/// declared text and span children.
+/// declared text and span children. `text_decoration` is inherited the same
+/// way, while spans can override decoration flags or just the decoration color.
 ///
 /// # Example
 ///
@@ -496,27 +582,31 @@ pub struct RichText {
   fragments: Vec<RichTextFragment>,
 
   #[declare(skip)]
-  layout: RefCell<Option<Arc<ParagraphLayout>>>,
+  layout: RefCell<Option<ParagraphLayoutRef>>,
 }
 
 fn rich_text_layout(
-  text: AttributedText, text_style: &TextStyle, text_align: TextAlign, bounds: Size,
-) -> Arc<ParagraphLayout> {
+  text: AttributedText, text_style: &TextStyle, text_align: TextAlign, clamp: BoxClamp,
+) -> ParagraphLayoutRef {
   let paragraph_style = single_style_paragraph_style(text_style, text_align);
   let paragraph = AppCtx::text_services().paragraph(text);
-  paragraph.layout(text_style, &paragraph_style, bounds)
+  paragraph.layout(text_style, &paragraph_style, clamp)
 }
 
 impl Render for RichText {
   fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     let style = Provider::of::<TextStyle>(ctx).unwrap();
+    let text_decoration = Provider::of::<TextDecorationStyle>(ctx)
+      .map(|style| (*style).clone())
+      .filter(|style| !style.decoration.is_empty());
     let text_align = Provider::of::<TextAlign>(ctx)
       .map(|align| *align)
       .unwrap_or_default();
-    let layout = rich_text_layout(self.combined_text(), &style, text_align, clamp.max);
+    let text = self.combined_text(text_decoration.as_ref());
+    let layout = rich_text_layout(text, &style, text_align, clamp);
     let size = layout.size();
     *self.layout.borrow_mut() = Some(layout);
-    clamp.clamp(size)
+    size
   }
 
   #[inline]
@@ -543,9 +633,9 @@ impl Render for RichText {
 
   #[cfg(feature = "debug")]
   fn debug_properties(&self) -> serde_json::Value {
-    let text = self.combined_text();
+    let text = self.combined_text(None);
     serde_json::json!({
-      "text": text.text.as_ref(),
+      "text": &*text.text,
       "span_count": text.spans.len(),
       "fragment_count": self.fragments.len(),
     })
@@ -575,7 +665,7 @@ impl ComposeChild<'static> for RichText {
 }
 
 impl RichText {
-  pub fn layout(&self) -> Option<Ref<'_, Arc<ParagraphLayout>>> {
+  pub fn layout(&self) -> Option<Ref<'_, ParagraphLayoutRef>> {
     Ref::filter_map(self.layout.borrow(), |v| v.as_ref()).ok()
   }
 
@@ -585,7 +675,9 @@ impl RichText {
   }
 
   #[inline]
-  fn combined_text(&self) -> AttributedText { append_declared_fragments(&self.fragments) }
+  fn combined_text(&self, default_decoration: Option<&TextDecorationStyle>) -> AttributedText {
+    append_declared_fragments(&self.fragments, default_decoration)
+  }
 }
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
@@ -626,6 +718,15 @@ mod tests {
         _ => None,
       })
       .expect("expected a text command")
+  }
+
+  fn decoration_kinds(cmd: &TextCommand) -> Vec<TextDecoration> {
+    cmd
+      .payload
+      .decorations
+      .iter()
+      .map(|decoration| decoration.decoration)
+      .collect()
   }
 
   fn tap_on(wnd: &Window, pos: Point) {
@@ -677,6 +778,52 @@ mod tests {
     assert_eq!(cmd.payload.runs[0].brush, None);
     assert_eq!(cmd.payload.runs[1].brush, Some(Color::RED.into()));
     assert_eq!(cmd.payload.runs[2].brush, None);
+  }
+
+  #[test]
+  fn rich_text_center_alignment_uses_content_width_for_measurement() {
+    reset_test_env!();
+    register_test_font();
+
+    let wnd_size = Size::new(200., 40.);
+
+    let mut start_wnd = TestWindow::new_with_size(
+      fn_widget! {
+        @RichText {
+          text_style: test_text_style(),
+          foreground: Color::WHITE,
+          text_align: TextAlign::Start,
+          @ { "All" }
+        }
+      },
+      wnd_size,
+    );
+    start_wnd.draw_frame();
+    let start = last_text_command(
+      start_wnd
+        .take_last_frame()
+        .expect("expected a frame"),
+    );
+
+    let mut center_wnd = TestWindow::new_with_size(
+      fn_widget! {
+        @RichText {
+          text_style: test_text_style(),
+          foreground: Color::WHITE,
+          text_align: TextAlign::Center,
+          @ { "All" }
+        }
+      },
+      wnd_size,
+    );
+    center_wnd.draw_frame();
+    let center = last_text_command(
+      center_wnd
+        .take_last_frame()
+        .expect("expected a frame"),
+    );
+
+    assert!((center.paint_bounds.width() - start.paint_bounds.width()).abs() < 1.);
   }
 
   #[test]
@@ -1131,5 +1278,64 @@ mod tests {
     );
 
     assert!(narrow_cmd.payload.bounds.height() > wide_cmd.payload.bounds.height());
+  }
+
+  #[test]
+  fn rich_text_inherits_text_decoration() {
+    reset_test_env!();
+    register_test_font();
+
+    let mut wnd = TestWindow::new_with_size(
+      fn_widget! {
+        @RichText {
+          text_style: test_text_style(),
+          foreground: Color::WHITE,
+          text_decoration: TextDecoration::UNDERLINE,
+          @ { "plain " }
+          @Span {
+            text: "accent",
+            text_decoration: TextDecorationStyle::color(Color::BLUE),
+          }
+        }
+      },
+      Size::new(200., 40.),
+    );
+
+    wnd.draw_frame();
+    let cmd = last_text_command(wnd.take_last_frame().expect("expected a frame"));
+
+    assert_eq!(decoration_kinds(&cmd), vec![TextDecoration::UNDERLINE, TextDecoration::UNDERLINE]);
+    assert_eq!(cmd.payload.decorations[0].brush, None);
+    assert_eq!(cmd.payload.decorations[1].brush, Some(Color::BLUE.into()));
+  }
+
+  #[test]
+  fn rich_text_span_text_decoration_overrides_parent() {
+    reset_test_env!();
+    register_test_font();
+
+    let mut wnd = TestWindow::new_with_size(
+      fn_widget! {
+        @RichText {
+          text_style: test_text_style(),
+          foreground: Color::WHITE,
+          text_decoration: TextDecoration::UNDERLINE,
+          @ { "plain " }
+          @Span {
+            text: "gone",
+            text_decoration: TextDecoration::THROUGHLINE,
+          }
+        }
+      },
+      Size::new(200., 40.),
+    );
+
+    wnd.draw_frame();
+    let cmd = last_text_command(wnd.take_last_frame().expect("expected a frame"));
+
+    assert_eq!(
+      decoration_kinds(&cmd),
+      vec![TextDecoration::UNDERLINE, TextDecoration::THROUGHLINE]
+    );
   }
 }

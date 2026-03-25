@@ -177,6 +177,6 @@ mod tests {
     })
     .with_wnd_size(Size::new(200., 200.)),
     LayoutCase::default().with_size(Size::new(102., 102.)),
-    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(1., 1.0, 100., 100.))
+    LayoutCase::new(&[0, 0]).with_rect(ribir_types::rect(1., 1.0, 100., 100.))
   );
 }

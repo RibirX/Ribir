@@ -1,5 +1,8 @@
 use super::*;
 
+pub type TextDecoration = ribir_text::TextDecoration;
+pub type TextDecorationStyle = ribir_text::TextDecorationStyle;
+
 /// Use typography to present your design and content as clearly and efficiently
 /// as possible.
 ///
@@ -28,29 +31,6 @@ pub struct TypographyTheme {
 pub struct TextTheme {
   pub text: ribir_painter::TextStyle,
   pub decoration: TextDecorationStyle,
-}
-
-/// Encapsulates the text decoration style for painting.
-#[derive(Clone, Debug, PartialEq)]
-pub struct TextDecorationStyle {
-  /// The decorations to paint near the text
-  pub decoration: TextDecoration,
-  /// The color in which to paint the text decorations.
-  pub decoration_color: Brush,
-}
-
-bitflags! {
-  /// A linear decoration to draw near the text.
-  #[derive(Default, PartialEq, Eq, Clone, Copy, Debug)]
-  pub struct  TextDecoration: u8 {
-    const NONE = 0b0001;
-    /// Draw a line underneath each line of text
-    const UNDERLINE =  0b0010;
-    /// Draw a line above each line of text
-    const OVERLINE = 0b0100;
-    /// Draw a line through each line of text
-    const THROUGHLINE = 0b1000;
-  }
 }
 
 impl TypographyTheme {

@@ -1,7 +1,6 @@
 use std::{
   cell::{Ref, RefCell},
   ops::Range,
-  sync::Arc,
 };
 
 use ribir_core::{
@@ -23,7 +22,7 @@ where
 {
   text: T,
   #[declare(skip)]
-  glyphs: RefCell<Option<Arc<ParagraphLayout>>>,
+  glyphs: RefCell<Option<ParagraphLayoutRef>>,
 }
 
 impl<T: 'static> TextGlyphs<T> {
@@ -36,32 +35,32 @@ impl<T: 'static> TextGlyphs<T> {
     &mut self.text
   }
 
-  pub fn glyphs(&self) -> Option<Ref<'_, Arc<ParagraphLayout>>> {
+  pub fn glyphs(&self) -> Option<Ref<'_, ParagraphLayoutRef>> {
     Ref::filter_map(self.glyphs.borrow(), |v| v.as_ref()).ok()
   }
 }
 
 pub trait VisualText: BaseText {
   /// return self's glyphs layout info.
-  fn layout_glyphs(&self, clamp: BoxClamp, ctx: &MeasureCtx) -> Arc<ParagraphLayout>;
+  fn layout_glyphs(&self, clamp: BoxClamp, ctx: &MeasureCtx) -> ParagraphLayoutRef;
 
   /// paint the glyphs in the rect.
   fn paint(
-    &self, painter: &mut Painter, style: PaintingStyle, glyphs: &Arc<ParagraphLayout>, rect: Rect,
+    &self, painter: &mut Painter, style: PaintingStyle, glyphs: &ParagraphLayoutRef, rect: Rect,
   );
 }
 
 impl VisualText for CowArc<str> {
-  fn layout_glyphs(&self, clamp: BoxClamp, ctx: &MeasureCtx) -> Arc<ParagraphLayout> {
+  fn layout_glyphs(&self, clamp: BoxClamp, ctx: &MeasureCtx) -> ParagraphLayoutRef {
     let style = Provider::of::<TextStyle>(ctx).unwrap();
     let paragraph_style = single_style_paragraph_style(&style, TextAlign::Start);
     let paragraph = AppCtx::text_services()
-      .paragraph(AttributedText::styled(self.to_string(), single_style_span_style(&style)));
-    paragraph.layout(&style, &paragraph_style, clamp.max)
+      .paragraph(AttributedText::styled(self.to_string(), single_style_span_style(&style, None)));
+    paragraph.layout(&style, &paragraph_style, clamp)
   }
 
   fn paint(
-    &self, painter: &mut Painter, style: PaintingStyle, glyphs: &Arc<ParagraphLayout>, rect: Rect,
+    &self, painter: &mut Painter, style: PaintingStyle, glyphs: &ParagraphLayoutRef, rect: Rect,
   ) {
     let _ = (style, rect);
     let brush = painter.fill_brush().clone();
@@ -211,7 +210,7 @@ impl ParagraphLayoutExt for ParagraphLayout {
   }
 }
 
-impl ParagraphLayoutExt for Arc<ParagraphLayout> {
+impl ParagraphLayoutExt for ParagraphLayoutRef {
   fn caret_position_from_pos(&self, pos: Point) -> CaretPosition {
     self.as_ref().caret_position_from_pos(pos)
   }
@@ -245,10 +244,8 @@ impl<T> std::ops::DerefMut for TextGlyphs<T> {
 
 #[cfg(test)]
 mod tests {
-  use std::sync::Arc;
-
   use ribir_core::{prelude::*, text::LineHeight};
-  use ribir_geom::Size;
+  use ribir_types::Size;
 
   use crate::{input::text_glyphs::ParagraphLayoutExt, prelude::CaretPosition};
 
@@ -256,14 +253,14 @@ mod tests {
     assert_eq!((caret.cluster, caret.position), (cluster, position));
   }
 
-  fn build_glyphs(text: &str, wrap: TextWrap, size: Size) -> Arc<ParagraphLayout> {
+  fn build_glyphs(text: &str, wrap: TextWrap, size: Size) -> ParagraphLayoutRef {
     let text_services = new_text_services();
     let path = env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/DejaVuSans.ttf";
     let _ = text_services.register_font_file(std::path::Path::new(&path));
 
     let paragraph_style = ParagraphStyle { text_align: TextAlign::Start, wrap };
     let paragraph = text_services.paragraph(AttributedText::styled(
-      text,
+      text.to_owned(),
       SpanStyle {
         font: Some(FontRequest {
           face: FontFace {
@@ -275,6 +272,7 @@ mod tests {
         letter_spacing: Some(0.),
         line_height: Some(LineHeight::Px(16.)),
         brush: None,
+        decoration: None,
       },
     ));
     let text_style = TextStyle {
@@ -287,10 +285,10 @@ mod tests {
       line_height: LineHeight::Px(16.),
       overflow: TextOverflow::AutoWrap,
     };
-    paragraph.layout(&text_style, &paragraph_style, size)
+    paragraph.layout(&text_style, &paragraph_style, BoxClamp::max_size(size))
   }
 
-  fn build_test_glyphs() -> Arc<ParagraphLayout> {
+  fn build_test_glyphs() -> ParagraphLayoutRef {
     build_glyphs(
       "1 23 456 7890\n12345",
       TextWrap::Wrap,
@@ -298,7 +296,7 @@ mod tests {
     )
   }
 
-  fn build_three_line_glyphs() -> Arc<ParagraphLayout> {
+  fn build_three_line_glyphs() -> ParagraphLayoutRef {
     build_glyphs(
       "abc\ndef\nghi",
       TextWrap::NoWrap,
@@ -306,7 +304,7 @@ mod tests {
     )
   }
 
-  fn build_trailing_empty_line_glyphs() -> Arc<ParagraphLayout> {
+  fn build_trailing_empty_line_glyphs() -> ParagraphLayoutRef {
     build_glyphs(
       "abc\ndef\n",
       TextWrap::NoWrap,
@@ -314,7 +312,7 @@ mod tests {
     )
   }
 
-  fn build_increasing_line_glyphs() -> Arc<ParagraphLayout> {
+  fn build_increasing_line_glyphs() -> ParagraphLayoutRef {
     build_glyphs(
       "a\nab\nabc",
       TextWrap::NoWrap,
@@ -322,7 +320,7 @@ mod tests {
     )
   }
 
-  fn build_wrapped_multiline_glyphs() -> Arc<ParagraphLayout> {
+  fn build_wrapped_multiline_glyphs() -> ParagraphLayoutRef {
     build_glyphs(
       "1 23 456 7890 12345 67890",
       TextWrap::Wrap,
@@ -330,7 +328,7 @@ mod tests {
     )
   }
 
-  fn last_line_start(glyphs: &Arc<ParagraphLayout>) -> CaretPosition {
+  fn last_line_start(glyphs: &ParagraphLayoutRef) -> CaretPosition {
     let mut caret = CaretPosition::default();
     for _ in 0..16 {
       let next = glyphs.down(caret);

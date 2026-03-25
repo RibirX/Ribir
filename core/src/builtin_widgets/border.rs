@@ -587,7 +587,7 @@ mod tests {
       }
     }),
     LayoutCase::default().with_size(Size::new(100., 100.)),
-    LayoutCase::new(&[0]).with_rect(ribir_geom::rect(0., 0., 100., 100.))
+    LayoutCase::new(&[0]).with_rect(ribir_types::rect(0., 0., 100., 100.))
   );
 
   fn border_100_50_box(

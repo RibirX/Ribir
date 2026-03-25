@@ -14,11 +14,12 @@ version.workspace = true
 
 [dependencies]
 ahash.workspace = true
+bitflags.workspace = true
 derive_more = { workspace = true, features = ["add", "add_assign", "mul", "not"] }
 parley.workspace = true
 quick-xml.workspace = true
 ribir_algo = { workspace = true }
-ribir_geom = { workspace = true }
+ribir_types = { workspace = true }
 swash.workspace = true
 tracing.workspace = true
 ttf-parser.workspace = true

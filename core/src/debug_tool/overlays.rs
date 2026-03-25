@@ -3,8 +3,8 @@ use std::{
   sync::{OnceLock, RwLock},
 };
 
-use ribir_geom::Transform;
 use ribir_painter::Painter;
+use ribir_types::Transform;
 
 use super::helpers::{get_widget_global_overlay_rect, parse_hex_color};
 use crate::{

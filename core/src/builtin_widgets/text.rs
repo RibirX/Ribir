@@ -1,7 +1,4 @@
-use std::{
-  cell::{Ref, RefCell},
-  sync::Arc,
-};
+use std::cell::{Ref, RefCell};
 
 use crate::{
   prelude::*,
@@ -25,7 +22,8 @@ const TEXT_FIT_TOLERANCE: f32 = 0.1;
 /// 4. `text_align` (see ./text_align.rs) - This is a builtin field of FatObj.
 ///    You can simply set the `text_align` field to attach a TextAlignWidget to
 ///    the host widget.
-/// 5. `foreground` (see ./painting_style.rs)
+/// 5. `text_decoration` (see ./text_decoration.rs)
+/// 6. `foreground` (see ./painting_style.rs)
 ///
 /// # Example
 ///
@@ -47,47 +45,62 @@ pub struct Text {
 
   /// Cached glyph layout results for the current text and style configuration
   #[declare(skip)]
-  layout: RefCell<Option<Arc<ParagraphLayout>>>,
+  layout: RefCell<Option<ParagraphLayoutRef>>,
 }
 
 fn text_layout(
-  text: CowArc<str>, text_style: &TextStyle, text_align: TextAlign, bounds: Size,
-) -> Arc<ParagraphLayout> {
+  text: CowArc<str>, text_style: &TextStyle, text_decoration: Option<TextDecorationStyle>,
+  text_align: TextAlign, clamp: BoxClamp,
+) -> ParagraphLayoutRef {
   if text_style.overflow == TextOverflow::Ellipsis {
-    return ellipsis_text_layout(text, text_style, text_align, bounds);
+    ellipsis_text_layout(text, text_style, text_decoration, text_align, clamp)
+  } else {
+    paragraph_layout_for_text(text, text_style, text_decoration, text_align, clamp)
   }
-
-  paragraph_layout_for_text(text, text_style, text_align, bounds)
 }
 
 fn paragraph_layout_for_text(
-  text: CowArc<str>, text_style: &TextStyle, text_align: TextAlign, bounds: Size,
-) -> Arc<ParagraphLayout> {
+  text: CowArc<str>, text_style: &TextStyle, text_decoration: Option<TextDecorationStyle>,
+  text_align: TextAlign, clamp: BoxClamp,
+) -> ParagraphLayoutRef {
   let paragraph_style = single_style_paragraph_style(text_style, text_align);
-  let paragraph = AppCtx::text_services()
-    .paragraph(AttributedText::styled(text.to_string(), single_style_span_style(text_style)));
-  paragraph.layout(text_style, &paragraph_style, bounds)
+  let paragraph = AppCtx::text_services().paragraph(AttributedText::styled(
+    text.to_string(),
+    single_style_span_style(text_style, text_decoration),
+  ));
+  paragraph.layout(text_style, &paragraph_style, clamp)
 }
 
 fn ellipsis_text_layout(
-  text: CowArc<str>, text_style: &TextStyle, text_align: TextAlign, bounds: Size,
-) -> Arc<ParagraphLayout> {
-  let full_layout = paragraph_layout_for_text(text.clone(), text_style, TextAlign::Start, bounds);
+  text: CowArc<str>, text_style: &TextStyle, text_decoration: Option<TextDecorationStyle>,
+  text_align: TextAlign, clamp: BoxClamp,
+) -> ParagraphLayoutRef {
+  // Ellipsis selection should depend only on the available line width. Once the
+  // truncated candidate is chosen, apply the requested alignment to the final
+  // clamped widget size.
+  let measured = measure_ellipsized_text_layout(text, text_style, text_decoration, clamp.max);
+  let size = clamp.clamp(measured.size());
+  measured.aligned(text_align, size)
+}
+
+fn measure_ellipsized_text_layout(
+  text: CowArc<str>, text_style: &TextStyle, text_decoration: Option<TextDecorationStyle>,
+  bounds: Size,
+) -> ParagraphLayoutRef {
+  let full_layout =
+    start_aligned_text_layout(text.clone(), text_style, text_decoration.clone(), bounds);
   if text.is_empty()
     || !bounds.width.is_finite()
-    || full_layout.size().width <= bounds.width + TEXT_FIT_TOLERANCE
+    || layout_fit_width(&full_layout) <= bounds.width + TEXT_FIT_TOLERANCE
   {
-    return if text_align == TextAlign::Start {
-      full_layout
-    } else {
-      paragraph_layout_for_text(text, text_style, text_align, bounds)
-    };
+    return full_layout;
   }
 
-  let ellipsis_layout = paragraph_layout_for_text(ELLIPSIS.into(), text_style, text_align, bounds);
-  let ellipsis_width = ellipsis_layout.size().width;
+  let ellipsis_layout =
+    start_aligned_text_layout(ELLIPSIS.into(), text_style, text_decoration.clone(), bounds);
+  let ellipsis_width = layout_fit_width(&ellipsis_layout);
   if ellipsis_width > bounds.width + TEXT_FIT_TOLERANCE {
-    return paragraph_layout_for_text("".into(), text_style, text_align, bounds);
+    return start_aligned_text_layout("".into(), text_style, text_decoration, bounds);
   }
 
   ellipsized_layout(
@@ -96,15 +109,16 @@ fn ellipsis_text_layout(
     ellipsis_layout,
     bounds.width - ellipsis_width,
     text_style,
-    text_align,
+    text_decoration,
     bounds,
   )
 }
 
 fn ellipsized_layout(
-  text: &CowArc<str>, full_layout: &Arc<ParagraphLayout>, ellipsis_layout: Arc<ParagraphLayout>,
-  available_width: f32, text_style: &TextStyle, text_align: TextAlign, bounds: Size,
-) -> Arc<ParagraphLayout> {
+  text: &CowArc<str>, full_layout: &ParagraphLayoutRef, ellipsis_layout: ParagraphLayoutRef,
+  available_width: f32, text_style: &TextStyle, text_decoration: Option<TextDecorationStyle>,
+  bounds: Size,
+) -> ParagraphLayoutRef {
   let caret_y = full_layout
     .caret_rect(Caret::default())
     .center()
@@ -121,13 +135,13 @@ fn ellipsized_layout(
       return ellipsis_layout;
     }
 
-    let layout = paragraph_layout_for_text(
+    let layout = start_aligned_text_layout(
       ellipsis_candidate(text.as_ref(), boundary),
       text_style,
-      text_align,
+      text_decoration.clone(),
       bounds,
     );
-    if layout.size().width <= bounds.width + TEXT_FIT_TOLERANCE {
+    if layout_fit_width(&layout) <= bounds.width + TEXT_FIT_TOLERANCE {
       return layout;
     }
 
@@ -141,6 +155,21 @@ fn ellipsized_layout(
   }
 }
 
+fn start_aligned_text_layout(
+  text: CowArc<str>, text_style: &TextStyle, text_decoration: Option<TextDecorationStyle>,
+  bounds: Size,
+) -> ParagraphLayoutRef {
+  paragraph_layout_for_text(
+    text,
+    text_style,
+    text_decoration,
+    TextAlign::Start,
+    BoxClamp::max_size(bounds),
+  )
+}
+
+fn layout_fit_width(layout: &ParagraphLayoutRef) -> f32 { layout.draw_payload().bounds.width() }
+
 fn ellipsis_candidate(text: &str, boundary: usize) -> CowArc<str> {
   let prefix = text[..boundary].trim_end();
   if prefix.is_empty() { ELLIPSIS.into() } else { format!("{prefix}{ELLIPSIS}").into() }
@@ -149,13 +178,16 @@ fn ellipsis_candidate(text: &str, boundary: usize) -> CowArc<str> {
 impl Render for Text {
   fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     let style = Provider::of::<TextStyle>(ctx).unwrap();
+    let text_decoration = Provider::of::<TextDecorationStyle>(ctx)
+      .map(|style| (*style).clone())
+      .filter(|style| !style.decoration.is_empty());
     let text_align = Provider::of::<TextAlign>(ctx)
       .map(|align| *align)
       .unwrap_or_default();
-    let layout = text_layout(self.text.clone(), &style, text_align, clamp.max);
+    let layout = text_layout(self.text.clone(), &style, text_decoration, text_align, clamp);
     let size = layout.size();
     *self.layout.borrow_mut() = Some(layout);
-    clamp.clamp(size)
+    size
   }
 
   #[inline]
@@ -193,7 +225,7 @@ impl Text {
     Self { text: text.into(), layout: Default::default() }
   }
 
-  pub fn layout(&self) -> Option<Ref<'_, Arc<ParagraphLayout>>> {
+  pub fn layout(&self) -> Option<Ref<'_, ParagraphLayoutRef>> {
     Ref::filter_map(self.layout.borrow(), |v| v.as_ref()).ok()
   }
 }
@@ -211,6 +243,7 @@ macro_rules! define_text_with_theme_style {
           @Text {
             text: pipe!($read(this).text.clone()),
             text_style: TypographyTheme::of(BuildCtx::get()).$style.text.clone(),
+            text_decoration: TypographyTheme::of(BuildCtx::get()).$style.decoration.clone(),
           }
         }
         .into_widget()
@@ -270,6 +303,29 @@ mod tests {
       .iter()
       .map(|run| run.glyphs.len())
       .sum()
+  }
+
+  fn min_glyph_x(cmd: &TextCommand) -> f32 {
+    cmd
+      .payload
+      .runs
+      .iter()
+      .flat_map(|run| {
+        run
+          .glyphs
+          .iter()
+          .map(|glyph| glyph.baseline_origin.x)
+      })
+      .fold(f32::INFINITY, f32::min)
+  }
+
+  fn decoration_kinds(cmd: &TextCommand) -> Vec<TextDecoration> {
+    cmd
+      .payload
+      .decorations
+      .iter()
+      .map(|decoration| decoration.decoration)
+      .collect()
   }
 
   widget_test_suit!(
@@ -377,5 +433,128 @@ mod tests {
     assert!(overflow.paint_bounds.width() > max_width + super::TEXT_FIT_TOLERANCE);
     assert!(ellipsis.paint_bounds.width() <= max_width + super::TEXT_FIT_TOLERANCE);
     assert!(glyph_count(&ellipsis) < glyph_count(&overflow));
+  }
+
+  #[test]
+  fn ellipsis_alignment_only_affects_final_position() {
+    fn ellipsis_command(max_width: f32, text_align: TextAlign) -> TextCommand {
+      let text = "Hello ribir ellipsis";
+      let wnd_size = Size::new(200., 40.);
+      let mut wnd = TestWindow::new_with_size(
+        fn_widget! {
+          @ConstrainedBox {
+            clamp: BoxClamp::fixed_width(max_width),
+            @Text {
+              text,
+              text_style: test_text_style(TextOverflow::Ellipsis),
+              foreground: Color::WHITE,
+              text_align,
+            }
+          }
+        },
+        wnd_size,
+      );
+      wnd.draw_frame();
+      last_text_command(wnd.take_last_frame().expect("expected a frame"))
+    }
+
+    reset_test_env!();
+    register_test_font();
+
+    let max_width = 60.;
+    let start = ellipsis_command(max_width, TextAlign::Start);
+    let center = ellipsis_command(max_width, TextAlign::Center);
+    let end = ellipsis_command(max_width, TextAlign::End);
+
+    assert_eq!(glyph_count(&start), glyph_count(&center));
+    assert_eq!(glyph_count(&center), glyph_count(&end));
+    assert!(start.paint_bounds.width() <= max_width + super::TEXT_FIT_TOLERANCE);
+    assert!(center.paint_bounds.width() <= max_width + super::TEXT_FIT_TOLERANCE);
+    assert!(end.paint_bounds.width() <= max_width + super::TEXT_FIT_TOLERANCE);
+    assert!(min_glyph_x(&start) < min_glyph_x(&center));
+    assert!(min_glyph_x(&center) < min_glyph_x(&end));
+  }
+
+  #[test]
+  fn center_aligned_text_uses_content_width_for_measurement() {
+    reset_test_env!();
+    register_test_font();
+
+    let text = "All";
+    let wnd_size = Size::new(200., 40.);
+
+    let mut start_wnd = TestWindow::new_with_size(
+      fn_widget! {
+        @Text {
+          text,
+          text_style: test_text_style(TextOverflow::Overflow),
+          foreground: Color::WHITE,
+          text_align: TextAlign::Start,
+        }
+      },
+      wnd_size,
+    );
+    start_wnd.draw_frame();
+    let start = last_text_command(
+      start_wnd
+        .take_last_frame()
+        .expect("expected a frame"),
+    );
+
+    let mut center_wnd = TestWindow::new_with_size(
+      fn_widget! {
+        @Text {
+          text,
+          text_style: test_text_style(TextOverflow::Overflow),
+          foreground: Color::WHITE,
+          text_align: TextAlign::Center,
+        }
+      },
+      wnd_size,
+    );
+    center_wnd.draw_frame();
+    let center = last_text_command(
+      center_wnd
+        .take_last_frame()
+        .expect("expected a frame"),
+    );
+
+    assert!((center.paint_bounds.width() - start.paint_bounds.width()).abs() < 1.);
+  }
+
+  #[test]
+  fn text_decoration_emits_payload_decorations() {
+    reset_test_env!();
+    register_test_font();
+
+    let mut wnd = TestWindow::new_with_size(
+      fn_widget! {
+        @Text {
+          text: "Decorated",
+          text_style: test_text_style(TextOverflow::Overflow),
+          foreground: Color::WHITE,
+          text_decoration: (
+            TextDecoration::UNDERLINE | TextDecoration::THROUGHLINE,
+            Color::GREEN,
+          ),
+        }
+      },
+      Size::new(200., 40.),
+    );
+
+    wnd.draw_frame();
+    let cmd = last_text_command(wnd.take_last_frame().expect("expected a frame"));
+
+    assert_eq!(
+      decoration_kinds(&cmd),
+      vec![TextDecoration::UNDERLINE, TextDecoration::THROUGHLINE]
+    );
+    assert!(
+      cmd
+        .payload
+        .decorations
+        .iter()
+        .all(|decoration| decoration.brush == Some(Color::GREEN.into()))
+    );
   }
 }

@@ -1,4 +1,4 @@
-use ribir_geom::Size;
+use ribir_types::Size;
 
 use super::{WidgetCtx, WidgetCtxImpl};
 use crate::{

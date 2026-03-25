@@ -886,7 +886,7 @@ widget_layout_test!(
       @ { sized_box2 }
     }
   }),
-  LayoutCase::default().with_rect(ribir_geom::rect(0., 0., 2., 1.))
+  LayoutCase::default().with_rect(ribir_types::rect(0., 0., 2., 1.))
 );
 
 #[test]

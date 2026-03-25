@@ -7,10 +7,12 @@ edition.workspace = true
 homepage.workspace = true
 keywords.workspace = true
 license.workspace = true
-name = "ribir_geom"
+name = "ribir_types"
 readme.workspace = true
-repository = "https://github.com/RibirX/Ribir/geom"
+repository = "https://github.com/RibirX/Ribir/types"
 version.workspace = true
 
 [dependencies]
 euclid.workspace = true
+material-colors.workspace = true
+serde = { workspace = true, features = ["derive"] }
