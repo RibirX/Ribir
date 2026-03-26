@@ -22,7 +22,6 @@ tracing-log.workspace = true
 tracing-subscriber.workspace = true
 lyon_geom.workspace = true
 paste.workspace = true
-pin-project-lite.workspace = true
 ribir_algo = { workspace = true }
 ribir_types = { workspace = true }
 ribir_macros = { workspace = true }
@@ -33,10 +32,6 @@ rxrust.workspace = true
 smallvec.workspace = true
 winit.workspace = true
 url.workspace = true
-futures-timer = { version = "3.0.3", optional = true }
-cfg-if.workspace = true
-
-tokio-stream = { workspace = true }
 
 # Debug server dependencies (optional)
 serde = { workspace = true, features = ["derive"], optional = true }
@@ -45,6 +40,7 @@ axum = { version = "0.8", optional = true }
 tower-http = { version = "0.6", features = ["cors"], optional = true }
 base64 = { version = "0.21", optional = true }
 dirs = { workspace = true, optional = true }
+tokio-stream = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "rt", "time", "macros", "sync"]}
@@ -70,4 +66,4 @@ wasm-bindgen-test = "0.3.42"
 png = ["ribir_painter/png"]
 jpeg = ["ribir_painter/jpeg"]
 test-utils = []
-debug = ["serde", "serde_json", "axum", "tower-http", "png", "dep:base64", "dep:dirs"]
+debug = ["serde", "serde_json", "axum", "tokio-stream", "tower-http", "png", "dep:base64", "dep:dirs"]

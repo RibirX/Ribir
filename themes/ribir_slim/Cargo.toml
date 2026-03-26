@@ -15,4 +15,3 @@ publish = false
 
 [dependencies]
 ribir_core = { workspace = true }
-ribir_widgets = { workspace = true }

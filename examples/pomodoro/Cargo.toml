@@ -15,7 +15,6 @@ version.workspace = true
 paste.workspace = true
 # we disable `default-features`, because we want more control over testing.
 ribir = {path = "../../ribir", features = ["material", "widgets"]}
-tokio.workspace = true
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rodio = "0.21"
@@ -24,7 +23,6 @@ dirs = "5.0"
 [dev-dependencies]
 ribir_dev_helper = {path = "../../dev-helper"}
 ribir_slim = { path = "../../themes/ribir_slim" }
-ribir_core = { path = "../../core", features = ["test-utils"]}
 
 [features]
 wgpu = ["ribir/wgpu"]

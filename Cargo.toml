@@ -78,7 +78,6 @@ colored = "3.0.0"
 derive_more = "2.0.1"
 dssim-core = "3.2.9"
 euclid = "0.22.11"
-fontdb = "0.23.0"
 futures = "0.3.26"
 guillotiere = "0.6.0"
 image = { version = "0.25.6", default-features = false, features = ["rayon"] }
@@ -102,8 +101,6 @@ serde = "1.0"
 serde_json = "1.0.82"
 smallvec = "1.15.0"
 syn = "2.0.87"
-unicode-bidi = "0.3.7"
-unicode-script = "0.5.4"
 unicode-segmentation = "1.9.0"
 usvg = { version = "0.45.0", default-features = false }
 wgpu = { version = "28.0.0", features = ["webgl"] }

@@ -28,15 +28,7 @@ usvg.workspace = true
 zerocopy = {workspace = true, optional = true, features = ["derive"]}
 derive_more= {workspace = true, features = ["add", "add_assign", "not", "mul"]} 
 smallvec = { workspace = true, features = ["serde"] }
-swash.workspace = true
-ttf-parser.workspace = true
-unicode-bidi.workspace = true
-unicode-script.workspace = true
-unicode-segmentation.workspace = true
-quick-xml.workspace = true
 ahash.workspace = true
-parley.workspace = true
-
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom-v3.workspace = true
