@@ -16,13 +16,10 @@ version.workspace = true
 
 [dependencies]
 bitflags.workspace = true
-lyon_algorithms.workspace = true
-lyon_path.workspace = true
 ribir_core = { workspace = true }
 ribir_types = { workspace = true }
 unicode-segmentation.workspace = true
 thiserror.workspace = true
-ahash.workspace = true
 serde_json = { workspace = true, optional = true }
 
 [dev-dependencies]

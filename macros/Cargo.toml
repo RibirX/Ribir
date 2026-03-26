@@ -17,7 +17,6 @@ proc-macro = true
 
 [dependencies]
 ahash.workspace = true
-bitflags.workspace = true
 image = { workspace = true, features = ["png", "jpeg", "gif", "bmp", "webp"] }
 proc-macro2.workspace = true
 quote.workspace = true

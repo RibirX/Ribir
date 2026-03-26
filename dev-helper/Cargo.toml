@@ -18,7 +18,6 @@ futures.workspace = true
 ribir_types = { workspace = true }
 ribir_gpu = { workspace = true }
 ribir_painter = { workspace = true, features = ["png"] }
-image.workspace = true
 dssim-core.workspace = true
 
 [dev-dependencies]
