@@ -25,7 +25,12 @@ impl DrawImgTrianglesPass {
   ) -> Self {
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       label: Some("Image pipeline layout"),
-      bind_group_layouts: &[mask_layout, texs_layout, slot0_layout, slot1_layout],
+      bind_group_layouts: &[
+        Some(mask_layout),
+        Some(texs_layout),
+        Some(slot0_layout),
+        Some(slot1_layout),
+      ],
       immediate_size: 0,
     });
 

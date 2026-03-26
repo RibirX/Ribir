@@ -37,7 +37,12 @@ impl DrawFilterPass {
 
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       label: Some("Filter pipeline layout"),
-      bind_group_layouts: &[mask_layout, texs_layout, slot0_layout, &origin_tex_layout],
+      bind_group_layouts: &[
+        Some(mask_layout),
+        Some(texs_layout),
+        Some(slot0_layout),
+        Some(&origin_tex_layout),
+      ],
       immediate_size: 0,
     });
 

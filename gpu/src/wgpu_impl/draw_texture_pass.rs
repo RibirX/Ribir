@@ -40,7 +40,12 @@ impl DrawTexturePass {
 
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       label: Some("Texture triangles pipeline layout"),
-      bind_group_layouts: &[mask_layout, texs_layout, slot0_layout, &input_tex_layout],
+      bind_group_layouts: &[
+        Some(mask_layout),
+        Some(texs_layout),
+        Some(slot0_layout),
+        Some(&input_tex_layout),
+      ],
       immediate_size: 0,
     });
 

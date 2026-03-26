@@ -26,7 +26,7 @@ impl DrawAlphaTrianglesPass {
     let size_uniform = Uniform::new(device, wgpu::ShaderStages::VERTEX, 4);
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       label: Some("Alpha triangles pipeline layout"),
-      bind_group_layouts: &[size_uniform.layout()],
+      bind_group_layouts: &[Some(size_uniform.layout())],
       immediate_size: 0,
     });
 
