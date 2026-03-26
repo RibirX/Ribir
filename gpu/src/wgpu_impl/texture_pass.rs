@@ -47,7 +47,7 @@ impl CopyTexturePass {
 
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       label: Some("Copy texture"),
-      bind_group_layouts: &[&bind_layout],
+      bind_group_layouts: &[Some(&bind_layout)],
       immediate_size: 0,
     });
     let vertices_buffer = new_vertices::<[f32; 2]>(device, 4);

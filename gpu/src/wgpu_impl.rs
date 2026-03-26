@@ -804,7 +804,11 @@ impl<'a> Surface<'a> {
 
   pub fn get_current_texture(&mut self) -> &mut WgpuTexture {
     self.current_texture.get_or_insert_with(|| {
-      let tex = self.surface.get_current_texture().unwrap();
+      let tex = match self.surface.get_current_texture() {
+        wgpu::CurrentSurfaceTexture::Success(tex)
+        | wgpu::CurrentSurfaceTexture::Suboptimal(tex) => tex,
+        status => panic!("Failed to acquire surface texture: {status:?}"),
+      };
       WgpuTexture::new(InnerTexture::SurfaceTexture(tex))
     })
   }
@@ -1050,9 +1054,9 @@ impl WgpuImpl {
 
   #[allow(clippy::needless_lifetimes)]
   async fn create<'a>(target: Option<wgpu::SurfaceTarget<'a>>) -> (WgpuImpl, Option<Surface<'a>>) {
-    let mut instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+    let mut instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
       backends: wgpu::Backends::PRIMARY,
-      ..<_>::default()
+      ..wgpu::InstanceDescriptor::new_without_display_handle()
     });
 
     // This detection mechanism might be deprecated in the future. Ideally, we
@@ -1064,9 +1068,9 @@ impl WgpuImpl {
       .await
       .is_err()
     {
-      instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+      instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends: wgpu::Backends::SECONDARY,
-        ..<_>::default()
+        ..wgpu::InstanceDescriptor::new_without_display_handle()
       });
     }
 
@@ -1134,7 +1138,7 @@ impl WgpuImpl {
     let mask_layers_uniform =
       Uniform::new(&device, wgpu::ShaderStages::FRAGMENT, limits.max_mask_layers);
     let can_prepare_storage_pool =
-      device_limits.max_storage_buffer_binding_size >= uniform_bytes as u32;
+      device_limits.max_storage_buffer_binding_size >= uniform_bytes as u64;
     debug!("primitive pool mode: can_use_storage={can_prepare_storage_pool}");
     let (slot0_pool, slot1_pool) = if can_prepare_storage_pool {
       (
