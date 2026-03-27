@@ -8,7 +8,7 @@ use ahash::HashSet;
 use ribir_painter::{Color, ColorFormat, PixelImage, VertexBuffers};
 use ribir_types::{DevicePoint, DeviceRect, DeviceSize};
 use tokio::sync::oneshot;
-use tracing::debug;
+use tracing::{debug, warn};
 use wgpu::TextureFormat;
 use zerocopy::AsBytes;
 
@@ -802,15 +802,38 @@ impl<'a> Surface<'a> {
     DeviceSize::new(self.config.width as i32, self.config.height as i32)
   }
 
-  pub fn get_current_texture(&mut self) -> &mut WgpuTexture {
-    self.current_texture.get_or_insert_with(|| {
-      let tex = match self.surface.get_current_texture() {
-        wgpu::CurrentSurfaceTexture::Success(tex)
-        | wgpu::CurrentSurfaceTexture::Suboptimal(tex) => tex,
-        status => panic!("Failed to acquire surface texture: {status:?}"),
-      };
-      WgpuTexture::new(InnerTexture::SurfaceTexture(tex))
-    })
+  pub fn get_current_texture(&mut self, backend: &WgpuImpl) -> Option<&mut WgpuTexture> {
+    if self.current_texture.is_none() {
+      let surface_texture = self.surface.get_current_texture();
+      match surface_acquire_action(&surface_texture) {
+        SurfaceAcquireAction::Ready => {
+          let tex = match surface_texture {
+            wgpu::CurrentSurfaceTexture::Success(tex)
+            | wgpu::CurrentSurfaceTexture::Suboptimal(tex) => tex,
+            _ => unreachable!(),
+          };
+          self.current_texture = Some(WgpuTexture::new(InnerTexture::SurfaceTexture(tex)));
+        }
+        SurfaceAcquireAction::SkipFrame => {
+          debug!(
+            "Skipping frame because surface texture acquisition returned {surface_texture:?}."
+          );
+          return None;
+        }
+        SurfaceAcquireAction::Reconfigure => {
+          warn!("Reconfiguring surface after acquire returned {surface_texture:?}.");
+          self
+            .surface
+            .configure(backend.device(), &self.config);
+          return None;
+        }
+        SurfaceAcquireAction::Fatal => {
+          panic!("Failed to acquire surface texture: {surface_texture:?}");
+        }
+      }
+    }
+
+    self.current_texture.as_mut()
   }
 
   /// Present the current texture to the surface.
@@ -821,6 +844,30 @@ impl<'a> Surface<'a> {
     }
   }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SurfaceAcquireAction {
+  Ready,
+  SkipFrame,
+  Reconfigure,
+  Fatal,
+}
+
+fn surface_acquire_action(surface_texture: &wgpu::CurrentSurfaceTexture) -> SurfaceAcquireAction {
+  match surface_texture {
+    wgpu::CurrentSurfaceTexture::Success(_) | wgpu::CurrentSurfaceTexture::Suboptimal(_) => {
+      SurfaceAcquireAction::Ready
+    }
+    wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {
+      SurfaceAcquireAction::SkipFrame
+    }
+    wgpu::CurrentSurfaceTexture::Outdated => SurfaceAcquireAction::Reconfigure,
+    wgpu::CurrentSurfaceTexture::Lost | wgpu::CurrentSurfaceTexture::Validation => {
+      SurfaceAcquireAction::Fatal
+    }
+  }
+}
+
 pub struct WgpuTexture {
   inner_tex: InnerTexture,
   view: wgpu::TextureView,
@@ -1384,4 +1431,41 @@ fn textures_bind(
     entries: &entries,
     label: Some("textures bind group"),
   })
+}
+
+#[cfg(test)]
+mod tests {
+  use super::{SurfaceAcquireAction, surface_acquire_action};
+
+  #[test]
+  fn skip_frame_when_surface_is_temporarily_unavailable() {
+    assert_eq!(
+      surface_acquire_action(&wgpu::CurrentSurfaceTexture::Timeout),
+      SurfaceAcquireAction::SkipFrame
+    );
+    assert_eq!(
+      surface_acquire_action(&wgpu::CurrentSurfaceTexture::Occluded),
+      SurfaceAcquireAction::SkipFrame
+    );
+  }
+
+  #[test]
+  fn reconfigure_when_surface_is_outdated() {
+    assert_eq!(
+      surface_acquire_action(&wgpu::CurrentSurfaceTexture::Outdated),
+      SurfaceAcquireAction::Reconfigure
+    );
+  }
+
+  #[test]
+  fn keep_non_recoverable_surface_errors_explicit() {
+    assert_eq!(
+      surface_acquire_action(&wgpu::CurrentSurfaceTexture::Lost),
+      SurfaceAcquireAction::Fatal
+    );
+    assert_eq!(
+      surface_acquire_action(&wgpu::CurrentSurfaceTexture::Validation),
+      SurfaceAcquireAction::Fatal
+    );
+  }
 }
