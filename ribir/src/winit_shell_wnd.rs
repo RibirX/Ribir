@@ -109,9 +109,12 @@ pub trait WinitBackend<'a>: Sized {
 
   fn end_frame(&mut self);
 
-  /// Capture the current frame from the GPU surface.
+  /// Capture the current frame
   #[cfg(feature = "debug")]
-  fn capture_screenshot(&mut self) -> Option<BoxFuture<'static, Option<PixelImage>>>;
+  fn capture_screenshot(
+    &mut self, viewport: DeviceRect, global_matrix: &Transform, commands: &[PaintCommand],
+    glyph_provider: &dyn GlyphRasterSource,
+  ) -> Option<BoxFuture<'static, Option<PixelImage>>>;
 }
 
 pub(crate) struct WinitShellWnd {
@@ -142,6 +145,7 @@ impl WinitShellWnd {
         if wnd_size == window_size(&self.winit_wnd) {
           self.backend.begin_frame(surface_color);
           let scale_factor = self.winit_wnd.scale_factor() as f32;
+          let global_matrix = Transform::scale(scale_factor, scale_factor);
 
           let viewport: DeviceRect = viewport
             .scale(scale_factor, scale_factor)
@@ -150,13 +154,18 @@ impl WinitShellWnd {
             .cast_unit();
           self.backend.draw_commands(
             viewport,
-            &Transform::scale(scale_factor, scale_factor),
+            &global_matrix,
             &commands,
             glyph_provider.as_ref().as_ref(),
           );
 
           #[cfg(feature = "debug")]
-          self.capture_debug_frame();
+          self.capture_debug_frame(
+            viewport,
+            &global_matrix,
+            &commands,
+            glyph_provider.as_ref().as_ref(),
+          );
 
           self.backend.end_frame();
         } else {
@@ -174,9 +183,15 @@ impl WinitShellWnd {
 
   /// Capture and send frame to debug server if enabled.
   #[cfg(feature = "debug")]
-  fn capture_debug_frame(&mut self) {
+  fn capture_debug_frame(
+    &mut self, viewport: DeviceRect, global_matrix: &Transform, commands: &[PaintCommand],
+    glyph_provider: &dyn GlyphRasterSource,
+  ) {
     if FRAME_TX.get().is_some()
-      && let Some(fut) = self.backend.capture_screenshot()
+      && let Some(fut) =
+        self
+          .backend
+          .capture_screenshot(viewport, global_matrix, commands, glyph_provider)
     {
       let wnd_id = self.id();
       App::spawn_local(async move {
