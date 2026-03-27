@@ -693,7 +693,7 @@ where
 
   fn can_batch_img_path(&self) -> bool {
     let limits = self.gpu_impl.limits();
-    (matches!(self.current_phase, CurrentPhase::None) && self.surface_color.is_none())
+    matches!(self.current_phase, CurrentPhase::None)
       || (matches!(self.current_phase, CurrentPhase::Img)
         && self.tex_ids_map.len() < limits.max_tex_load - 1
         && self.img_prims.len() < limits.max_image_primitives)
@@ -854,7 +854,7 @@ where
     };
 
     match (&self.current_phase, brush) {
-      (CurrentPhase::None, _) => self.surface_color.is_none(),
+      (CurrentPhase::None, _) => true,
       (CurrentPhase::Filter(_), _) => false,
       (CurrentPhase::Color, CommandBrush::Color(_)) => tex_used < limits.max_tex_load,
       (CurrentPhase::Img, CommandBrush::Image { .. }) => {
