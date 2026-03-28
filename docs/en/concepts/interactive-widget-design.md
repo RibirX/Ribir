@@ -11,7 +11,7 @@ This document defines the standard design paradigm for all interactive widgets i
 ### 1.2 Data Flow Architecture
 Ribir follows a strict unidirectional data flow with one specific exception for optimistic updates.
 
-```
+```ignore
 ┌────────────────────────────────────────────────────────┐
 │                     Model                              │
 │                       ↑                                │
@@ -73,9 +73,11 @@ Ribir distinguishes between "changing" a value and "submitting" it.
 Rx streams are the underlying implementation for all widget events. `on_change` and `on_submit` are convenience sugar built on top of these streams.
 
 Accessing the raw stream enables advanced Rx operators like throttling and debouncing:
-```rust
+```rust,ignore
 // on_change is sugar for:
-slider.change_stream().subscribe(move |v| ...);
+slider.change_stream().subscribe(move |v| {
+    // Handle the value change
+});
 ```
 
 See [4.5 Throttling & Debouncing](#45-throttling--debouncing) for practical examples.
@@ -111,25 +113,25 @@ If the handler decides *not* to update the model (e.g., value is out of bounds),
 ## 4. Implementation Patterns
 
 ### 4.1 Basic Controlled Widget
-```rust
+```rust,ignore
 let slider = @Slider {
     value: pipe!($read(data).volume),
     on_change: move |v| {
         // Business logic here
-        if v <= 100.0 { $write(data).volume = v; } 
+        if v <= 100.0 { $write(data).volume = v; }
     }
 };
 ```
 
 ### 4.2 Two-Way Binding (Sugar)
 Use for simple fields with no side effects.
-```rust
+```rust,ignore
 @Slider { value: TwoWay::new(data.volume) }
 ```
 
 **Widget Definition**: To support `TwoWay`, widget authors mark fields with `#[declare(event = EventType.field_path)]`. This tells the builder which event contains the new value and where to find it.
 
-```rust
+```rust,ignore
 // 1. Define the event
 #[derive(Debug, Clone, Copy)]
 pub struct SliderChanged {
@@ -166,7 +168,7 @@ Handling mismatched types (String input -> Number model).
 > [!NOTE]
 > **Events are interaction-only**: Widget events like `on_change` and `on_submit` are triggered **exclusively by user interaction** (typing, clicking, dragging). API calls like `$write(input).set_text()` do **not** fire these events. This design prevents infinite loops and makes the "escape hatch" safe to use.
 
-```rust
+```rust,ignore
 @Input {
     value: pipe!($read(data).age.to_string()),
     on_change: move |s| {
@@ -175,7 +177,7 @@ Handling mismatched types (String input -> Number model).
             Err(_) => {
                 // Invalid: Force UI update to show raw input, but don't touch model.
                 // Safe: set_text() does NOT trigger on_change (no loop).
-                $write(input).set_text(&s); 
+                $write(input).set_text(&s);
             }
         }
     }
@@ -185,15 +187,15 @@ Handling mismatched types (String input -> Number model).
 ### 4.4 Optimistic UI (Async/Heavy Operations)
 When the data update is slow (network request, heavy computation), update the UI immediately using **Direct Property Write**.
 
-```rust
+```rust,ignore
 @Slider {
     value: pipe!($read(data).cloud_setting),
     on_change: move |v| {
         let old_value = $read(data).cloud_setting;
-        
+
         // 1. Optimistic: Update UI instantly
         $write(slider).value = v;
-        
+
         // 2. Async: Do the heavy lifting
         spawn(async move {
             match api.update(v).await {
@@ -213,7 +215,7 @@ When the data update is slow (network request, heavy computation), update the UI
 
 ### 4.5 Throttling & Debouncing
 Prevent event storms using Rx operators.
-```rust
+```rust,ignore
 // Search-as-you-type (Debounce)
 input.change_stream()
     .debounce(Duration::from_millis(300))
@@ -223,7 +225,7 @@ input.change_stream()
 ### 4.6 Common Pitfalls
 
 **❌ Double Update in Optimistic UI**
-```rust
+```rust,ignore
 on_change: move |v| {
     $write(slider).value = v;  // Optimistic update
     $write(data).volume = v;   // Model update → Pipe emits → redundant UI update
@@ -232,7 +234,7 @@ on_change: move |v| {
 **Fix**: Choose one path. Use optimistic write only when the model update is async/heavy; otherwise, just update the model directly.
 
 **❌ Forgetting to Reconcile Optimistic State**
-```rust
+```rust,ignore
 on_change: move |v| {
     $write(slider).value = v;  // UI shows new value
     spawn(async move {
@@ -243,7 +245,7 @@ on_change: move |v| {
 **Fix**: Always update the model after the operation completes (see [4.4](#44-optimistic-ui-asyncheavy-operations)).
 
 **❌ Validation Logic in Two Places**
-```rust
+```rust,ignore
 @Slider {
     value: pipe!(clamp($read(data).vol, 0.0, 100.0)),  // Clamping here
     on_change: move |v| {
@@ -262,7 +264,7 @@ To ensure widget consistency at creation time, add `#[declare(validate)]` to you
 
 Unlike strict validation, `declare_validate` consumes `self` and returns `Result<Self, ...>`, allowing you to **modify** the widget (normalization) to ensure it's valid (e.g., swapping min/max).
 
-```rust
+```rust,ignore
 #[derive(Declare)]
 #[declare(validate)]
 pub struct Range {
@@ -285,11 +287,13 @@ impl Range {
 By default, when a bound pipe emits a value, Ribir performs a direct field assignment: `widget.field = value`.
 If a field update requires side effects (e.g., recalculating layout, clamping values), use `#[declare(setter = method_name)]` to redirect the update to a method.
 
-```rust
+```rust,ignore
 #[derive(Declare)]
 pub struct Slider {
     #[declare(setter = set_value)]
     pub value: f32,
+    pub min: f32,
+    pub max: f32,
 }
 
 impl Slider {
@@ -314,7 +318,7 @@ For complex container widgets like `Tabs`, `List`, and `Menu`, widget implemente
 
 **Update Strategy**: Use `pipe!` to wrap the **entire widget**. When the underlying data changes, the whole widget re-renders. Ribir's reconciliation engine, powered by `reuse`, handles efficient diffing and instance reuse automatically.
 
-```rust
+```rust,ignore
 // ✅ Correct: Pipe wraps the entire widget
 @pipe! {
     @Tabs {
@@ -346,7 +350,7 @@ For complex container widgets like `Tabs`, `List`, and `Menu`, widget implemente
 > - **Example**: `key: "settings"` identifies this navigation item for selection
 > 
 > **They Are Independent**:
-> ```rust
+> ```rust,ignore
 > @RailItem {
 >   key: "profile",           // Business: "This is the profile section"
 >   reuse: user.id,        // Framework: "Reuse this widget for this user"
@@ -377,7 +381,7 @@ In dynamic lists (`pipe! { @List }`), Ribir recreates widgets by default when da
 
 **Solution**: Use `reuse` with a stable `ReuseKey`.
 
-```rust
+```rust,ignore
 @pipe! {
     @List {
         reuse: ReuseKey::local("list_xxx"),
@@ -396,13 +400,13 @@ Some container widgets (like `NavigationRail`, `Menu`) provide a `key` property 
 
 **Design Pattern**: Use `key` for selection state and business logic, use `reuse` for performance optimization.
 
-```rust
+```rust,ignore
 // Example: NavigationRail with both key and reuse
 @pipe! {
     @NavigationRail {
         selected: TwoWay::new(app.current_section),
         reuse: "main_nav",  // Framework: reuse this widget instance
-        
+
         on_select: move |e| {
             // Business logic using key
             match e.to.as_deref() {
@@ -411,7 +415,7 @@ Some container widgets (like `NavigationRail`, `Menu`) provide a `key` property 
                 _ => {}
             }
         },
-        
+
         @ {
             sections.iter().map(|section| @RailItem {
                 key: section.id,           // Business: selection matching
@@ -425,14 +429,14 @@ Some container widgets (like `NavigationRail`, `Menu`) provide a `key` property 
 
 **When `key` and `reuse` Should Differ**:
 
-```rust
+```rust,ignore
 // Scenario: User-specific navigation item
 @RailItem {
     key: "profile",  // Business: always represents "profile section"
-    
+
     // Framework: different instance per user (avoids data pollution)
     reuse: pipe!($current_user.map(|u| format!("profile_{}", u.id))),
-    
+
     label: pipe!($current_user.map(|u| u.name)),
 }
 ```

@@ -346,21 +346,29 @@ impl ListItem {
   }
 
   /// Generates classes based on the item's state
-  fn item_classes(item: &impl StateWatcher<Value = Self>) -> Pipe<ClassList> {
-    distinct_pipe! {
-      let item = $read(item);
-      let mut classes = ClassList::new();
-      if item.is_selected() {
-        classes.push(LIST_ITEM_SELECTED);
-      } else {
-        classes.push(LIST_ITEM_UNSELECTED);
-      }
-      if item.is_interactive() {
-        classes.push(LIST_ITEM_INTERACTIVE);
-      }
-      classes.push(LIST_ITEM);
-      classes
-    }
+  fn item_classes(item: &impl StateWatcher<Value = Self>) -> ClassList {
+    let current = item.read();
+    let init_selected_class =
+      if current.is_selected() { LIST_ITEM_SELECTED } else { LIST_ITEM_UNSELECTED };
+    let init_interactive_class = current
+      .is_interactive()
+      .then_some(LIST_ITEM_INTERACTIVE);
+    drop(current);
+
+    class_list![
+      distinct_pipe!({
+        let item = $read(item);
+        Some(if item.is_selected() {
+          LIST_ITEM_SELECTED
+        } else {
+          LIST_ITEM_UNSELECTED
+        })
+      })
+      .with_init_value(Some(init_selected_class)),
+      distinct_pipe!($read(item).is_interactive().then_some(LIST_ITEM_INTERACTIVE))
+        .with_init_value(init_interactive_class),
+      LIST_ITEM,
+    ]
   }
 }
 
