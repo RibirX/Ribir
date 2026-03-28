@@ -16,11 +16,12 @@ version.workspace = true
 ahash.workspace = true
 bitflags.workspace = true
 derive_more = { workspace = true, features = ["add", "add_assign", "mul", "not"] }
+font-types.workspace = true
 parley.workspace = true
 quick-xml.workspace = true
+read-fonts.workspace = true
 ribir_algo = { workspace = true }
 ribir_types = { workspace = true }
 swash.workspace = true
 tracing.workspace = true
-ttf-parser.workspace = true
 unicode-segmentation.workspace = true

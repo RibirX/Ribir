@@ -6,23 +6,25 @@ use quick_xml::{
   name::QName,
   reader::Reader,
 };
+use read_fonts::TableProvider;
 use swash::FontRef;
 use tracing::warn;
 
 use crate::paint::GlyphId;
 
-/// Extract SVG glyph from OpenType font.
-///
-/// `swash` doesn't expose SVG glyph documents directly, so we extract them
-/// through `ttf-parser`, which is already in the dependency tree.
+/// Extract SVG glyph from OpenType font using `read-fonts` to access the SVG
+/// table.
 pub(crate) fn extract_svg_glyph(
-  glyph_id: GlyphId, font: &FontRef, face_index: u32,
+  glyph_id: GlyphId, font: &FontRef, _face_index: u32,
 ) -> Option<String> {
-  let face = ttf_parser::Face::parse(font.data, face_index).ok()?;
-  let doc = face.glyph_svg_image(ttf_parser::GlyphId(glyph_id.0))?;
-  let svg_doc =
-    SvgDocument::new(doc.glyphs_range().start().0..=doc.glyphs_range().end().0, doc.data);
-  svg_doc.glyph_svg(glyph_id, font)
+  let font_ref = read_fonts::FontRef::new(font.data).ok()?;
+  let svg_table = font_ref.svg().ok()?;
+
+  let svg_bytes: &[u8] = svg_table
+    .glyph_data(font_types::GlyphId::new(glyph_id.0.into()))
+    .ok()??;
+
+  SvgDocument::parse(svg_bytes)?.glyph_svg(glyph_id, font)
 }
 
 struct SvgDocument {
@@ -30,29 +32,46 @@ struct SvgDocument {
 }
 
 impl SvgDocument {
-  fn new(_range: std::ops::RangeInclusive<u16>, content: &[u8]) -> Self {
-    let elems = Self::parse(content).unwrap_or_default();
-    Self { elems }
+  fn parse(content: &[u8]) -> Option<Self> {
+    let elems = Self::parse_svg(content)?;
+    Some(Self { elems })
+  }
+
+  fn parse_svg(data: &[u8]) -> Option<HashMap<String, String>> {
+    let xml = std::str::from_utf8(data).ok()?;
+    let mut reader = Reader::from_str(xml);
+    let mut buf = Vec::new();
+    let mut elems = HashMap::default();
+    loop {
+      let event = reader.read_event_into(&mut buf).ok()?;
+      match event {
+        Event::Start(ref tag) | Event::Empty(ref tag) if tag.name() != QName(b"defs") => {
+          let has_child = matches!(event, Event::Start(_));
+          Self::collect_named_obj(&mut reader, &mut elems, xml, tag, has_child);
+        }
+        Event::Eof => break,
+        _ => (),
+      }
+    }
+    Some(elems)
   }
 
   fn glyph_svg(&self, glyph: GlyphId, font: &FontRef) -> Option<String> {
     let key = format!("glyph{}", glyph.0);
+    let mut linked_elems = vec![key.clone()];
     let mut all_links = HashSet::default();
-    let mut elems = vec![key.clone()];
-
-    while let Some(curr) = elems.pop() {
+    while let Some(curr) = linked_elems.pop() {
       if let Some(content) = self.elems.get(&curr) {
-        elems.extend(Self::collect_link(content, &mut all_links));
+        linked_elems.extend(Self::collect_link(content, &mut all_links));
       }
     }
 
     let root = self.elems.get(&key)?;
-
-    let units_per_em = font.metrics(&[]).units_per_em;
     let metrics = font.metrics(&[]);
+    let units_per_em = metrics.units_per_em;
     let ascender = metrics.ascent as i32;
-    let mut writer = std::io::Cursor::new(Vec::new());
 
+    let mut writer = std::io::Cursor::new(Vec::new());
     writer
       .write_all(
         format!(
@@ -74,30 +93,6 @@ impl SvgDocument {
     writer.write_all("</svg>".as_bytes()).ok()?;
 
     String::from_utf8(writer.into_inner()).ok()
-  }
-
-  fn parse(data: &[u8]) -> Option<HashMap<String, String>> {
-    let content = std::str::from_utf8(data).ok()?;
-    let mut reader = Reader::from_str(content);
-    let mut buf = Vec::new();
-    let mut elems = HashMap::default();
-    loop {
-      match reader.read_event_into(&mut buf) {
-        Ok(ref e @ Event::Start(ref tag)) | Ok(ref e @ Event::Empty(ref tag)) => {
-          if tag.name() != QName(b"defs") {
-            let has_child = matches!(e, Event::Start(_));
-            Self::collect_named_obj(&mut reader, &mut elems, content, tag, has_child);
-          }
-        }
-        Ok(Event::Eof) => break,
-        Err(e) => {
-          warn!("Error at position {}: {:?}", reader.buffer_position(), e);
-          return None;
-        }
-        _ => (),
-      }
-    }
-    Some(elems)
   }
 
   fn collect_named_obj(
@@ -221,7 +216,7 @@ mod tests {
               transform="matrix(7.674 0 0 7.674 12593.511 3663.078)" fill="#FFCC32" />
           </g>
         </svg>"##;
-    let doc = SvgDocument::new(2428..=2428, content.as_bytes());
+    let doc = SvgDocument::parse(content.as_bytes()).unwrap();
     let font_bytes = include_bytes!("Lato-Regular.ttf");
     let dummy_font_ref = swash::FontRef::from_index(font_bytes, 0).unwrap();
     assert_eq!(doc.elems.len(), 4);
