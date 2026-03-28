@@ -3,34 +3,6 @@ use std::{
   sync::{OnceLock, RwLock},
 };
 
-// TODO: Remove this macOS fallback scan after upgrading to a parley release
-// that includes the upstream system-font fix from main.
-#[cfg(target_os = "macos")]
-mod macos_font_patch;
-#[cfg(not(target_os = "macos"))]
-mod macos_font_patch {
-  use std::borrow::Cow;
-
-  use super::*;
-
-  #[derive(Default)]
-  pub(super) struct MacosLibraryFonts;
-
-  impl MacosLibraryFonts {
-    pub(super) fn new() -> Self { Self }
-
-    pub(super) fn ensure_named_families<Brush>(
-      &mut self, _collection: &mut parley::fontique::Collection, _source: &AttributedText<Brush>,
-      _text_style: &TextStyle,
-    ) {
-    }
-  }
-
-  pub(super) fn named_font_family_variants(name: &str) -> Vec<Cow<'static, str>> {
-    vec![Cow::Owned(name.to_string())]
-  }
-}
-
 use parley::{
   FontContext as ParleyFontContext, FontData as ParleyFontData, Layout as ParleyLayout,
   LayoutContext as ParleyLayoutContext,
@@ -38,17 +10,16 @@ use parley::{
   fontique::{Blob, CollectionOptions},
   layout::{Affinity as ParleyAffinity, BreakReason, PositionedLayoutItem},
   style::{
-    FontFamily as ParleyFontFamily, FontStack as ParleyFontStack, FontStyle as ParleyFontStyle,
-    FontWeight as ParleyFontWeight, FontWidth as ParleyFontWidth, GenericFamily,
-    LineHeight as ParleyLineHeight, OverflowWrap as ParleyOverflowWrap, StyleProperty,
-    TextWrapMode,
+    FontFamily as ParleyFontFamily, FontFamilyName as ParleyFontFamilyName,
+    FontStyle as ParleyFontStyle, FontWeight as ParleyFontWeight, FontWidth as ParleyFontWidth,
+    GenericFamily, LineHeight as ParleyLineHeight, OverflowWrap as ParleyOverflowWrap,
+    StyleProperty, TextWrapMode,
   },
 };
 use ribir_algo::Arc;
 use ribir_types::{BoxClamp, Point, Rect, Size, Vector};
 use swash::FontRef;
 
-use self::macos_font_patch::{MacosLibraryFonts, named_font_family_variants};
 use crate::{
   AttributedText, FontSystem,
   font::{FontFaceId, FontFaceMetrics, FontFamily, FontLoadError, FontStretch, FontStyle},
@@ -106,7 +77,6 @@ struct ParleyFace {
 struct ParleyEngine {
   font_ctx: ParleyFontContext,
   layout_ctx: ParleyLayoutContext<usize>,
-  macos_library_fonts: MacosLibraryFonts,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -172,13 +142,7 @@ impl ParleyEngine {
       system_fonts: !cfg!(target_arch = "wasm32"),
     });
 
-    Self {
-      font_ctx,
-      layout_ctx: ParleyLayoutContext::new(),
-      // TODO: Remove this macOS fallback scan after upgrading to a parley release
-      // that includes the upstream system-font fix from main.
-      macos_library_fonts: MacosLibraryFonts::new(),
-    }
+    Self { font_ctx, layout_ctx: ParleyLayoutContext::new() }
   }
 
   pub fn register_font_bytes(&mut self, data: Vec<u8>) {
@@ -206,7 +170,6 @@ impl ParleyEngine {
   where
     Brush: Clone + From<Color>,
   {
-    self.ensure_macos_named_families(source, text_style);
     let text = source.text.as_ref();
     let mut builder = self
       .layout_ctx
@@ -231,7 +194,6 @@ impl ParleyEngine {
   where
     Brush: Clone + From<Color> + PartialEq + 'static,
   {
-    self.ensure_macos_named_families(source, text_style);
     let text = source.text.as_ref();
     let mut builder = self
       .layout_ctx
@@ -416,18 +378,6 @@ impl ParleyEngine {
       decorations: decorations.into_boxed_slice(),
     }
   }
-
-  // TODO: Remove this macOS fallback scan after upgrading to a parley release
-  // that includes the upstream system-font fix from main.
-  fn ensure_macos_named_families<Brush>(
-    &mut self, source: &AttributedText<Brush>, text_style: &TextStyle,
-  ) {
-    self.macos_library_fonts.ensure_named_families(
-      &mut self.font_ctx.collection,
-      source,
-      text_style,
-    );
-  }
 }
 
 fn push_decoration_rect<Brush: Clone>(
@@ -472,7 +422,7 @@ fn push_layout_defaults(
   paragraph_style: &ParagraphStyle, include_wrap: bool,
 ) {
   builder.push_default(StyleProperty::Brush(0));
-  builder.push_default(StyleProperty::FontStack(font_family_for_face(&text_style.font_face)));
+  builder.push_default(StyleProperty::FontFamily(font_family_for_face(&text_style.font_face)));
   builder.push_default(StyleProperty::FontSize(text_style.font_size));
   builder.push_default(StyleProperty::FontWeight(ParleyFontWeight::new(
     text_style.font_face.weight.value(),
@@ -832,7 +782,7 @@ fn push_span_styles<Brush>(
 {
   let range = span.range.start.0..span.range.end.0;
   if let Some(font) = span.style.font.as_ref() {
-    builder.push(StyleProperty::FontStack(font_family_for_face(&font.face)), range.clone());
+    builder.push(StyleProperty::FontFamily(font_family_for_face(&font.face)), range.clone());
     builder.push(
       StyleProperty::FontWeight(ParleyFontWeight::new(font.face.weight.value())),
       range.clone(),
@@ -1187,25 +1137,25 @@ fn parley_affinity(affinity: CaretAffinity) -> ParleyAffinity {
   }
 }
 
-fn font_family_for_face(face: &crate::FontFace) -> ParleyFontStack<'static> {
+fn font_family_for_face(face: &crate::FontFace) -> ParleyFontFamily<'static> {
   let mut families = Vec::new();
 
   for family in face.families.iter() {
     match family {
-      FontFamily::Name(name) => families.extend(
-        named_font_family_variants(name.as_ref())
-          .into_iter()
-          .map(ParleyFontFamily::Named),
-      ),
-      FontFamily::Serif => families.push(ParleyFontFamily::Generic(GenericFamily::Serif)),
-      FontFamily::SansSerif => families.push(ParleyFontFamily::Generic(GenericFamily::SansSerif)),
-      FontFamily::Cursive => families.push(ParleyFontFamily::Generic(GenericFamily::Cursive)),
-      FontFamily::Fantasy => families.push(ParleyFontFamily::Generic(GenericFamily::Fantasy)),
-      FontFamily::Monospace => families.push(ParleyFontFamily::Generic(GenericFamily::Monospace)),
+      FontFamily::Name(name) => families.push(ParleyFontFamilyName::Named(name.to_string().into())),
+      FontFamily::Serif => families.push(ParleyFontFamilyName::Generic(GenericFamily::Serif)),
+      FontFamily::SansSerif => {
+        families.push(ParleyFontFamilyName::Generic(GenericFamily::SansSerif))
+      }
+      FontFamily::Cursive => families.push(ParleyFontFamilyName::Generic(GenericFamily::Cursive)),
+      FontFamily::Fantasy => families.push(ParleyFontFamilyName::Generic(GenericFamily::Fantasy)),
+      FontFamily::Monospace => {
+        families.push(ParleyFontFamilyName::Generic(GenericFamily::Monospace))
+      }
     }
   }
 
-  ParleyFontStack::List(families.into())
+  ParleyFontFamily::List(families.into())
 }
 
 fn font_style(style: FontStyle) -> ParleyFontStyle { style }

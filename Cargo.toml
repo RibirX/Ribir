@@ -115,7 +115,7 @@ quick-xml = "0.38.4"
 tokio = { version = "1.0" }
 swash = "0.1.18"
 ttf-parser = "0.21.1"
-parley = "0.7.0"
+parley = "0.8.0"
 
 # Logging / telemetry (used by debug server)
 tracing = { version = "0.1.41", features = ["log"] }
