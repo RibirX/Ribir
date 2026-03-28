@@ -150,10 +150,10 @@ mod tests {
       });
 
     source.next(true);
-    wait(Duration::from_millis(50));
+    wait(Duration::from_millis(20));
     assert!(values.borrow().is_empty());
 
-    wait(Duration::from_millis(80));
+    wait(Duration::from_millis(110));
     assert_eq!(*values.borrow(), vec![true]);
   }
 

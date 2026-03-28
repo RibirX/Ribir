@@ -81,7 +81,10 @@ impl ComposeChild<'static> for Radio {
       on_action: move |_| $write(this).selected = true,
       @ {
         let icon = @Icon {
-          class: distinct_pipe!([$read(this).radio_class_name(), RADIO]),
+          class: class_list![
+            distinct_pipe!($read(this).radio_class_name()),
+            RADIO
+          ],
           @Void { class: distinct_pipe!($read(this).radio_icon_class_name()) }
         };
         icon_with_label(icon.into_widget(), child)
@@ -93,10 +96,10 @@ impl ComposeChild<'static> for Radio {
 
 #[cfg(test)]
 mod tests {
-  use ribir_core::{prelude::*, test_helper::*};
+  use ribir_core::test_helper::*;
   use ribir_dev_helper::*;
 
-  use crate::prelude::*;
+  use super::*;
 
   widget_image_tests!(
     radio_widget,
