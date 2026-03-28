@@ -114,7 +114,8 @@ zerocopy = "0.7.3"
 quick-xml = "0.38.4"
 tokio = { version = "1.0" }
 swash = "0.1.18"
-ttf-parser = "0.21.1"
+read-fonts = "0.22.7"
+font-types = "0.7.3"
 parley = "0.8.0"
 
 # Logging / telemetry (used by debug server)
