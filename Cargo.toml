@@ -112,7 +112,7 @@ wgpu = { version = "29.0.0", features = ["webgl"] }
 winit = { version = "0.30.11", default-features = false, features = [
   "rwh_06",
 ] }
-zerocopy = "0.7.3"
+zerocopy = "0.8.48"
 quick-xml = "0.38.4"
 tokio = { version = "1.0", default-features = false }
 swash = "0.1.18"
