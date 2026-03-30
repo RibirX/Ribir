@@ -20,37 +20,35 @@ ribir_material = { workspace = true, optional = true }
 ribir_widgets = { workspace = true, optional = true }
 rxrust.workspace = true
 wgpu = { workspace = true, optional = true }
-winit.workspace = true
 futures.workspace = true
 pin-project-lite.workspace = true
 cfg-if.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 arboard.workspace = true
-tokio = { workspace = true, features = ["rt-multi-thread", "rt", "sync", "time"]}
-
+tokio = { workspace = true, features = ["rt-multi-thread", "rt", "sync", "time"] }
+winit = { workspace = true, features = ["x11", "wayland", "wayland-dlopen"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys.workspace = true
-tokio = { workspace = true, features = ["rt", "sync"]}
+tokio = { workspace = true, features = ["rt", "sync"] }
 wasm-bindgen-futures.workspace = true
-
+winit.workspace = true
 
 [dev-dependencies]
 colored.workspace = true
 futures.workspace = true
 ribir_dev_helper = { path = "../dev-helper" }
 ribir_material = { path = "../themes/material" }
-ribir_core = { workspace = true, features=["test-utils"]  }
+ribir_core = { workspace = true, features = ["test-utils"] }
 
 [features]
-default = ["wgpu", "widgets", "material", "png", "jpeg"]
+default = ["wgpu", "widgets", "material"]
 material = ["ribir_material"]
-png = ["ribir_core/png"]
-jpeg = ["ribir_core/jpeg"]
 wgpu = ["ribir_gpu/wgpu", "dep:wgpu"]
 widgets = ["ribir_widgets"]
 debug = ["ribir_core/debug", "ribir_widgets/debug"]
+test-utils = ["ribir_core/test-utils"]
 
 [target.'cfg(windows)'.dependencies]
 winapi = "0.3.9"

@@ -285,13 +285,13 @@ pub fn start_debug_server() -> mpsc::Sender<DebugCommand> {
       if state_clone.recording.load(Ordering::Relaxed)
         && state_clone.active_capture.lock().await.is_none()
       {
-        let filename = format!("frame_{}_{}.png", pkt.ts_unix_ms, pkt.seq);
+        let filename = format!("frame_{}_{}.webp", pkt.ts_unix_ms, pkt.seq);
 
         // Spawn blocking IO task to save image
         let img_clone = pkt.image.clone();
         tokio::task::spawn_blocking(move || {
           let mut data = Vec::new();
-          if img_clone.write_as_png(&mut data).is_ok() {
+          if img_clone.write_as_webp(&mut data).is_ok() {
             let _ = std::fs::write(filename, data);
           }
         });
@@ -307,7 +307,7 @@ pub fn start_debug_server() -> mpsc::Sender<DebugCommand> {
           let ts_unix_ms = pkt.ts_unix_ms;
           let seq = pkt.seq;
 
-          let rel_path = format!("frames/frame_{}_{}.png", ts_unix_ms, seq);
+          let rel_path = format!("frames/frame_{}_{}.webp", ts_unix_ms, seq);
           let abs_path = session.dir.join(&rel_path);
           session
             .frames
@@ -326,7 +326,7 @@ pub fn start_debug_server() -> mpsc::Sender<DebugCommand> {
               .unwrap_or_else(|| std::path::Path::new(".")),
           );
           let mut data = Vec::new();
-          if img_clone.write_as_png(&mut data).is_ok() {
+          if img_clone.write_as_webp(&mut data).is_ok() {
             let _ = std::fs::write(abs_path, data);
           }
         });
@@ -1409,7 +1409,7 @@ async fn toggle_recording(
 async fn capture_screenshot(State(state): State<Arc<DebugServerState>>) -> impl IntoResponse {
   use crate::debug_tool::service::*;
   match capture_screenshot_svc(&state).await {
-    Ok(img) => encode_png_response(&img),
+    Ok(img) => encode_webp_response(&img),
     Err(ServiceError::Timeout) => (StatusCode::REQUEST_TIMEOUT, Vec::new()).into_response(),
     Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Vec::new()).into_response(),
   }
@@ -1427,10 +1427,10 @@ async fn inject_events_handler(
   }
 }
 
-fn encode_png_response(img: &PixelImage) -> axum::response::Response {
-  let mut png_data = Vec::new();
-  if img.write_as_png(&mut png_data).is_ok() {
-    (StatusCode::OK, [("content-type", "image/png")], png_data).into_response()
+fn encode_webp_response(img: &PixelImage) -> axum::response::Response {
+  let mut webp_data = Vec::new();
+  if img.write_as_webp(&mut webp_data).is_ok() {
+    (StatusCode::OK, [("content-type", "image/webp")], webp_data).into_response()
   } else {
     (StatusCode::INTERNAL_SERVER_ERROR, Vec::new()).into_response()
   }

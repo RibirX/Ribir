@@ -13,20 +13,20 @@ repository = "https://github.com/RibirX/Ribir/painter"
 version.workspace = true
 
 [dependencies]
-bitflags = "2.3.0"
-image = {workspace = true, optional = true}
+bitflags.workspace = true
+image-webp.workspace = true
 tracing.workspace = true
-lyon_algorithms = {version = "1.0.3", features = ["serialization"]}
-lyon_tessellation = {version = "1.0.3", features = ["serialization"], optional = true}
-material-colors = {workspace = true}
+lyon_algorithms = { workspace = true, features = ["serialization"] }
+lyon_tessellation = { workspace = true, features = ["serialization"], optional = true }
+material-colors.workspace = true
 ribir_algo = { workspace = true }
 ribir_types = { workspace = true }
 ribir_text = { workspace = true }
-serde = {version = "1.0", features = ["derive"]}
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 usvg.workspace = true
-zerocopy = {workspace = true, optional = true, features = ["derive"]}
-derive_more= {workspace = true, features = ["add", "add_assign", "not", "mul"]} 
+zerocopy = { workspace = true, optional = true, features = ["derive"] }
+derive_more = { workspace = true, features = ["add", "add_assign", "not", "mul"] }
 smallvec = { workspace = true, features = ["serde"] }
 ahash.workspace = true
 
@@ -34,6 +34,4 @@ ahash.workspace = true
 getrandom-v3.workspace = true
 
 [features]
-png = ["image/png"]
-jpeg = ["image/jpeg"]
 tessellation = ["lyon_tessellation", "zerocopy"]

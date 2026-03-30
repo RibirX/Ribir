@@ -1291,6 +1291,7 @@ mod tests {
   use super::*;
 
   fn painter(bounds: Size) -> Painter { Painter::new(Rect::from_size(bounds)) }
+  fn webp_image(bytes: &'static [u8]) -> PixelImage { PixelImage::from_webp(bytes).unwrap() }
 
   painter_backend_eq_image_test!(smoke, comparison = 0.001);
   fn smoke() -> Painter {
@@ -1308,7 +1309,7 @@ mod tests {
 
     let mut painter = painter(Size::new(512., 512.));
 
-    let img = PixelImage::from_png(include_bytes!("../imgs/leaves.png"));
+    let img = webp_image(include_bytes!("../imgs/leaves.webp"));
     let share_img = Resource::new(img);
 
     let img_brush = Brush::Image(share_img);
@@ -1349,7 +1350,7 @@ mod tests {
       .rect(&rect, true)
       .fill();
 
-    let leaves_brush = Resource::new(PixelImage::from_png(include_bytes!("../imgs/leaves.png")));
+    let leaves_brush = Resource::new(webp_image(include_bytes!("../imgs/leaves.webp")));
 
     painter
       .set_fill_brush(leaves_brush)
@@ -1429,8 +1430,8 @@ mod tests {
   fn two_img_brush() -> Painter {
     let mut painter = painter(Size::new(200., 100.));
 
-    let brush1 = PixelImage::from_png(include_bytes!("../imgs/leaves.png"));
-    let brush2 = PixelImage::from_png(include_bytes!("../../examples/attachments/3DDD-1.png"));
+    let brush1 = webp_image(include_bytes!("../imgs/leaves.webp"));
+    let brush2 = webp_image(include_bytes!("../../examples/attachments/3DDD-1.webp"));
     let rect = rect(0., 0., 100., 100.);
     painter
       .set_fill_brush(brush1)
@@ -1447,7 +1448,7 @@ mod tests {
 
   painter_backend_eq_image_test!(draw_partial_img, comparison = 0.0015);
   fn draw_partial_img() -> Painter {
-    let img = Resource::new(PixelImage::from_png(include_bytes!("../imgs/leaves.png")));
+    let img = Resource::new(webp_image(include_bytes!("../imgs/leaves.webp")));
     let m_width = img.width() as f32;
     let m_height = img.height() as f32;
     let mut painter = painter(Size::new(m_width * 2., m_height * 2.));

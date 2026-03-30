@@ -12,28 +12,32 @@ struct MessageList {
   messages: Vec<Message>,
 }
 
+fn message_image(bytes: &'static [u8]) -> Resource<PixelImage> {
+  Resource::new(PixelImage::from_webp(bytes).unwrap())
+}
+
 pub fn messages() -> Widget<'static> {
   MessageList {
     messages: vec![
       Message {
         nick_name: "James Harden".to_string(),
         content: "Coming soon!".to_string(),
-        img: Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-2.png"))),
+        img: message_image(include_bytes!("../../attachments/3DDD-2.webp")),
       },
       Message {
         nick_name: "Allen Iverson".to_string(),
         content: "You are welcome!".to_string(),
-        img: Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-1.png"))),
+        img: message_image(include_bytes!("../../attachments/3DDD-1.webp")),
       },
       Message {
         nick_name: "Kyrie Irving".to_string(),
         content: "See you next week!".to_string(),
-        img: Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-3.png"))),
+        img: message_image(include_bytes!("../../attachments/3DDD-3.webp")),
       },
       Message {
         nick_name: "Jaylon Lee".to_string(),
         content: "Fighting!".to_string(),
-        img: Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-4.png"))),
+        img: message_image(include_bytes!("../../attachments/3DDD-4.webp")),
       },
     ],
   }

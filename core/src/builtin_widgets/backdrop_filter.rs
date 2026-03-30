@@ -70,11 +70,10 @@ mod tests {
   use ribir::{core::test_helper::*, material as ribir_material, prelude::*};
   use ribir_dev_helper::*;
 
-  #[cfg(feature = "png")]
   widget_image_tests!(
     backdrop_filter,
     WidgetTester::new(fn_widget! {
-      let img = Resource::new(PixelImage::from_png(include_bytes!("../../../gpu/imgs/leaves.png")));
+      let img = Resource::new(PixelImage::from_webp(include_bytes!("../../../gpu/imgs/leaves.webp")).unwrap());
 
       @Stack {
         @ { img }

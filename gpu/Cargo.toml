@@ -14,7 +14,7 @@ version.workspace = true
 
 [dependencies]
 ahash.workspace = true
-tokio = {workspace = true, optional = true, features=["sync"]}
+futures.workspace = true
 guillotiere.workspace = true
 tracing.workspace = true
 rayon.workspace = true
@@ -22,15 +22,15 @@ ribir_algo = { workspace = true }
 ribir_types = { workspace = true }
 ribir_painter = { workspace = true, features = ["tessellation"] }
 slab = "0.4.9"
-wgpu = {workspace = true, optional = true}
-zerocopy = {workspace=true, features = ["derive"]}
+wgpu = { workspace = true, optional = true }
+zerocopy = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
 paste.workspace = true
-ribir_dev_helper = {path = "../dev-helper"}
-ribir_core = {workspace = true}
+ribir_dev_helper = { path = "../dev-helper" }
+ribir_core = { workspace = true }
 futures.workspace = true
 
 [features]
 default = ["wgpu"]
-wgpu = ["dep:wgpu", "tokio"]
+wgpu = ["dep:wgpu"]

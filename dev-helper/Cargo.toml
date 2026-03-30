@@ -11,13 +11,11 @@ name = "ribir_dev_helper"
 repository = "https://github.com/RibirX/Ribir/test-helper"
 version.workspace = true
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 futures.workspace = true
 ribir_types = { workspace = true }
 ribir_gpu = { workspace = true }
-ribir_painter = { workspace = true, features = ["png"] }
+ribir_painter = { workspace = true }
 dssim-core.workspace = true
 
 [dev-dependencies]

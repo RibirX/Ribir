@@ -1,9 +1,11 @@
 use std::fs;
 
-use image::{AnimationDecoder, GenericImageView, ImageFormat, codecs::gif::GifDecoder};
+use image::{
+  AnimationDecoder, ExtendedColorType, GenericImageView, ImageEncoder, ImageFormat,
+  codecs::{gif::GifDecoder, webp::WebPEncoder},
+};
 use proc_macro2::TokenStream;
 use quote::quote;
-use webp_animation::prelude::*;
 
 use super::{Asset, AssetContext};
 
@@ -36,19 +38,20 @@ fn encode_static(data: &[u8], format: ImageFormat, ctx: &AssetContext) -> syn::R
   let img = image::load_from_memory_with_format(data, format)
     .map_err(|e| ctx.error(format!("Decode: {e}")))?;
   let (w, h) = img.dimensions();
+  let rgba = img.to_rgba8();
+  let mut output = Vec::new();
 
-  let mut enc = Encoder::new((w, h)).map_err(|e| ctx.error(format!("Encoder init: {e}")))?;
-  enc
-    .add_frame(&img.to_rgba8(), 0)
-    .map_err(|e| ctx.error(format!("Frame encode: {e}")))?;
-  enc
-    .finalize(0)
-    .map(|d| d.to_vec())
-    .map_err(|e| ctx.error(format!("Finalize: {e}")))
+  WebPEncoder::new_lossless(&mut output)
+    .write_image(rgba.as_raw(), w, h, ExtendedColorType::Rgba8)
+    .map_err(|e| ctx.error(format!("Encode: {e}")))?;
+
+  Ok(output)
 }
 
 /// Encode animated GIF to animated WebP.
 fn encode_gif(data: &[u8], ctx: &AssetContext) -> syn::Result<Vec<u8>> {
+  use webp_animation::prelude::*;
+
   let decoder = GifDecoder::new(std::io::Cursor::new(data))
     .map_err(|e| ctx.error(format!("GIF decode: {e}")))?;
   let frames: Vec<_> = decoder

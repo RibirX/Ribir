@@ -21,8 +21,8 @@ Cargo.lock
 
 **/.DS_Store
 **/.log/**
-/test_cases/**/*_actual.png
-/test_cases/**/*_diff.png
+/test_cases/**/*_actual.webp
+/test_cases/**/*_diff.webp
 
 # Agent configurations
 .gemini/*
