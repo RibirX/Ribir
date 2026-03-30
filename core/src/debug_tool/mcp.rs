@@ -282,12 +282,12 @@ async fn handle_tool_call(
   match params.name.as_str() {
     "capture_screenshot" => match capture_screenshot_svc(&state).await {
       Ok(img) => {
-        let mut png_data = Vec::new();
-        if img.write_as_png(&mut png_data).is_ok() {
+        let mut webp_data = Vec::new();
+        if img.write_as_webp(&mut webp_data).is_ok() {
           use base64::{Engine as _, engine::general_purpose};
-          let b64 = general_purpose::STANDARD.encode(&png_data);
+          let b64 = general_purpose::STANDARD.encode(&webp_data);
           let result = CallToolResult {
-            content: vec![ToolContent::Image { data: b64, mime_type: "image/png".to_string() }],
+            content: vec![ToolContent::Image { data: b64, mime_type: "image/webp".to_string() }],
             is_error: false,
           };
           JsonRpcResponse::result(id, serde_json::to_value(result).unwrap())

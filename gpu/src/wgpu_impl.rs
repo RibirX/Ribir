@@ -5,9 +5,9 @@ use std::{
 };
 
 use ahash::HashSet;
+use futures::channel::oneshot;
 use ribir_painter::{Color, ColorFormat, PixelImage, VertexBuffers};
 use ribir_types::{DevicePoint, DeviceRect, DeviceSize};
-use tokio::sync::oneshot;
 use tracing::{debug, warn};
 use wgpu::TextureFormat;
 use zerocopy::AsBytes;

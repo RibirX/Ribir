@@ -31,8 +31,8 @@ fn get_resource_path(resource: &str) -> PathBuf {
 }
 
 pub static APP_ICON: LazyLock<Resource<PixelImage>> = LazyLock::new(|| {
-  let path = get_resource_path("static/icon.png");
-  Resource::new(PixelImage::from_png(std::fs::read(path).unwrap().as_slice()))
+  let path = get_resource_path("static/icon.webp");
+  Resource::new(PixelImage::from_webp(std::fs::read(path).unwrap().as_slice()).unwrap())
 });
 
 pub fn load_icons() {

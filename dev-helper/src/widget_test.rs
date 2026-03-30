@@ -77,7 +77,7 @@ macro_rules! widget_image_tests {
 #[macro_export]
 macro_rules! assert_widget_eq_image {
   ($widget_tester:expr, $name:expr) => {
-    let img_path = $crate::test_case_name!($name, "png");
+    let img_path = $crate::test_case_name!($name, "webp");
 
     let mut wnd = $widget_tester.create_wnd();
     wnd.0.draw_frame(None);

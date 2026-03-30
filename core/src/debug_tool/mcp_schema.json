@@ -239,7 +239,7 @@
     },
     {
       "name": "capture_one_shot",
-      "description": "One-click capture: start -> request redraw (if images enabled) -> wait -> stop. Returns the capture session directory path. Default output directory is $RIBIR_CAPTURE_DIR or ./captures/{capture_id}/, containing frames/*.png, logs.jsonl and manifest.json",
+      "description": "One-click capture: start -> request redraw (if images enabled) -> wait -> stop. Returns the capture session directory path. Default output directory is $RIBIR_CAPTURE_DIR or ./captures/{capture_id}/, containing frames/*.webp, logs.jsonl and manifest.json",
       "inputSchema": {
         "type": "object",
         "properties": {

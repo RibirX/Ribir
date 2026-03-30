@@ -1,6 +1,10 @@
 use ribir::prelude::*;
 use webbrowser::{Browser, open_browser};
 
+fn webp_resource(bytes: &'static [u8]) -> Resource<PixelImage> {
+  Resource::new(PixelImage::from_webp(bytes).unwrap())
+}
+
 fn section_title(title: &'static str) -> GenWidget {
   row! {
     clamp: BoxClamp::fixed_height(30.),
@@ -180,7 +184,7 @@ fn content() -> Widget<'static> {
           @Divider { indent: DividerIndent::Start }
           @ListItem {
             @Avatar {
-              @Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-1.png")))
+              @webp_resource(include_bytes!("../../attachments/3DDD-1.webp"))
             }
             @ListItemHeadline { @ { "Two lines list item" } }
             @ListItemSupporting {
@@ -199,7 +203,7 @@ fn content() -> Widget<'static> {
           @Divider { indent: DividerIndent::Start }
           @ListItem {
             @ListItemThumbnail {
-              @Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-3.png")))
+              @webp_resource(include_bytes!("../../attachments/3DDD-3.webp"))
             }
             @ListItemHeadline { @ { "One lines list item" } }
             @ListItemSupporting { @ { "One lines supporting text" } }

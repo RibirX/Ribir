@@ -162,7 +162,6 @@ mod tests {
   use ribir::{core::test_helper::*, material as ribir_material, prelude::*};
   use ribir_dev_helper::*;
 
-  #[cfg(feature = "png")]
   widget_image_tests!(
     box_shadow_basic,
     WidgetTester::new(fn_widget! {

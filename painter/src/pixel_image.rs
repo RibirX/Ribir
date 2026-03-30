@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 
+use image_webp::{ColorType as WebPColorType, WebPDecoder, WebPEncoder};
 use ribir_types::DeviceSize;
 use serde::{Deserialize, Serialize};
 
-#[cfg(any(feature = "jpeg", feature = "png"))]
-pub type ImageFormat = image::ImageFormat;
+type BoxError = Box<dyn std::error::Error>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum ColorFormat {
@@ -45,59 +45,48 @@ impl PixelImage {
   #[inline]
   pub fn pixel_bytes(&self) -> &[u8] { &self.data }
 
-  // TODO: Move these image format methods out of painter crate
-  // These should be in a separate utility crate or in core
-  // Blocker: Many usages across examples, tests, and internal code
-
-  #[cfg(feature = "jpeg")]
-  pub fn from_jpeg(bytes: &[u8]) -> Self {
-    Self::parse_img(bytes, image::ImageFormat::Jpeg).unwrap()
+  fn expand_rgb(bytes: Vec<u8>) -> Vec<u8> {
+    bytes
+      .chunks_exact(3)
+      .flat_map(|rgb| [rgb[0], rgb[1], rgb[2], 255])
+      .collect()
   }
 
-  #[cfg(feature = "jpeg")]
-  pub fn write_as_jpeg(
-    &self, w: &mut impl std::io::Write,
-  ) -> Result<(), Box<dyn std::error::Error>> {
-    use image::{DynamicImage, GrayImage, RgbaImage};
-
-    let encoder = ::image::codecs::jpeg::JpegEncoder::new(w);
+  fn rgba_bytes(&self) -> Cow<'_, [u8]> {
     match self.format {
-      ColorFormat::Rgba8 => DynamicImage::from(
-        RgbaImage::from_raw(self.width, self.height, self.data.to_vec()).ok_or("Invalid image")?,
-      )
-      .to_rgb8()
-      .write_with_encoder(encoder)?,
-      ColorFormat::Alpha8 => GrayImage::from_raw(self.width, self.height, self.data.to_vec())
-        .ok_or("Invalid image")?
-        .write_with_encoder(encoder)?,
-    };
-    Ok(())
+      ColorFormat::Rgba8 => self.data.clone(),
+      ColorFormat::Alpha8 => Cow::Owned(
+        self
+          .data
+          .iter()
+          .flat_map(|&alpha| [255u8, 255, 255, alpha])
+          .collect(),
+      ),
+    }
   }
 
-  #[cfg(feature = "png")]
-  pub fn from_png(bytes: &[u8]) -> Self { Self::parse_img(bytes, image::ImageFormat::Png).unwrap() }
+  /// Decode WebP data to PixelImage (first frame for animated WebP).
+  pub fn from_webp(bytes: &[u8]) -> Result<Self, BoxError> {
+    let mut decoder = WebPDecoder::new(std::io::Cursor::new(bytes))?;
+    let (width, height) = decoder.dimensions();
+    let mut data = vec![
+      0;
+      decoder
+        .output_buffer_size()
+        .ok_or_else(|| std::io::Error::other("WebP image too large"))?
+    ];
+    decoder.read_image(&mut data)?;
 
-  #[cfg(feature = "png")]
-  pub fn write_as_png(
-    &self, w: &mut impl std::io::Write,
-  ) -> Result<(), Box<dyn std::error::Error>> {
-    use image::ImageEncoder;
+    let data = if decoder.has_alpha() { data } else { Self::expand_rgb(data) };
 
-    let encoder = ::image::codecs::png::PngEncoder::new(w);
-    let fmt = match self.format {
-      ColorFormat::Rgba8 => ::image::ColorType::Rgba8,
-      ColorFormat::Alpha8 => ::image::ColorType::L8,
-    };
-    encoder.write_image(&self.data, self.width, self.height, fmt.into())?;
-    Ok(())
+    Ok(Self::new(data.into(), width, height, ColorFormat::Rgba8))
   }
 
-  #[cfg(any(feature = "jpeg", feature = "png"))]
-  pub fn parse_img(bytes: &[u8], format: image::ImageFormat) -> image::ImageResult<PixelImage> {
-    let img = ::image::load(std::io::Cursor::new(bytes), format)?.to_rgba8();
-    let width = img.width();
-    let height = img.height();
-    Ok(PixelImage::new(img.into_raw().into(), width, height, ColorFormat::Rgba8))
+  /// Encode PixelImage to WebP (single frame). Only supports RGBA8.
+  pub fn write_as_webp(&self, w: &mut impl std::io::Write) -> Result<(), BoxError> {
+    let rgba = self.rgba_bytes();
+    WebPEncoder::new(w).encode(&rgba, self.width, self.height, WebPColorType::Rgba8)?;
+    Ok(())
   }
 }
 

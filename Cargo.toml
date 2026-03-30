@@ -81,8 +81,11 @@ euclid = "0.22.11"
 futures = "0.3.26"
 guillotiere = "0.6.0"
 image = { version = "0.25.6", default-features = false, features = ["rayon"] }
+# Keep both crates for now:
+# - `image-webp` handles runtime decode and single-frame encode paths
+# - `webp-animation` remains the compile-time animated WebP encoder in `ribir_macros`
 image-webp = "0.2"
-webp-animation = "0.9"
+webp-animation = { version = "0.9", features = ["static"] }
 indextree = { version = "4.7.3", features = ["deser"] }
 lyon_algorithms = "1.0.5"
 lyon_geom = "1.0.6"
@@ -104,15 +107,14 @@ syn = "2.0.87"
 unicode-segmentation = "1.9.0"
 usvg = { version = "0.45.0", default-features = false }
 wgpu = { version = "29.0.0", features = ["webgl"] }
+# Keep workspace `winit` minimal so wasm targets don't inherit desktop backends.
+# Desktop-only backends are enabled by leaf crates that actually open native windows.
 winit = { version = "0.30.11", default-features = false, features = [
-  "x11",
-  "wayland",
-  "wayland-dlopen",
   "rwh_06",
 ] }
 zerocopy = "0.7.3"
 quick-xml = "0.38.4"
-tokio = { version = "1.0" }
+tokio = { version = "1.0", default-features = false }
 swash = "0.1.18"
 read-fonts = "0.22.7"
 font-types = "0.7.3"

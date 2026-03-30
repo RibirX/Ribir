@@ -38,7 +38,7 @@ macro_rules! painter_backend_eq_image_test {
           glyph_provider.as_ref().as_ref(),
         );
         let name = format!("{}_wgpu", std::stringify!($painter_fn));
-        let file_path = test_case_name!(name, "png");
+        let file_path = test_case_name!(name, "webp");
         ImageTest::new(img, &file_path)
           $(.with_comparison($comparison))?
           .test();
@@ -81,20 +81,14 @@ impl<'a> ImageTest<'a> {
   pub fn test(self) {
     let Self { test_img, ref_path, comparison } = self;
 
-    use std::fs::File;
-
     let overwrite = std::ffi::OsStr::new("overwrite");
     let dir = ref_path.parent().unwrap();
     let stem = ref_path.file_stem().unwrap().to_str().unwrap();
     if std::env::var_os("RIBIR_IMG_TEST").is_some_and(|var| var == overwrite) {
       std::fs::create_dir_all(dir).unwrap();
-      let mut file = File::create(ref_path).unwrap();
-      test_img.write_as_png(&mut file).unwrap();
+      Self::write_webp(&test_img, ref_path);
     } else {
-      let mut f = File::open(ref_path).unwrap();
-      let mut bytes = Vec::new();
-      std::io::Read::read_to_end(&mut f, &mut bytes).unwrap();
-      let ref_img = PixelImage::from_png(&bytes);
+      let ref_img = PixelImage::from_webp(&std::fs::read(ref_path).unwrap()).unwrap();
 
       assert_eq!(test_img.pixel_bytes().len(), ref_img.pixel_bytes().len());
       assert_eq!(test_img.color_format(), ColorFormat::Rgba8);
@@ -120,15 +114,10 @@ impl<'a> ImageTest<'a> {
       let (v, mut diffs) = dssim.compare(&d_ref, d_test);
       let dssim: f64 = v.into();
 
-      let diff_path = dir.join(format!("{stem}_diff.png"));
-      let actual_path = dir.join(format!("{stem}_actual.png"));
+      let diff_path = dir.join(format!("{stem}_diff.webp"));
+      let actual_path = dir.join(format!("{stem}_actual.webp"));
       if dssim > f64::EPSILON {
-        // write the actual image to the same folder
-        test_img
-          .write_as_png(&mut File::create(&actual_path).unwrap())
-          .unwrap();
-
-        // write the diff image to the same folder
+        Self::write_webp(&test_img, &actual_path);
         Self::write_ssim_maps(diffs.pop().unwrap(), &diff_path);
       }
 
@@ -141,6 +130,11 @@ impl<'a> ImageTest<'a> {
       Difference file location: {diff_path:?}"
       );
     }
+  }
+
+  fn write_webp(img: &PixelImage, path: &std::path::Path) {
+    let mut file = std::fs::File::create(path).unwrap();
+    img.write_as_webp(&mut file).unwrap();
   }
 
   #[track_caller]
@@ -165,14 +159,13 @@ impl<'a> ImageTest<'a> {
         [to_byte(maxsq * 16.0), to_byte(max * 3.0), to_byte(max / ((1_f32 - avgssim) * 4_f32)), 255]
       })
       .collect();
-    PixelImage::new(
+    let diff_img = PixelImage::new(
       out,
       ssim_map.map.width() as u32,
       ssim_map.map.height() as u32,
       ColorFormat::Rgba8,
-    )
-    .write_as_png(&mut std::fs::File::create(out_file).unwrap())
-    .unwrap();
+    );
+    Self::write_webp(&diff_img, out_file);
   }
 }
 
