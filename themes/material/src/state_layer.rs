@@ -113,20 +113,26 @@ impl<const M: u8> WrapRender for StateLayer<M> {
       return host.paint(ctx);
     }
 
-    // Fork a painter to create an overlay without affecting the main painter's
-    // state
-    let mut layer = ctx.painter().fork();
+    let size = ctx.box_size().unwrap();
+    // Capture a fork from the box painter before the host mutates content
+    // transforms. This keeps the overlay anchored to the widget box while
+    // still letting us paint it after the host content.
+    let (boundary, mut layer) = {
+      let (provider_ctx, painter) = ctx.provider_ctx_and_box_painter();
+      (widget_boundary(size, provider_ctx), painter.fork())
+    };
+
     host.paint(ctx);
 
     layer.apply_alpha(*draw_opacity);
     match area {
       LayerArea::Circle { center, radius, constrain_to_bounds } => {
         if *constrain_to_bounds {
-          layer.clip(widget_boundary(ctx).into());
+          layer.clip(boundary.clone().into());
         }
         layer.circle(*center, *radius, true).fill()
       }
-      LayerArea::FullContent => layer.fill_path(widget_boundary(ctx).into()),
+      LayerArea::FullContent => layer.fill_path(boundary.into()),
     };
     ctx.painter().merge(&mut layer);
   }
@@ -156,9 +162,9 @@ pub enum LayerArea {
   FullContent,
 }
 
-fn widget_boundary(ctx: &PaintingCtx) -> Path {
-  let rect = Rect::from_size(ctx.box_size().unwrap());
-  let widget_radius = Provider::of::<Radius>(ctx);
+fn widget_boundary(size: Size, provider_ctx: &ProviderCtx) -> Path {
+  let rect = Rect::from_size(size);
+  let widget_radius = Provider::of::<Radius>(provider_ctx);
   if let Some(radius) = widget_radius {
     Path::rect_round(&rect, &radius)
   } else {

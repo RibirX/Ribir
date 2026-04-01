@@ -72,7 +72,14 @@ impl<'a> MeasureCtx<'a> {
 
         debug_assert!(clamp.min.is_finite());
         let size = id.assert_get(tree2).measure(clamp, self);
-        debug_assert!(size.is_finite());
+        if !size.is_finite() {
+          #[cfg(feature = "debug")]
+          let id_name = id.get(tree2).unwrap().debug_name();
+          #[cfg(not(feature = "debug"))]
+          let id_name = format!("{id:?}");
+          tracing::error!("Layout of {:?} is not finite: {:?}", id_name, size);
+          debug_assert!(size.is_finite(), "Layout of widget is not finite: {:?}", size);
+        }
         let info = self.tree.store.layout_info_or_default(id);
         info.size = Some(size);
 
