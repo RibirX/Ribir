@@ -36,6 +36,12 @@ fn new(palette: Palette) -> Theme {
   register_svg!("expand_more", "../icons/expand_more_FILL0_wght400_GRAD0_opsz48.svg");
   register_svg!("favorite", "../icons/favorite_FILL0_wght400_GRAD0_opsz48.svg");
   register_svg!("home", "../icons/home_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("widgets", "../icons/widgets_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("movie_filter", "../icons/movie_filter_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!(
+    "auto_awesome_motion",
+    "../icons/auto_awesome_motion_FILL0_wght400_GRAD0_opsz48.svg"
+  );
   register_svg!("login", "../icons/login_FILL0_wght400_GRAD0_opsz48.svg");
   register_svg!("logout", "../icons/logout_FILL0_wght400_GRAD0_opsz48.svg");
   register_svg!("menu", "../icons/menu_FILL0_wght400_GRAD0_opsz48.svg");

@@ -526,7 +526,7 @@ pub(crate) mod nav_rail {
     }
     pub const LEADING_ICON_CENTER_X: f32 = 48.;
     pub const CONTAINER_PADDING: EdgeInsets = EdgeInsets::only_bottom(4.);
-    pub const HEADER_MARGIN: EdgeInsets = EdgeInsets::only_top(44.).with_bottom(40.);
+    pub const HEADER_MARGIN: EdgeInsets = EdgeInsets::only_top(16.).with_bottom(16.);
     pub const CONTENT_TOP_MARGIN_NO_HEADER: EdgeInsets = EdgeInsets::only_top(44.);
     pub const ACTION_WITH_MENU_MARGIN: EdgeInsets = EdgeInsets::only_top(24.);
   }

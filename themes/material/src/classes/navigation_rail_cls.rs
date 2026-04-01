@@ -68,33 +68,38 @@ fn rail_content_init(classes: &mut Classes) {
 
 fn rail_item_init(classes: &mut Classes) {
   fn indicator() -> Widget<'static> {
-    let ctx = BuildCtx::get();
-    let key = RailItem::of(ctx)
-      .map(|item| item.key.clone())
-      .expect("RAIL_ITEM should only be used in RailItem");
-    let selected = Provider::state_of::<Stateful<NavigationRail>>(ctx)
-      .expect("RAIL_ITEM_ICON should only be used in NavigationRail")
-      .part_watcher(|nav| PartRef::from(nav.selected()));
+    fn_widget! {
+      let ctx = BuildCtx::get();
+      let key = RailItem::of(ctx)
+        .map(|item| item.key.clone())
+        .expect("RAIL_ITEM should only be used in RailItem");
+      let selected = Provider::state_of::<Stateful<NavigationRail>>(ctx)
+        .expect("RAIL_ITEM_ICON should only be used in NavigationRail")
+        .part_watcher(|nav| PartRef::from(nav.selected()));
 
-    pipe! {
-      (*$read(selected) == key).then(|| {
-        @SmoothLayout {
-          transition: md::motion::spring::effects::slow(),
-          pos_axes: PosAxes::None,
-          size_axes: SizeAxes::Size,
-          size_mode: SizeMode::Visual,
-          size_effect: SizeEffect::Scale,
-          @Void {
-            background: Palette::of(BuildCtx::get()).secondary_container(),
-            x: AnchorX::center(),
-            hint_size: expanded_switch(
-              expanded::INDICATOR_SIZE,
-              collapsed::INDICATOR_SIZE.into(),
-            ),
-            radius: expanded_switch(expanded::item::RADIUS, collapsed::INDICATOR_RADIUS),
-          }
-        }
-      })
+      let is_selected = distinct_pipe!(*$read(selected) == key);
+
+      let mut inner = @Void {
+        background: Palette::of(BuildCtx::get()).secondary_container(),
+        x: AnchorX::center(),
+        hint_size: expanded_switch(
+          expanded::INDICATOR_SIZE,
+          collapsed::INDICATOR_SIZE.into(),
+        ),
+        radius: expanded_switch(expanded::item::RADIUS, collapsed::INDICATOR_RADIUS),
+      };
+      let fade_trans = md::motion::spring::spatial::default();
+      inner.opacity().transition_with_init(0., fade_trans);
+      inner.with_opacity(is_selected.map(|v| if v { 1. } else { 0. }));
+
+      @SmoothLayout {
+        transition: md::motion::spring::spatial::default(),
+        pos_axes: PosAxes::None,
+        size_axes: SizeAxes::Size,
+        size_mode: SizeMode::Visual,
+        size_effect: SizeEffect::Scale,
+        @ { inner }
+      }
     }
     .into_widget()
   }
@@ -180,8 +185,12 @@ fn rail_item_init(classes: &mut Classes) {
         ),
         @ { w }
       };
+      // M3 Expressive: label transitions use spatial fast (350ms, damping 0.9)
+      // for a snappy take-off with soft landing — not effects slow (300ms, damping 1.0)
+      // which feels abrupt and critically-damped.
+      let label_trans = md::motion::spring::spatial::default();
       let fade_in_out = @Animate {
-        transition: md::motion::spring::effects::slow(),
+        transition: label_trans,
         state: label.opacity(),
         from: 0.,
       };
@@ -201,10 +210,9 @@ fn rail_item_init(classes: &mut Classes) {
       if let Some(item) = RailItem::of(ctx) {
         let visible = item.label_visible();
         if matches!(visible, PipeValue::Pipe{ ..}) {
-          let effects_trans = md::motion::spring::effects::slow();
           // Configure transition before binding opacity value, so the initial
           // visible-state sync can animate from init opacity.
-          label.opacity().transition_with_init(0., effects_trans);
+          label.opacity().transition_with_init(0., label_trans);
           label.with_opacity(visible.map(|v| if v { 1. } else { 0. }));
         }
       }
