@@ -32,7 +32,7 @@ jobs:
           tool: cargo-edit
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y libwebp-dev libasound2-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y libwebp-dev libasound2-dev libfontconfig1-dev pkg-config
 
       - uses: ./.github/actions/setup-codex
         with:
