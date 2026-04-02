@@ -24,6 +24,8 @@ struct RailControlState {
   content_align: RailContentAlign,
 }
 
+const RAIL_CONTROLS_PANEL_WIDTH: f32 = 240.;
+
 #[derive(Clone, Copy, PartialEq)]
 struct MailState {
   selected_idx: usize,
@@ -53,7 +55,7 @@ impl Compose for RailStructureState {
             @ { controls.clone_writer() }
           }
           @Scrollbar {
-            clamp: BoxClamp::fixed_width(220.),
+            clamp: BoxClamp::fixed_width(RAIL_CONTROLS_PANEL_WIDTH),
             scrollable: Scrollable::Y,
             @Flex {
               class: GALLERY_RAIL_CONTROLS_PANEL,
