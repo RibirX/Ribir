@@ -1,6 +1,7 @@
 mod animations;
 mod common;
 mod concepts;
+mod navigation_rail;
 mod showcase;
 mod widgets;
 
