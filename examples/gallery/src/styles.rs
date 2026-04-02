@@ -11,6 +11,8 @@ class_names! {
   GALLERY_STATUS_BADGE,
   GALLERY_STATUS_TITLE,
   GALLERY_STATUS_BODY,
+  /// Controls panel sidebar used by interactive sandbox pages.
+  GALLERY_RAIL_CONTROLS_PANEL,
 }
 
 pub fn styles() -> Vec<Provider> {
@@ -98,6 +100,14 @@ pub fn styles() -> Vec<Provider> {
         text_align: TextAlign::Center,
         max_width: 560.,
         text_overflow: TextOverflow::AutoWrap,
+      },
+    ),
+    Class::provider(
+      GALLERY_RAIL_CONTROLS_PANEL,
+      style_class! {
+        padding: EdgeInsets::all(20.),
+        radius: Radius::all(16.),
+        background: Palette::of(BuildCtx::get()).surface_container(),
       },
     ),
   ]

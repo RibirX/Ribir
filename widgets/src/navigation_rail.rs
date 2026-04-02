@@ -107,9 +107,9 @@ use crate::prelude::*;
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub enum RailLabelPolicy {
   /// Labels are never visible. Icons are centered within the item.
-  #[default]
   None,
   /// Labels are only visible when the item is selected.
+  #[default]
   OnSelected,
   /// Labels are always visible. Icons are moved upwards to make room for the
   /// text.
@@ -122,12 +122,8 @@ pub enum RailLabelPolicy {
 pub struct RailExpanded(pub bool);
 
 /// Content alignment Provider
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub struct RailContentAlign(pub Align);
-
-impl Default for RailContentAlign {
-  fn default() -> Self { Self(Align::Center) }
-}
 
 /// Metadata about the structure of a rail item.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -725,15 +721,15 @@ mod tests {
             Provider::new(RailContentAlign(Align::Start)),
           ],
           @NavigationRail {
-            selected: CowArc::<str>::from("home"),
+            selected: "home",
             size: Size::new(80., 200.),
             @RailItem {
-              key: CowArc::<str>::from("home"),
+              key: "home",
               @Void { size: Size::new(24., 24.) }
               @ { "Home" }
             }
             @RailItem {
-              key: CowArc::<str>::from("settings"),
+              key: "settings",
               @Void { size: Size::new(24., 24.) }
               @ { "Settings" }
             }
@@ -773,9 +769,9 @@ mod tests {
           *$write(w_outside_selected) = RailItem::is_selected_of(e);
         },
         @NavigationRail {
-          selected: CowArc::<str>::from("home"),
+          selected: "home",
           @RailItem {
-            key: CowArc::<str>::from("home"),
+            key: "home",
             @FatObj {
               on_mounted: move |e| {
                 *$write(w_selected) = RailItem::is_selected_of(e);
@@ -802,9 +798,9 @@ mod tests {
     let (is_selected, w_selected) = split_value(true);
     let wnd = TestWindow::from_widget(fn_widget! {
       @NavigationRail {
-        selected: CowArc::<str>::from("home"),
+        selected: "home",
         @RailItem {
-          key: CowArc::<str>::from("settings"),
+          key: "settings",
           @FatObj {
             on_mounted: move |e| {
               *$write(w_selected) = RailItem::is_selected_of(e);
@@ -830,17 +826,17 @@ mod tests {
         @Providers {
           providers: [Provider::new(RailContentAlign(Align::Start))],
           @NavigationRail {
-            selected: CowArc::<str>::from("home"),
+            selected: "home",
             size: Size::new(96., 200.),
             on_custom: move |e: &mut RailSelectEvent| *$write(w_selected) = e.data().to.clone(),
             @RailItem {
-              key: CowArc::<str>::from("home"),
+              key: "home",
               @Void {
                 size: Size::new(24., 24.),
               }
             }
             @RailItem {
-              key: CowArc::<str>::from("settings"),
+              key: "settings",
               @Void {
                 size: Size::new(24., 24.),
                 on_mounted: move |e| *$write(w_second_item_id) = Some(e.current_target()),
@@ -907,7 +903,7 @@ mod tests {
         ],
         @NavigationRail {
           @RailItem {
-            key: CowArc::<str>::from("home"),
+            key: "home",
             @Void {}
           }
         }
@@ -968,16 +964,16 @@ mod tests {
             Class::provider(RAIL_ITEM_UNSELECTED, count_item_state),
           ],
           @NavigationRail {
-            selected: CowArc::<str>::from("home"),
+            selected: "home",
             size: Size::new(96., 200.),
             @RailItem {
-              key: CowArc::<str>::from("home"),
+              key: "home",
               @Void {
                 size: Size::new(24., 24.),
               }
             }
             @RailItem {
-              key: CowArc::<str>::from("settings"),
+              key: "settings",
               @Void {
                 size: Size::new(24., 24.),
                 on_mounted: move |e| *$write(w_second_item_id) = Some(e.current_target()),
@@ -1069,7 +1065,7 @@ mod tests {
               ),
             ],
             @NavigationRail {
-              selected: CowArc::<str>::from(selected),
+              selected: selected,
               size: Size::new(TEST_NAV_EXPANDED_WIDTH, 320.),
               @RailMenu {
                 @Void {
@@ -1084,7 +1080,7 @@ mod tests {
                 }
               }
               @RailItem {
-                key: CowArc::<str>::from("home"),
+                key: "home",
                 @Void {
                   size: Size::new(24., 24.),
                   on_mounted: move |e| *$write(home_icon_id) = Some(e.current_target()),
@@ -1092,7 +1088,7 @@ mod tests {
                 @ { "Home" }
               }
               @RailItem {
-                key: CowArc::<str>::from("messages"),
+                key: "messages",
                 @Void {
                   size: Size::new(24., 24.),
                   on_mounted: move |e| *$write(messages_icon_id) = Some(e.current_target()),
@@ -1100,7 +1096,7 @@ mod tests {
                 @ { "Messages" }
               }
               @RailItem {
-                key: CowArc::<str>::from("pomodoro"),
+                key: "pomodoro",
                 @Void {
                   size: Size::new(24., 24.),
                   on_mounted: move |e| *$write(pomodoro_icon_id) = Some(e.current_target()),
@@ -1243,10 +1239,10 @@ mod tests {
               ),
             ],
             @NavigationRail {
-              selected: CowArc::<str>::from(selected),
+              selected: selected,
               size: Size::new(TEST_NAV_EXPANDED_WIDTH, 240.),
               @RailItem {
-                key: CowArc::<str>::from("messages"),
+                key: "messages",
                 @Void {
                   size: Size::new(24., 24.),
                   on_mounted: move |e| *$write(messages_icon_id) = Some(e.current_target()),
@@ -1254,7 +1250,7 @@ mod tests {
                 @ { "Messages" }
               }
               @RailItem {
-                key: CowArc::<str>::from("pomodoro"),
+                key: "pomodoro",
                 @Void {
                   size: Size::new(24., 24.),
                   on_mounted: move |e| *$write(pomodoro_icon_id) = Some(e.current_target()),

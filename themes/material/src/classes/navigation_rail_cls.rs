@@ -15,26 +15,6 @@ pub(super) fn init(classes: &mut Classes) {
   rail_slots_init(classes);
 }
 
-fn smooth_pos<'c>(child: Widget<'c>) -> Widget<'c> {
-  smooth_layout! {
-    transition: md::motion::spring::spatial::default(),
-    pos_axes: PosAxes::Pos,
-    size_axes: SizeAxes::None,
-    @ { child }
-  }
-  .into_widget()
-}
-
-fn smooth_y<'c>(child: Widget<'c>) -> Widget<'c> {
-  smooth_layout! {
-    transition: md::motion::spring::spatial::default(),
-    pos_axes: PosAxes::Y,
-    size_axes: SizeAxes::None,
-    @ { child }
-  }
-  .into_widget()
-}
-
 fn rail_root_init(classes: &mut Classes) {
   classes.insert(NAVIGATION_RAIL, |w| {
     smooth_layout! {
@@ -77,7 +57,13 @@ fn rail_item_init(classes: &mut Classes) {
         .expect("RAIL_ITEM_ICON should only be used in NavigationRail")
         .part_watcher(|nav| PartRef::from(nav.selected()));
 
-      let is_selected = distinct_pipe!(*$read(selected) == key);
+      let init_opacity = if *selected.read() == key { 1. } else { 0. };
+      let selected_opacity = {
+        let key = key.clone();
+        distinct_pipe!(*$read(selected) == key)
+          .map(|selected| if selected { 1. } else { 0. })
+          .with_init_value(init_opacity)
+      };
 
       let mut inner = @Void {
         background: Palette::of(BuildCtx::get()).secondary_container(),
@@ -89,8 +75,13 @@ fn rail_item_init(classes: &mut Classes) {
         radius: expanded_switch(expanded::item::RADIUS, collapsed::INDICATOR_RADIUS),
       };
       let fade_trans = md::motion::spring::spatial::default();
-      inner.opacity().transition_with_init(0., fade_trans);
-      inner.with_opacity(is_selected.map(|v| if v { 1. } else { 0. }));
+      // `transition_with_init` uses the property's current value as the first
+      // observed state. Seed the real current opacity first, otherwise every
+      // remount starts from the wrapper default (`1.0`) and unselected items
+      // replay a fake `1 -> 0` fade on the first frame.
+      inner.with_opacity(init_opacity);
+      inner.opacity().transition_with_init(init_opacity, fade_trans);
+      inner.with_opacity(selected_opacity);
 
       @SmoothLayout {
         transition: md::motion::spring::spatial::default(),
@@ -161,15 +152,16 @@ fn rail_item_init(classes: &mut Classes) {
   });
 
   classes.insert(RAIL_ITEM_ICON, |w| {
-    smooth_y(
-      fn_widget! {
-        @FatObj {
-          text_line_height: md::ICON_SIZE,
-          @ { w }
-        }
+    smooth_layout! {
+      transition: md::motion::spring::spatial::default(),
+      pos_axes: PosAxes::Y,
+      size_axes: SizeAxes::None,
+      @FatObj {
+        text_line_height: md::ICON_SIZE,
+        @ { w }
       }
-      .into_widget(),
-    )
+    }
+    .into_widget()
   });
 
   classes.insert(RAIL_ITEM_LABEL, |w| {
@@ -210,10 +202,16 @@ fn rail_item_init(classes: &mut Classes) {
       if let Some(item) = RailItem::of(ctx) {
         let visible = item.label_visible();
         if matches!(visible, PipeValue::Pipe{ ..}) {
+          let opacity = visible.map(|visible| if visible { 1. } else { 0. });
+          let init_opacity = match &opacity {
+            PipeValue::Value(v) => *v,
+            PipeValue::Pipe { init_value, .. } => *init_value,
+          };
           // Configure transition before binding opacity value, so the initial
           // visible-state sync can animate from init opacity.
-          label.opacity().transition_with_init(0., label_trans);
-          label.with_opacity(visible.map(|v| if v { 1. } else { 0. }));
+          label.with_opacity(init_opacity);
+          label.opacity().transition_with_init(init_opacity, label_trans);
+          label.with_opacity(opacity);
         }
       }
 
@@ -225,18 +223,19 @@ fn rail_item_init(classes: &mut Classes) {
 
 fn rail_section_init(classes: &mut Classes) {
   classes.insert(RAIL_SECTION, |w| {
-    smooth_pos(
-      fn_widget! {
-        @FatObj {
-          // The section not visible when rail is collapsed
-          margin: expanded::section::MARGIN,
-          text_style: expanded::section::text_style(),
-          foreground: Palette::of(BuildCtx::get()).on_surface_variant(),
-          @ { w }
-        }
+    smooth_layout! {
+      transition: md::motion::spring::spatial::default(),
+      pos_axes: PosAxes::Pos,
+      size_axes: SizeAxes::None,
+      @FatObj {
+        // The section not visible when rail is collapsed
+        margin: expanded::section::MARGIN,
+        text_style: expanded::section::text_style(),
+        foreground: Palette::of(BuildCtx::get()).on_surface_variant(),
+        @ { w }
       }
-      .into_widget(),
-    )
+    }
+    .into_widget()
   });
 }
 
