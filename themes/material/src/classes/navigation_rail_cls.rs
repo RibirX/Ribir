@@ -42,6 +42,7 @@ fn rail_header_init(classes: &mut Classes) {
 }
 
 fn rail_content_init(classes: &mut Classes) {
+  classes.insert(RAIL_CONTENT, style_class! { padding: common::CONTENT_PADDING });
   classes
     .insert(RAIL_CONTENT_NO_HEADER, style_class! { margin: common::CONTENT_TOP_MARGIN_NO_HEADER });
 }
@@ -228,7 +229,6 @@ fn rail_section_init(classes: &mut Classes) {
       pos_axes: PosAxes::Pos,
       size_axes: SizeAxes::None,
       @FatObj {
-        // The section not visible when rail is collapsed
         margin: expanded::section::MARGIN,
         text_style: expanded::section::text_style(),
         foreground: Palette::of(BuildCtx::get()).on_surface_variant(),
