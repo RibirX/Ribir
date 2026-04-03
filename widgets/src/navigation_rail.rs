@@ -473,12 +473,14 @@ impl<'c> ComposeChild<'c> for NavigationRail {
         class: classes,
         @ { header }
         @Expanded {
-          @Column {
+          @ScrollableWidget {
             scrollable: Scrollable::Y,
-            class: content_class,
-            align_items: Align::Start,
-            justify_content: Self::content_align(),
-            @ { content_children }
+            @Column {
+              class: content_class,
+              align_items: Align::Start,
+              justify_content: Self::content_align(),
+              @ { content_children }
+            }
           }
         }
         @ { footer }
@@ -1003,6 +1005,58 @@ mod tests {
   }
 
   #[test]
+  fn first_badged_item_keeps_badge_inside_scroll_view() {
+    reset_test_env!();
+    AppCtx::set_app_theme(material::purple::light());
+
+    let (icon_top_in_view, w_icon_top_in_view) = split_value(None::<f32>);
+
+    let wnd = TestWindow::new_with_size(
+      fn_widget! {
+        @Providers {
+          providers: [Provider::new(RailContentAlign(Align::Start))],
+          @NavigationRail {
+            selected: "inbox",
+            size: Size::new(96., 200.),
+            @RailItem {
+              key: "inbox",
+              @NumBadge {
+                count: Some(12),
+                @Void {
+                  size: Size::new(24., 24.),
+                  on_performed_layout: move |e| {
+                    let top = ScrollableWidget::of(e)
+                      .and_then(|scrollable| {
+                        scrollable.map_to_view(Point::zero(), e.current_target(), &e.window())
+                      })
+                      .map(|pos| pos.y);
+                    *$write(w_icon_top_in_view) = top;
+                  },
+                }
+              }
+            }
+            @RailItem {
+              key: "sent",
+              @Void { size: Size::new(24., 24.) }
+            }
+          }
+        }
+      },
+      Size::new(96., 200.),
+    );
+
+    wnd.draw_frame();
+
+    let icon_top_in_view = icon_top_in_view
+      .read()
+      .expect("rail icon should resolve its scroll-view position after layout");
+    assert!(
+      icon_top_in_view >= 8.,
+      "expected at least 8px top inset for badge overflow, got {icon_top_in_view}",
+    );
+  }
+
+  #[test]
   fn rail_menu_action_and_item_icon_keep_same_settled_x_across_modes() {
     reset_test_env!();
 
@@ -1048,11 +1102,20 @@ mod tests {
                 style_class! { margin: EdgeInsets::only_top(24.) },
               ),
               Class::provider(
+                RAIL_CONTENT,
+                style_class! {
+                  padding: expanded_switch(
+                    EdgeInsets::only_left(20.).with_top(4.),
+                    EdgeInsets::only_left(20.).with_top(4.),
+                  )
+                },
+              ),
+              Class::provider(
                 RAIL_ITEM,
                 style_class! {
                   margin: expanded_switch(
-                    EdgeInsets::only_left(20.),
-                    EdgeInsets::only_left(20.).with_bottom(4.)
+                    EdgeInsets::ZERO,
+                    EdgeInsets::only_bottom(4.)
                   ),
                   clamp: expanded_switch(BoxClamp::min_width(56.), BoxClamp::fixed_width(56.)),
                   height: 56.,

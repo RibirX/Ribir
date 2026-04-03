@@ -526,8 +526,13 @@ pub(crate) mod nav_rail {
     }
     pub const LEADING_ICON_CENTER_X: f32 = 48.;
     pub const CONTAINER_PADDING: EdgeInsets = EdgeInsets::only_bottom(4.);
-    pub const HEADER_MARGIN: EdgeInsets = EdgeInsets::only_top(16.).with_bottom(16.);
-    pub const CONTENT_TOP_MARGIN_NO_HEADER: EdgeInsets = EdgeInsets::only_top(44.);
+    // Keep 4px inside the scroll content so the first item's badge can overflow
+    // upward without being clipped. HEADER_MARGIN and
+    // CONTENT_TOP_MARGIN_NO_HEADER subtract the same 4px to preserve the total
+    // top whitespace.
+    pub const CONTENT_PADDING: EdgeInsets = EdgeInsets::only_top(4.);
+    pub const HEADER_MARGIN: EdgeInsets = EdgeInsets::only_top(16.).with_bottom(12.);
+    pub const CONTENT_TOP_MARGIN_NO_HEADER: EdgeInsets = EdgeInsets::only_top(40.);
     pub const ACTION_WITH_MENU_MARGIN: EdgeInsets = EdgeInsets::only_top(24.);
   }
 
