@@ -247,6 +247,37 @@ where
   #[inline]
   pub fn into_impl(self) -> Impl { self.gpu_impl }
 
+  pub fn composite_texture_to_output(
+    &mut self, source: &Impl::Texture, output: &mut Impl::Texture,
+  ) {
+    debug_assert!(self.clip_layer_stack.is_empty());
+
+    self.begin_draw_phase();
+    self.texture_vertices_buffer.clear();
+    add_full_texture_vertices(TexturePrimIndex(0), &mut self.texture_vertices_buffer);
+
+    let prim = TexturePrimitive {
+      transform: Transform::identity().to_array(),
+      mask_head: -1,
+      opacity: 1.0,
+      is_premultiplied: 1,
+      _padding: [0; 3],
+    };
+    let prims_offset = self
+      .gpu_impl
+      .load_texture_data(&[prim], &self.texture_vertices_buffer);
+    let indices = 0..self.texture_vertices_buffer.indices.len() as u32;
+    self.gpu_impl.draw_texture_triangles(
+      output,
+      indices,
+      Some(Color::TRANSPARENT),
+      source,
+      0,
+      prims_offset,
+    );
+    self.end_draw_phase();
+  }
+
   fn draw_command(
     &mut self, cmd: &PaintCommand, global_matrix: &Transform, output_tex_size: DeviceSize,
     output: &mut Impl::Texture, glyph_provider: &dyn GlyphRasterSource,

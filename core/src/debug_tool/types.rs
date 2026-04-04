@@ -46,7 +46,7 @@ pub struct InjectEventsResult {
   pub accepted: usize,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, serde::Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum InjectedUiEvent {
   Delay {
@@ -123,7 +123,7 @@ pub enum InjectedUiEvent {
   },
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, serde::Serialize)]
 pub enum InjectMouseButton {
   #[default]
   Primary,
@@ -133,13 +133,13 @@ pub enum InjectMouseButton {
   Fifth,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum InjectElementState {
   Pressed,
   Released,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, serde::Serialize)]
 pub enum InjectKeyLocation {
   #[default]
   Standard,
@@ -291,6 +291,52 @@ impl<'de> Deserialize<'de> for InjectKeyLocation {
   }
 }
 
+// === Event Macro Recording Types ===
+
+/// Request to start recording user interaction events.
+#[derive(Debug, Clone, Deserialize)]
+pub struct StartEventMacroRecordingRequest {
+  pub window_id: Option<WindowId>,
+  /// Optional auto-stop duration in milliseconds.
+  #[serde(default)]
+  pub duration_ms: Option<u64>,
+}
+
+/// Result of starting event macro recording.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct StartEventMacroRecordingResult {
+  pub recording_id: String,
+  pub started_at_ts_unix_ms: u64,
+}
+
+/// Request to stop event macro recording.
+#[derive(Debug, Clone, Deserialize)]
+pub struct StopEventMacroRecordingRequest {
+  /// Optional recording ID. When omitted, stops the current active session.
+  #[serde(default)]
+  pub recording_id: Option<String>,
+}
+
+/// Result of stopping event macro recording.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct StopEventMacroRecordingResult {
+  pub recording_id: String,
+  /// Replay-ready events (includes Delay events for timing).
+  pub events: Vec<InjectedUiEvent>,
+  /// Full wall-clock recording duration, in milliseconds.
+  pub duration_ms: u64,
+}
+
+/// Unified result for start macro recording.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(untagged)]
+pub enum StartMacroResult {
+  /// Synchronous mode (with duration): recording completed with events
+  WithEvents(StopEventMacroRecordingResult),
+  /// Async mode: just recording started
+  Started(StartEventMacroRecordingResult),
+}
+
 /// Command sent from the HTTP server to the main UI thread.
 pub enum DebugCommand {
   InspectWidgetTree {
@@ -330,5 +376,16 @@ pub enum DebugCommand {
     window_id: Option<WindowId>,
     events: Vec<InjectedUiEvent>,
     reply: tokio::sync::oneshot::Sender<Result<InjectEventsResult, String>>,
+  },
+  /// Start recording user interaction events.
+  StartEventMacroRecording {
+    window_id: Option<WindowId>,
+    duration_ms: Option<u64>,
+    reply: tokio::sync::oneshot::Sender<Result<StartMacroResult, String>>,
+  },
+  /// Stop the active event macro recording.
+  StopEventMacroRecording {
+    recording_id: Option<String>,
+    reply: tokio::sync::oneshot::Sender<Result<StopEventMacroRecordingResult, String>>,
   },
 }

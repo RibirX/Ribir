@@ -15,7 +15,7 @@ pub const RIBIR_CANVAS: &str = "ribir_canvas";
 pub const RIBIR_CONTAINER: &str = "ribir_container";
 
 #[cfg(feature = "debug")]
-use ribir_core::debug_tool::{FRAME_TX, FramePacket};
+use ribir_core::debug_tool::{FRAME_TX, FramePacket, now_unix_ms};
 
 use crate::{
   app::{App, CmdSender},
@@ -198,10 +198,7 @@ impl WinitShellWnd {
         if let Some(img) = fut.await
           && let Some(frame_tx) = FRAME_TX.get()
         {
-          let ts_unix_ms = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis() as u64;
+          let ts_unix_ms = now_unix_ms();
           static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
           let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 

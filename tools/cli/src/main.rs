@@ -1,5 +1,5 @@
 mod bundle;
-mod mcp;
+mod debug_bridge;
 mod program_check;
 mod run_wasm;
 mod util;
@@ -15,7 +15,7 @@ use tracing_subscriber::{
   prelude::*,
 };
 
-use crate::{bundle::bundle, mcp::mcp};
+use crate::{bundle::bundle, debug_bridge::debug_server};
 
 trait CliCommand {
   fn name(&self) -> &str;
@@ -97,7 +97,7 @@ fn init_log(log_level: Level) {
 fn main() {
   let mut cli = clap::Command::new("cli").bin_name("cli");
 
-  let commands = [run_wasm(), bundle(), mcp()];
+  let commands = [run_wasm(), bundle(), debug_server()];
 
   for cmd in &commands {
     cli = cli.subcommand(cmd.command());

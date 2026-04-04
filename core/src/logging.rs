@@ -14,13 +14,14 @@ use std::{
     OnceLock, RwLock,
     atomic::{AtomicU64, Ordering},
   },
-  time::{SystemTime, UNIX_EPOCH},
 };
 
 use serde_json::{Map, Value};
 use tokio::sync::mpsc;
 use tracing::{Event, Subscriber};
 use tracing_subscriber::{EnvFilter, Layer, layer::Context, prelude::*, registry::LookupSpan};
+
+use crate::debug_tool::now_unix_ms;
 
 type ReloadHandle = tracing_subscriber::reload::Handle<EnvFilter, tracing_subscriber::Registry>;
 
@@ -77,13 +78,6 @@ pub fn update_filter(filter: &str) -> Result<(), String> {
   Ok(())
 }
 
-fn now_unix_ms() -> u64 {
-  SystemTime::now()
-    .duration_since(UNIX_EPOCH)
-    .unwrap_or_default()
-    .as_millis() as u64
-}
-
 /// Initialize a global tracing subscriber for debug scenarios.
 ///
 /// - Uses `try_init` so it will NOT override an existing global subscriber.
@@ -111,7 +105,12 @@ pub fn init_debug_tracing(default_filter: &str) {
     .with(filter_layer)
     .with(DebugMcpLogLayer);
 
-  let _ = tracing::subscriber::set_global_default(subscriber);
+  if tracing::subscriber::set_global_default(subscriber).is_err() {
+    #[cfg(target_arch = "wasm32")]
+    web_sys::console::log_1(
+      &"Ribir: tracing subscriber already set, debug layer may not work".into(),
+    );
+  }
 }
 
 struct JsonVisitor {

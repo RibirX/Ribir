@@ -777,9 +777,16 @@ impl GPUBackendImpl for WgpuImpl {
 
   fn end_frame(&mut self) {
     self.submit();
-    let _ = self
-      .device
-      .poll(wgpu::PollType::Wait { timeout: None, submission_index: None });
+    #[cfg(target_arch = "wasm32")]
+    {
+      let _ = self.device.poll(wgpu::PollType::Poll);
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+      let _ = self
+        .device
+        .poll(wgpu::PollType::Wait { timeout: None, submission_index: None });
+    }
     #[cfg(debug_assertions)]
     self.stop_capture();
   }
@@ -800,6 +807,13 @@ impl<'a> Surface<'a> {
   /// Get the size of the surface.
   pub fn size(&self) -> DeviceSize {
     DeviceSize::new(self.config.width as i32, self.config.height as i32)
+  }
+
+  pub fn supports_copy_src(&self) -> bool {
+    self
+      .config
+      .usage
+      .contains(wgpu::TextureUsages::COPY_SRC)
   }
 
   pub fn get_current_texture(&mut self, backend: &WgpuImpl) -> Option<&mut WgpuTexture> {
@@ -1018,10 +1032,19 @@ impl Texture for WgpuTexture {
       let _ = sender.send(v);
     });
 
-    backend
-      .device
-      .poll(wgpu::PollType::Wait { submission_index: None, timeout: None })
-      .unwrap();
+    // On WASM, PollType::Wait would block the main thread, so we use PollType::Poll
+    // and let the async callback handle the completion.
+    #[cfg(target_arch = "wasm32")]
+    {
+      let _ = backend.device.poll(wgpu::PollType::Poll);
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+      backend
+        .device
+        .poll(wgpu::PollType::Wait { submission_index: None, timeout: None })
+        .unwrap();
+    }
 
     // Capture texture format for color conversion logic
     let texture_format = self.format();

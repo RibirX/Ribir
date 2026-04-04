@@ -31,7 +31,8 @@ winit = { workspace = true, features = ["x11", "wayland", "wayland-dlopen"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys.workspace = true
-tokio = { workspace = true, features = ["rt", "sync"] }
+js-sys = "0.3"
+tokio = { workspace = true, features = ["rt", "sync"]}
 wasm-bindgen-futures.workspace = true
 winit.workspace = true
 

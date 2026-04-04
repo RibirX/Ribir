@@ -283,6 +283,8 @@ fn char_to_key_code(ch: char) -> Option<KeyCode> {
   }
 }
 
+// levenshtein_distance is defined in this module
+// (helpers.rs has a different implementation)
 fn levenshtein_distance(a: &str, b: &str) -> usize {
   let a_chars: Vec<char> = a.chars().collect();
   let b_chars: Vec<char> = b.chars().collect();

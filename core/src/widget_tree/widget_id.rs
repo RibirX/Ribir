@@ -9,6 +9,7 @@ use crate::{
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
 #[cfg_attr(feature = "debug", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "debug", serde(transparent))]
 pub struct WidgetId(pub(crate) NodeId);
 
 // A place holder get from a `WidgetId`, you can use it to insert a widget

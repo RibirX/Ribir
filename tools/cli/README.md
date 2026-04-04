@@ -11,11 +11,116 @@ cargo install --path tools/cli
 
 #### run-wasm
 
-build the example to wasm
+Build and serve a Ribir project as WebAssembly.
 
-1. Compile to target wasm32-unknown-unknown
-2. Use wasm-bindgen to export relative function to js
-3. Serve the wasm in 127.0.0.1:8000 by simpl-http-server
+##### Quick Start
+
+```bash
+# Basic usage
+cargo run -p ribir-cli -- run-wasm --package counter
+
+# Debug mode (with bridge server)
+cargo run -p ribir-cli -- run-wasm --package counter --debug
+
+# With custom template
+cargo run -p ribir-cli -- run-wasm --package counter --template path/to/template
+```
+
+##### Options
+
+| Option | Description |
+|--------|-------------|
+| `-p, --package <NAME>` | Package name to build (required) |
+| `-n, --name <NAME>` | Output name, default: `web_wasm` |
+| `-o, --out-dir <PATH>` | Output directory, default: `target/wasm` |
+| `-r, --release` | Build in release mode |
+| `--no-server` | Build only, don't start HTTP server |
+| `-t, --template <PATH>` | Custom template file/directory |
+| `--host <HOST>` | HTTP server host, default: `127.0.0.1` |
+| `--port <PORT>` | HTTP server port, default: `8000` |
+| `--debug` | Enable debug features and start bridge server |
+| `--bridge-host <HOST>` | Bridge server host (debug mode), default: `127.0.0.1` |
+| `--bridge-port <PORT>` | Bridge server port (debug mode), default: `2333` |
+
+##### How It Works
+
+1. **Compile**: Builds the package for `wasm32-unknown-unknown` target
+2. **Bindgen**: Uses `wasm-bindgen` to generate JS bindings
+3. **Template**: Copies user template (if provided) or uses built-in template
+4. **Debug Injection** (optional): In `--debug` mode, automatically injects bridge connection script
+5. **Serve**: Starts HTTP server with CORS headers for WASM SharedArrayBuffer support
+
+##### HTML Template
+
+The CLI generates `index.html` using this priority:
+
+1. **User Template** (if `--template` provided and contains `index.html`)
+2. **Built-in Template** (`tools/cli/template/index.html`)
+
+In debug mode, the bridge WebSocket URL is automatically injected.
+
+##### Debug Mode
+
+When `--debug` is enabled:
+
+- Starts a bridge server for WASM debugging
+- Injects connection script into HTML
+- Enables debugging tools for browser-based inspection
+
+```bash
+# Start with debug bridge
+cargo run -p ribir-cli -- run-wasm --package my_app --debug
+
+# App will be available at http://127.0.0.1:8000
+# Bridge server prefers ws://127.0.0.1:2333/ws, but the injected page uses the actual bound URL
+```
+
+The injected script automatically connects to the bridge, uses the bridge's real runtime URL if the preferred port is unavailable, and sets `RIBIR_DEBUG_URL` for debugging tools.
+
+For wasm debug sessions, `/status`, `/logs/filter`, and capture endpoints are proxied through the bridge to the connected page. Capture artifacts are written by the bridge host and returned as server-side `capture_dir` / `manifest_path` paths.
+
+##### Custom Template
+
+You can provide your own HTML template:
+
+```bash
+# Single HTML file
+cargo run -p ribir-cli -- run-wasm --package my_app --template custom.html
+
+# Directory with assets
+cargo run -p ribir-cli -- run-wasm --package my_app --template ./my-template/
+```
+
+The template should include:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>My App</title>
+  <style>
+    .ribir_container {
+      width: 100vw;
+      height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="ribir_container"></div>
+  <script type="module">
+    import init, { run } from './web_wasm.js';
+    await init();
+    run();
+  </script>
+</body>
+</html>
+```
+
+**Important**: The container element must have `class="ribir_container"` (not `id`) for the WASM runtime to find it.
 
 #### bundle
 
@@ -127,204 +232,3 @@ The bundle command automatically detects and includes assets processed by the `a
 3. At runtime, assets are loaded relative to the executable
 
 No additional configuration is needed - just use `asset!("path/to/file")` in your code and the bundler will handle the rest.
-
-#### mcp
-
-Start MCP (Model Context Protocol) stdio server for AI coding assistants to debug Ribir applications.
-
-##### What is MCP?
-
-MCP (Model Context Protocol) is a standard that allows AI assistants to interact with external tools and services. The Ribir MCP server provides a native Rust stdio server that enables AI clients to inspect and debug running Ribir applications in real-time.
-
-##### Automatic Port Discovery
-
-The MCP server supports **automatic port discovery** for pre-existing sessions, and also supports explicit URL attach:
-
-- When a Ribir app starts with `--features debug`, it binds to `127.0.0.1:2333` and increments until it finds a free port (fallbacks to a dynamic port), then registers the chosen port in `~/.local/state/ribir/debug-ports/`
-- `start_app(project_path)` uses registry attach-first for that project path, then launches if no running session exists
-- `attach_app(url)` bypasses discovery and connects directly by explicit URL
-- `mcp check` fails fast when no matching session is found; `mcp serve` still starts in fallback mode so MCP handshake and tool discovery continue to work
-
-```bash
-# Terminal 1: Debug project A (auto-discovered port)
-cd ~/projects/app-a
-cargo run --features debug
-# Output: Debug server listening on http://127.0.0.1:2333
-
-# Terminal 2: Debug project B (auto-discovered port)
-cd ~/projects/app-b
-cargo run --features debug
-# Output: Debug server listening on http://127.0.0.1:2334
-
-# MCP clients can either call start_app(project_path) or attach_app(url)
-```
-
-##### MCP Tools and Resources
-
-MCP tools and resources are discovered dynamically. For full documentation, see [`dev-docs/debug-features.md`](../../dev-docs/debug-features.md).
-
-Brief overview:
-
-| Category | Tools |
-|----------|-------|
-| **Lifecycle** | `start_app`, `attach_app`, `stop_app` |
-| **Inspection** | `capture_screenshot`, `inspect_tree`, `inspect_widget` |
-| **Overlays** | `add_overlay`, `remove_overlay`, `clear_overlays`, `get_overlays` |
-| **Logging** | `set_log_filter` |
-| **Events** | `inject_events` |
-| **Recording** | `start_recording`, `stop_recording`, `capture_one_shot` |
-
-**Resources:** `ribir://logs`, `ribir://windows`, `ribir://status`
-
-##### Quick Start
-
-See [`dev-docs/debug-features.md`](../../dev-docs/debug-features.md) for detailed debugging workflows.
-
-```bash
-# 1. Run your Ribir app with debug feature enabled
-cargo run --features debug
-
-# 2. Configure your AI client (see Configuration Examples below)
-# 3. In MCP:
-#    - call start_app(project_path) for attach-first launch flow, or
-#    - call attach_app(url) if you already have RIBIR_DEBUG_URL.
-```
-
-##### Configuration Examples
-
-###### Claude Desktop / Claude CLI
-
-Add to `~/.claude.json` or `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "ribir-debug": {
-      "command": "cargo",
-      "args": ["run", "-p", "cli", "--", "mcp", "serve"]
-    }
-  }
-}
-```
-
-###### OpenCode CLI
-
-Add to `~/.config/opencode/opencode.json`:
-
-```json
-{
-  "mcp": {
-    "ribir-debug": {
-      "type": "local",
-      "command": ["cargo", "run", "-p", "cli", "--", "mcp", "serve"],
-      "enabled": true
-    }
-  }
-}
-```
-
-###### Codex CLI
-
-Add to `~/.codex/config.toml`:
-
-```toml
-[[mcp.servers]]
-name = "ribir-debug"
-command = "cargo"
-args = ["run", "-p", "cli", "--", "mcp", "serve"]
-```
-
-##### Subcommands
-
-| Command | Description |
-|---------|-------------|
-| `mcp serve` | Start MCP stdio server (used by AI clients) |
-| `mcp check` | Check connection to the Ribir debug server |
-| `mcp list` | List all active debug sessions |
-
-##### Options
-
-**serve options:**
-
-| Option | Description |
-|--------|-------------|
-| `-p, --port <PORT>` | Override auto-discovered port |
-
-**check options:**
-
-| Option | Description |
-|--------|-------------|
-| `-p, --port <PORT>` | Override auto-discovered port |
-
-##### Examples
-
-```bash
-# List all active debug sessions
-ribir-cli mcp list
-
-# Test connection to discovered debug server
-ribir-cli mcp check
-
-# Start MCP server bridge
-ribir-cli mcp serve
-
-# Override with a specific port
-ribir-cli mcp serve --port=8080
-```
-
-##### How It Works
-
-```
-┌─────────────────┐     stdio      ┌──────────────────┐     HTTP     ┌─────────────────┐
-│   AI Client     │◄──────────────►│  Rust MCP Server │◄───────────►│  Ribir App      │
-│ (Claude/Codex)  │               │  (cli mcp serve) │  :attach   │  (debug server) │
-└─────────────────┘               └──────────────────┘            └─────────────────┘
-```
-
-1. **Run**: Start your Ribir app with `--features debug` (or let `start_app(project_path)` start it)
-2. **Configure**: Add `ribir-debug` server entry to your AI client's config (no port needed)
-3. **Connect**: AI client launches `cli mcp serve`, then calls `start_app(project_path)` or `attach_app(url)`
-4. **Forward**: The MCP server forwards JSON-RPC requests to the debug HTTP server
-5. **Respond**: Responses flow back through the MCP server to the AI client
-
-##### Multi-Project Debugging
-
-When debugging multiple Ribir projects simultaneously:
-
-1. Each project's debug server registers its port with the project path as key
-2. `start_app(project_path)` attaches by exact project path or starts a new session for that path
-3. `attach_app(url)` attaches directly when client already has a debug URL
-
-```bash
-# View all active sessions
-cargo run -p ribir-cli -- mcp list
-
-# Output:
-# Active debug sessions:
-#
-#   Port: 2333
-#   Path: /Users/you/projects/app-a
-#   PID:  12345
-#
-#   Port: 2334
-#   Path: /Users/you/projects/app-b
-#   PID:  12346
-```
-
-##### Fallback Mode
-
-If the debug server is not running, the MCP server operates in fallback mode:
-- Tool/resource discovery still works (via `initialize`, `tools/list`, `resources/list`)
-- Tool invocations return helpful error messages with setup instructions
-- This allows AI clients to discover available capabilities even when the app isn't running
-
-##### Troubleshooting: Session Not Found or Wrong Port
-
-1. Preferred for MCP clients: call `start_app` with an absolute runnable crate `project_path`
-2. If you already know `RIBIR_DEBUG_URL`, call `attach_app` with that URL
-3. If you manually start the GUI app, run it in background to avoid blocking the client process:
-   - macOS/Linux: `cd <project_path> && nohup cargo run --features debug > /tmp/ribir-debug.log 2>&1 &`
-   - PowerShell: `Start-Process cargo -ArgumentList 'run --features debug' -WorkingDirectory '<project_path>'`
-4. Run `ribir-cli mcp list` to inspect which paths and ports are currently registered
-5. If needed, force the port via `ribir-cli mcp serve --port <PORT>`
-`start_app` rejects workspace roots that are not directly runnable crates.

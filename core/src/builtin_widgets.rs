@@ -1552,7 +1552,6 @@ impl<'a> FatObj<Widget<'a>> {
 
     #[cfg(feature = "debug")]
     if let Some(name) = self.debug_name {
-      println!("attach debug name: {name}");
       host = host.attach_debug_name_value(name);
     }
 

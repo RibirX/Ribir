@@ -1,6 +1,16 @@
 # Debug Features
 
-Ribir provides a built-in debug server that enables both AI-powered debugging via the Model Context Protocol (MCP) and manual debugging via a web-based HTTP interface.
+Ribir provides a built-in debug server that enables both AI-powered debugging (via skills) and manual debugging via a web-based HTTP interface.
+
+## Architecture
+
+Both Native and WASM targets use the same unified bridge architecture:
+
+```
+App (Native/WASM) --WebSocket--> CLI Debug Server --HTTP--> Debug Tools/UI
+```
+
+The app acts as a WebSocket client, connecting to the CLI debug server. This eliminates duplicate HTTP server code and simplifies maintenance.
 
 ## 🚀 Getting Started
 
@@ -12,77 +22,67 @@ To enable debug features in your Ribir application:
 # From the repo root
 cargo install --path tools/cli
 ```
-2. Run your app with the `debug` feature enabled:
 
-**For AI assistants (MCP):** Use the `start_app` tool with the absolute path to your runnable crate. This automatically launches the app with `--features debug` if not already running.
+2. Start the debug server:
 
-**For manual debugging:**
 ```bash
+cargo run -p ribir-cli -- debug-server
+```
+
+The debug server will print the URL on startup:
+```
+RIBIR_DEBUG_URL=http://127.0.0.1:2333
+```
+
+3. Run your app with the `debug` feature enabled:
+
+**Native apps:**
+```bash
+# Auto-connects to ws://127.0.0.1:2333/ws by default
 cargo run --features debug
 ```
 
+**WASM apps:**
+```bash
+# Terminal 1: debug server is already running
+# Terminal 2: serve the wasm app
+cargo run -p ribir-cli -- run-wasm --package <your_package>
+```
+
+Then open the wasm page with the debug server HTTP URL injected as a query parameter:
+```
+http://127.0.0.1:<wasm_port>/?ribir_debug_server=http://127.0.0.1:2333
+```
+
 When the `debug` feature is active:
-1. An HTTP debug server starts on `127.0.0.1` and prints the full URL on startup (`RIBIR_DEBUG_URL=...`).
+1. The app connects to the CLI debug server via WebSocket.
 2. Continuous frame capture and log buffering are enabled.
-3. The application can interact with MCP-compatible AI assistants.
 
 ### Configuration
 
-The debug server can be configured using environment variables:
+The debug server can be configured via CLI arguments:
 
-| Variable | Description | Default |
+| Argument | Description | Default |
 |----------|-------------|---------|
-| `RIBIR_CAPTURE_DIR` | Directory where recorded frames and captures are saved | `captures` |
+| `--host` | Host to bind | `127.0.0.1` |
+| `--port` | Port to bind | `2333` |
 
----
+Native apps automatically connect to the debug server using the `RIBIR_DEBUG_URL` environment variable (printed on server startup).
 
-> **Port:** The HTTP debug server tries `127.0.0.1:2333` first, then increments until it finds a free port (default range: `2333..2432`). If none are available, it falls back to a dynamic port. Use the startup log (`RIBIR_DEBUG_URL=...`) or the port registry for discovery.
+WASM apps use the `ribir_debug_server` query parameter with the HTTP URL (automatically converted to WebSocket).
 
-## 🤖 AI Debugging (MCP)
+## 🤖 AI Debugging (Skills)
 
-Ribir supports the [Model Context Protocol (MCP)](https://modelcontextprotocol.io), allowing AI coding assistants like Claude, Codex, or OpenCode to "see" and interact with your running application.
+For AI assistants, use the **ribir-debug** skill. The skill provides tools for inspecting, debugging, and interacting with running Ribir applications.
 
-### Setup
+### Prerequisites
 
-Configure your AI client to use the Ribir MCP server. Add the following to your AI client's MCP configuration:
+Before using the debug skill, make sure:
 
-**For Claude Desktop / Claude CLI** (`~/.claude.json` or `claude_desktop_config.json`):
-```json
-{
-  "mcpServers": {
-    "ribir-debug": {
-      "command": "ribir-cli",
-      "args": ["mcp", "serve"]
-    }
-  }
-}
-```
+1. **Debug server is running**: Start it with `cargo run -p ribir-cli -- debug-server`
+2. **App is built with debug feature**: Run your app with `--features debug`
 
-**For Codex CLI** (`~/.codex/config.toml`):
-```toml
-[[mcp.servers]]
-name = "ribir-debug"
-command = "ribir-cli"
-args = ["mcp", "serve"]
-```
-
-For other clients, see `tools/cli/README.md` for configuration examples.
-
-The MCP bridge (`ribir-cli mcp serve`) can discover debug ports via registry, and also supports explicit attach by URL when the client already knows `RIBIR_DEBUG_URL`.
-
-If no matching debug session exists:
-- `ribir-cli mcp check` fails fast with guidance.
-- `ribir-cli mcp serve` starts in fallback mode so MCP initialization and tool/resource listing still work.
-
-For MCP clients, prefer:
-- `start_app` with absolute runnable crate `project_path` (attach-first, then launch if needed).
-- `attach_app` with explicit URL when the client already has `RIBIR_DEBUG_URL`.
-
-If users manually launch GUI apps before attach, recommend non-blocking startup commands; foreground `cargo run` blocks until app exit.
-
-### Key MCP Tools
-
-> **Note:** Tool schemas are discovered automatically via MCP. Use `tools/list` for full schema details.
+### Key Tools
 
 | Category | Tools |
 |----------|-------|
@@ -121,51 +121,6 @@ Example `inject_events` arguments:
 }
 ```
 
-Keyboard input sequence:
-
-```json
-{
-  "events": [
-    { "type": "keyboard_input", "key": "a", "chars": "a" },
-    { "type": "keyboard_input", "key": "Enter" }
-  ]
-}
-```
-
-Raw keyboard input sequence:
-
-```json
-{
-  "events": [
-    { "type": "raw_keyboard_input", "key": "a", "physical_key": "KeyA", "state": "pressed", "location": "standard", "is_repeat": false },
-    { "type": "raw_keyboard_input", "key": "a", "physical_key": "KeyA", "state": "released", "location": "standard" }
-  ]
-}
-```
-
-Minimal tap-like sequence (let framework derive tap from down/up):
-
-```json
-{
-  "events": [
-    { "type": "cursor_moved", "x": 20, "y": 20 },
-    { "type": "mouse_input", "button": "primary", "state": "pressed" },
-    { "type": "mouse_input", "button": "primary", "state": "released" }
-  ]
-}
-```
-
-Direct advanced click / double click:
-
-```json
-{
-  "events": [
-    { "type": "click", "id": "3:0" },
-    { "type": "double_click", "x": 30, "y": 30, "button": "primary", "device_id": { "type": "custom", "value": 9 } }
-  ]
-}
-```
-
 You can also target a widget by its `debug_name` using the `name:` prefix:
 
 ```json
@@ -176,7 +131,7 @@ You can also target a widget by its `debug_name` using the `name:` prefix:
 }
 ```
 
-### MCP Resources
+### Resources
 
 | URI | Description |
 |-----|-------------|
@@ -192,8 +147,10 @@ The debug server provides a REST API and a built-in web UI for manual inspection
 
 ### Built-in Web UI
 
-Open your browser to the URL printed on startup, for example:
-`http://127.0.0.1:<port>/ui`
+Open your browser to the URL printed by the debug server on startup:
+```
+http://127.0.0.1:<port>/ui
+```
 
 This UI allows you to:
 - View live logs.
@@ -201,9 +158,6 @@ This UI allows you to:
 - Inspect the widget tree.
 - Manage debug overlays.
 - Control frame recording.
-
-For MCP SSE, use:
-`http://127.0.0.1:<port>/mcp/sse`
 
 ### API Endpoints
 
@@ -225,7 +179,6 @@ For MCP SSE, use:
 | `/capture/start` | `POST` | Start a capture session |
 | `/capture/stop` | `POST` | Stop the active capture session |
 | `/capture/one_shot` | `POST` | One-click capture (start → wait → stop) |
-| `/mcp/sse` | `GET` | MCP Server-Sent Events endpoint for AI assistants |
 
 `/inspect/tree` and `/inspect/{id}` accept `options` tokens:
 `all,id,layout,global_pos,clamp,props,no_global_pos,no_clamp,no_props`.
@@ -260,7 +213,7 @@ In multi-window scenarios, query `/windows` first and pass `window_id` explicitl
 
 #### Event Injection (`POST /events/inject`)
 
-Inject UI events to simulate user interaction. **Note**: For HTTP API, `window_id` must be a number (not string). For MCP, use string format.
+Inject UI events to simulate user interaction.
 
 **Request Body:**
 ```json
@@ -310,10 +263,10 @@ You can record every frame rendered by the application. This is useful for debug
 - **Via UI**: Toggle the "Recording" checkbox.
 - **Via API**: `POST /recording`
 - **Output**: PNG frames are saved to the `captures` directory.
-- **MCP tools**: `start_recording(include?)` creates a capture session directory. `include` accepts `logs` and/or `images` (default: `images`). `stop_recording` returns absolute `capture_dir` and `manifest_path`.
 
 ### Captures (One-Shot)
 
 A "Capture" is a bundled set of logs and frames surrounding a specific moment. This is what the AI uses to understand a bug report.
 
 - **One-Shot**: `POST /capture/one_shot` captures a short sequence of frames and logs and saves them with a `manifest.json`.
+- **Debug server**: The debug server writes capture files to disk for both native and WASM sessions, returning `capture_dir` and `manifest_path`.
