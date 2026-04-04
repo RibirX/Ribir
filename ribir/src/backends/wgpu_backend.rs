@@ -1,18 +1,16 @@
 #[cfg(feature = "debug")]
-use ribir_core::prelude::{BoxFuture, ColorFormat, PixelImage};
+use ribir_core::prelude::{BoxFuture, PixelImage};
 use ribir_core::prelude::{
-  Color, DeviceRect, DeviceSize, GlyphRasterSource, PaintCommand, PainterBackend, Transform,
+  Color, ColorFormat, DeviceRect, DeviceSize, GlyphRasterSource, PaintCommand, PainterBackend,
+  Transform,
 };
-use ribir_gpu::Surface;
-#[cfg(feature = "debug")]
-use ribir_gpu::{GPUBackendImpl, Texture, WgpuTexture};
+use ribir_gpu::{GPUBackendImpl, Surface, Texture, WgpuTexture};
 
 use crate::winit_shell_wnd::WinitBackend;
 
 pub struct WgpuBackend<'a> {
   surface: Surface<'a>,
   backend: ribir_gpu::GPUBackend<ribir_gpu::WgpuImpl>,
-  #[cfg(feature = "debug")]
   offscreen_texture: Option<WgpuTexture>,
 }
 
@@ -22,12 +20,8 @@ impl<'a> WinitBackend<'a> for WgpuBackend<'a> {
     let size = window.inner_size();
     let size = DeviceSize::new(size.width as i32, size.height as i32);
 
-    let mut wgpu = WgpuBackend {
-      surface,
-      backend: ribir_gpu::GPUBackend::new(wgpu),
-      #[cfg(feature = "debug")]
-      offscreen_texture: None,
-    };
+    let mut wgpu =
+      WgpuBackend { surface, backend: ribir_gpu::GPUBackend::new(wgpu), offscreen_texture: None };
     wgpu.on_resize(size);
 
     wgpu
@@ -36,10 +30,7 @@ impl<'a> WinitBackend<'a> for WgpuBackend<'a> {
   fn on_resize(&mut self, size: DeviceSize) {
     if size != self.surface.size() {
       self.surface.resize(size, self.backend.get_impl());
-      #[cfg(feature = "debug")]
-      {
-        self.offscreen_texture = None;
-      }
+      self.offscreen_texture = None;
     }
   }
 
@@ -49,18 +40,13 @@ impl<'a> WinitBackend<'a> for WgpuBackend<'a> {
     &mut self, viewport: DeviceRect, global_matrix: &Transform, commands: &[PaintCommand],
     glyph_provider: &dyn GlyphRasterSource,
   ) {
-    let Some(texture) = self
-      .surface
-      .get_current_texture(self.backend.get_impl())
-    else {
-      return;
-    };
-    self
-      .backend
-      .draw_commands(viewport, commands, global_matrix, texture, glyph_provider);
+    let _ = self.with_frame_texture(|backend, texture| {
+      backend.draw_commands(viewport, commands, global_matrix, texture, glyph_provider);
+    });
   }
 
   fn end_frame(&mut self) {
+    self.present_offscreen_texture();
     self.backend.end_frame();
     self.surface.present();
   }
@@ -77,12 +63,16 @@ impl<'a> WinitBackend<'a> for WgpuBackend<'a> {
       return None;
     }
 
-    let texture = match surface.get_current_texture(backend.get_impl()) {
-      Some(texture) => texture,
-      None => {
-        let texture = ensure_offscreen_texture(size, backend, cached_offscreen_texture);
-        backend.draw_commands(viewport, commands, global_matrix, texture, glyph_provider);
-        texture
+    let texture = if !surface.supports_copy_src() {
+      ensure_offscreen_texture(size, backend, cached_offscreen_texture)
+    } else {
+      match surface.get_current_texture(backend.get_impl()) {
+        Some(texture) => texture,
+        None => {
+          let texture = ensure_offscreen_texture(size, backend, cached_offscreen_texture);
+          backend.draw_commands(viewport, commands, global_matrix, texture, glyph_provider);
+          texture
+        }
       }
     };
     let rect = DeviceRect::from_size(size);
@@ -94,7 +84,47 @@ impl<'a> WinitBackend<'a> for WgpuBackend<'a> {
   }
 }
 
-#[cfg(feature = "debug")]
+impl<'a> WgpuBackend<'a> {
+  fn uses_offscreen_texture(&self) -> bool { !self.surface.supports_copy_src() }
+
+  fn with_frame_texture<R>(
+    &mut self,
+    f: impl FnOnce(&mut ribir_gpu::GPUBackend<ribir_gpu::WgpuImpl>, &mut WgpuTexture) -> R,
+  ) -> Option<R> {
+    if self.uses_offscreen_texture() {
+      let size = self.surface.size();
+      if size.is_empty() {
+        return None;
+      }
+
+      let (backend, offscreen_texture) = (&mut self.backend, &mut self.offscreen_texture);
+      let texture = ensure_offscreen_texture(size, backend, offscreen_texture);
+      Some(f(backend, texture))
+    } else {
+      let (surface, backend) = (&mut self.surface, &mut self.backend);
+      let texture = surface.get_current_texture(backend.get_impl())?;
+      Some(f(backend, texture))
+    }
+  }
+
+  fn present_offscreen_texture(&mut self) {
+    if !self.uses_offscreen_texture() {
+      return;
+    }
+
+    let (surface, backend, offscreen_texture) =
+      (&mut self.surface, &mut self.backend, &mut self.offscreen_texture);
+    let Some(offscreen_texture) = offscreen_texture.as_ref() else {
+      return;
+    };
+    let Some(surface_texture) = surface.get_current_texture(backend.get_impl()) else {
+      return;
+    };
+
+    backend.composite_texture_to_output(offscreen_texture, surface_texture);
+  }
+}
+
 fn ensure_offscreen_texture<'a>(
   size: DeviceSize, backend: &mut ribir_gpu::GPUBackend<ribir_gpu::WgpuImpl>,
   offscreen_texture: &'a mut Option<WgpuTexture>,

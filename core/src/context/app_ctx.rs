@@ -153,7 +153,7 @@ impl AppCtx {
       let main_fut = async {
         #[cfg(feature = "debug")]
         {
-          crate::debug_tool::start_debug_server();
+          crate::debug_tool::start_debug_client();
         }
 
         init.await;
@@ -170,7 +170,7 @@ impl AppCtx {
       AppCtx::spawn_local(async move {
         #[cfg(feature = "debug")]
         {
-          crate::debug_tool::start_debug_server();
+          crate::debug_tool::start_debug_client();
         }
 
         init.await;

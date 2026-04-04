@@ -44,6 +44,7 @@ pub enum AppEvent {
 
 pub(crate) enum RibirAppEvent {
   /// The event is sent when any future is waked to poll.
+  #[allow(dead_code)]
   FuturesWake,
   App(AppEvent),
   Cmd(ShellCmd),

@@ -162,6 +162,9 @@ impl EventLoop {
   }
 
   fn on_platform_event(&mut self, event: UiEvent) {
+    #[cfg(feature = "debug")]
+    crate::debug_tool::record_ui_event(&event);
+
     let Some(wnd_id) = event.wnd_id() else { return };
     let Some(wnd) = self.scheduler.get_window(wnd_id) else { return };
 

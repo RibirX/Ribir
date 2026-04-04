@@ -79,55 +79,48 @@ impl Compose for MyComponent {
 4. **Test**: `cargo +nightly ci test`
 5. **Visual Tests**: If you change rendering, check `test_cases/`. Update expected images with `RIBIR_IMG_TEST=overwrite cargo +nightly ci test`.
 
-## 6. Debug & MCP
+## 6. Debug & Skill
 
-Use the **Ribir Debug Server** MCP to inspect and debug running applications.
+Use the **ribir-debug** skill to inspect and debug running applications.
 
-### Starting Applications
+### Prerequisites
 
-Use the `start_app` tool to launch or attach to a Ribir debug session. 
-If the app is already running manually, you can use `attach_app` with the `RIBIR_DEBUG_URL`.
+Before using the debug skill:
 
-For specific parameter details and exact behavior, please refer directly to the MCP tool descriptions as they are the most accurate source.
+1. **Start the debug server**: `cargo run -p ribir-cli -- debug-server`
+2. **Run app with debug feature**: `cargo run --features debug`
 
-### Key Tools
+The debug server prints `RIBIR_DEBUG_URL` on startup. The app automatically connects to it.
 
-Commonly used MCP tools:
-- `start_app` / `attach_app` / `stop_app` - Application lifecycle
-- `capture_screenshot` - Visual state inspection
-- `inspect_tree` / `inspect_widget` - Widget tree inspection
-- `add_overlay` / `remove_overlay` - Visual debugging
-- `inject_events` - Simulate user interactions
-- `set_log_filter` - Dynamic log level adjustment
+### Key Workflow
 
-### Resources
+```bash
+# Terminal 1: Start debug server
+cargo run -p ribir-cli -- debug-server
 
-- `ribir://logs` - Application logs (NDJSON, ~60s history, 50k entry cap)
-- `ribir://windows` - Active windows
-- `ribir://status` - Server status
+# Terminal 2: Run app with debug feature
+cargo run -p your_package --features debug
+```
+
+Then invoke the ribir-debug skill to inspect, interact, and debug the running application.
 
 See `dev-docs/debug-features.md` for detailed API documentation.
 
 ### Custom Debug Names (`debug_name`)
 
-**IMPORTANT FOR AI AGENTS**: When debugging or interacting with a Ribir application, **proactively** assign stable names to target widgets using `debug_name: "some_name"` in the widget declaration. This allows you to easily find and interact with them via MCP tools (`inspect_widget`, `inject_events`, `add_overlay`, etc.) using the `name:some_name` format without needing to traverse the tree for a numeric `index1` ID.
+**IMPORTANT FOR AI AGENTS**: When debugging or interacting with a Ribir application, **proactively** assign stable names to target widgets using `debug_name: "some_name"` in the widget declaration. This allows you to easily find and interact with them via debug tools using the `name:some_name` format without needing to traverse the tree for a numeric `index1` ID.
 
 ```rust
 button! {
-  debug_name: "counter_button", // Add this to target it via MCP
+  debug_name: "counter_button", // Add this to target it via debug tools
   @{ "+1" }
 }
 ```
 
-Then, you can directly use it in MCP tools:
-- `inspect_widget` with `{"id": "name:counter_button"}`
-- `inject_events` with `{"events": [{"type": "click", "id": "name:counter_button"}]}`
-- `add_overlay` with `{"id": "name:counter_button"}`
-
 Rules for `debug_name`:
 - Works via builtin `with_debug_name` on `FatObj`.
 - Only active in debug builds.
-- Falls back to type-based names if not set, but explicit names are highly recommended for robust MCP tool interactions.
+- Falls back to type-based names if not set, but explicit names are highly recommended for robust debug tool interactions.
 
 ## 7. Interaction & Data Flow
 For interactive widgets, follow the **Single Source of Truth** rule: UI is a projection of data.

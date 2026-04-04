@@ -569,6 +569,7 @@
         </select>
         <span class="pill" id="pillSse">SSE: Disconnected</span>
         <span class="pill" id="pillRecording">Recording: ?</span>
+        <span class="pill" id="pillMacroRecording">Macro: Idle</span>
         <span class="pill" id="pillRing">Ring: ?</span>
         <span class="pill" id="pillDropped">Dropped: ?</span>
     </header>
@@ -577,18 +578,6 @@
         <!-- Column 1: Workspace & Status Sidebar -->
         <!-- Column 1: Workspace & Status Sidebar -->
         <div class="sidebar">
-            <section>
-                <div class="hd">
-                    <span>Status</span>
-                    <div class="row">
-                        <button id="btnRefreshStatus">Refresh</button>
-                    </div>
-                </div>
-                <div class="bd">
-                    <div class="kv" id="statusKv"></div>
-                </div>
-            </section>
-
             <section>
                 <div class="hd">
                     <span>Overlay</span>
@@ -653,6 +642,36 @@
                     <small class="muted">Sends <code>POST /events/inject</code> with <code>click</code>/<code>double_click</code>. If X/Y are omitted, the server resolves by id or <code>name:...</code> (debug_name).</small>
                 </div>
             </section>
+
+            <section>
+                <div class="hd">
+                    <span>Event Macro</span>
+                    <span id="macroStatusPill" class="pill" style="font-size: 11px;">Idle</span>
+                    <div class="row">
+                        <button class="primary" id="btnMacroStart">Start</button>
+                        <button class="danger" id="btnMacroStop">Stop</button>
+                    </div>
+                </div>
+                <div class="bd">
+                    <div class="field">
+                        <label for="macroDuration">Auto-stop Duration (ms, optional)</label>
+                        <input id="macroDuration" type="number" placeholder="e.g. 30000" min="0" />
+                    </div>
+                    <div style="height:8px"></div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <small class="muted">Recorded Events</small>
+                        <small class="muted" id="macroEventCount">0 events</small>
+                    </div>
+                    <pre id="macroEventsOut" style="max-height: 120px; min-height: 40px; font-size: 11px;">(No events recorded)</pre>
+                    <div style="height:6px"></div>
+                    <div class="row" style="justify-content: flex-end;">
+                        <button id="btnMacroDownload" disabled>Download Events</button>
+                    </div>
+                    <div style="height:6px"></div>
+                    <small class="muted">Record user interactions (clicks, keyboard, etc.). Stop to get events and download. Uses <code>POST /events/macro/start</code>, <code>/events/macro/stop</code>.</small>
+                </div>
+            </section>
+
             <section>
                 <div class="hd">
                     <span>Capture</span>
@@ -873,6 +892,7 @@
         const capOutEl = $('captureOut');
         const pillSse = $('pillSse');
         const pillRecording = $('pillRecording');
+        const pillMacroRecording = $('pillMacroRecording');
         const pillRing = $('pillRing');
         const pillDropped = $('pillDropped');
         let es = null;
@@ -1327,34 +1347,23 @@
             }
         }
 
-        function renderStatusKV(obj) {
-            const kv = $('statusKv');
-            kv.innerHTML = '';
-            const entries = [
-                ['recording', obj.recording],
-                ['log_sink_connected', obj.log_sink_connected],
-                ['filter_reload_installed', obj.filter_reload_installed],
-                ['filter', obj.filter],
-                ['dropped_total', obj.dropped_total],
-                ['ring_len', obj.ring_len],
-                ['capture_root', obj.capture_root],
-                ['active_capture', obj.active_capture ? (obj.active_capture.capture_id + ' @ ' + obj.active_capture.capture_dir) : null],
-            ];
-            for (const [k, v] of entries) {
-                const dk = document.createElement('div'); dk.className = 'k'; dk.textContent = k;
-                const dv = document.createElement('div'); dv.textContent = (v === null || v === undefined) ? '-' : String(v);
-                kv.appendChild(dk); kv.appendChild(dv);
-            }
-        }
-
         async function refreshStatus() {
             const res = await fetch('/status');
             const obj = await res.json();
-            renderStatusKV(obj);
             pillRecording.textContent = 'Recording: ' + obj.recording;
             pillRing.textContent = 'Ring: ' + obj.ring_len;
             pillDropped.textContent = 'Dropped: ' + obj.dropped_total;
             if (obj.filter) $('filterInput').value = obj.filter;
+
+            // Update macro recording status in header
+            if (obj.active_macro_recording) {
+                pillMacroRecording.textContent = 'Macro: Recording';
+                updateMacroStatusUI('recording', 0);
+                renderMacroPendingState();
+            } else {
+                pillMacroRecording.textContent = 'Macro: Idle';
+                updateMacroStatusUI('idle', null);
+            }
         }
 
         async function setFilter() {
@@ -1419,6 +1428,15 @@
                     if (typeof s.dropped_total !== 'undefined') pillDropped.textContent = 'Dropped: ' + s.dropped_total;
                     if (typeof s.recording !== 'undefined') pillRecording.textContent = 'Recording: ' + s.recording;
                     if (typeof s.filter !== 'undefined' && s.filter) $('filterInput').value = s.filter;
+                    if (typeof s.active_macro_recording !== 'undefined') {
+                        if (s.active_macro_recording) {
+                            pillMacroRecording.textContent = 'Macro: Recording';
+                            updateMacroStatusUI('recording', 0);
+                            renderMacroPendingState();
+                        } else {
+                            pillMacroRecording.textContent = 'Macro: Idle';
+                        }
+                    }
                 } catch (_) { }
             });
         }
@@ -1808,7 +1826,6 @@
             // Layout tree/info will update on next click
         };
 
-        $('btnRefreshStatus').onclick = refreshStatus;
         $('btnSetFilter').onclick = setFilter;
         $('btnConnection').onclick = toggleConnection;
         $('btnPause').onclick = () => {
@@ -1871,6 +1888,207 @@
         $('btnCaptureStart').onclick = capStart;
         $('btnCaptureStop').onclick = capStop;
         $('btnCaptureOneShot').onclick = capOneShot;
+
+        // === Event Macro Recording ===
+        let macroRecordingActive = false;
+        let macroLastResult = null;
+        let macroCountdownTimer = null;
+        let macroTimedDurationMs = null;
+        let macroTimedStartedAtMs = null;
+
+        function syncMacroButtons() {
+            $('btnMacroStart').disabled = macroRecordingActive;
+            $('btnMacroStop').disabled = !macroRecordingActive;
+        }
+
+        function formatMacroDuration(ms) {
+            if (ms >= 1000) {
+                const seconds = ms / 1000;
+                return (seconds >= 10 ? seconds.toFixed(0) : seconds.toFixed(1)) + 's';
+            }
+            return Math.max(0, Math.round(ms)) + 'ms';
+        }
+
+        function clearMacroTimedState() {
+            if (macroCountdownTimer) clearInterval(macroCountdownTimer);
+            macroCountdownTimer = null;
+            macroTimedDurationMs = null;
+            macroTimedStartedAtMs = null;
+        }
+
+        function updateMacroStatusUI(status, eventCount) {
+            const pill = $('macroStatusPill');
+            const countEl = $('macroEventCount');
+            if (status === 'recording') {
+                pill.textContent = 'Recording';
+                pill.style.background = 'rgba(34, 197, 94, .15)';
+                pill.style.borderColor = 'rgba(34, 197, 94, .35)';
+                macroRecordingActive = true;
+            } else if (status === 'stopped') {
+                pill.textContent = 'Stopped';
+                pill.style.background = 'rgba(239, 68, 68, .15)';
+                pill.style.borderColor = 'rgba(239, 68, 68, .35)';
+                macroRecordingActive = false;
+            } else {
+                pill.textContent = 'Idle';
+                pill.style.background = '';
+                pill.style.borderColor = '';
+                macroRecordingActive = false;
+            }
+            if (typeof eventCount === 'number') {
+                countEl.textContent = eventCount + ' events';
+            }
+            syncMacroButtons();
+        }
+
+        function renderMacroPendingState() {
+            if (!macroRecordingActive) return;
+            const out = $('macroEventsOut');
+            if (macroTimedDurationMs !== null && macroTimedStartedAtMs !== null) {
+                const elapsed = Date.now() - macroTimedStartedAtMs;
+                const remaining = Math.max(0, macroTimedDurationMs - elapsed);
+                const remainingText = formatMacroDuration(remaining);
+                out.textContent = `(Timed recording in progress, auto-stop in ${remainingText})`;
+                $('macroEventCount').textContent = `Auto-stop in ${remainingText}`;
+            } else {
+                out.textContent = '(Recording in progress...)';
+                $('macroEventCount').textContent = '0 events';
+            }
+        }
+
+        function beginMacroRecording(durationMs) {
+            macroLastResult = null;
+            clearMacroTimedState();
+            $('btnMacroDownload').disabled = true;
+            if (typeof durationMs === 'number' && durationMs > 0) {
+                macroTimedDurationMs = durationMs;
+                macroTimedStartedAtMs = Date.now();
+                macroCountdownTimer = setInterval(() => {
+                    if (!macroRecordingActive) {
+                        clearMacroTimedState();
+                        return;
+                    }
+                    renderMacroPendingState();
+                }, 100);
+            }
+            updateMacroStatusUI('recording', 0);
+            renderMacroPendingState();
+        }
+
+        function applyMacroResult(obj, promptBuilder) {
+            if (!obj) return false;
+            if (obj.recording_id && macroLastResult && macroLastResult.recording_id === obj.recording_id) {
+                return false;
+            }
+            clearMacroTimedState();
+            macroLastResult = obj;
+            updateMacroStatusUI('stopped', obj.events ? obj.events.length : 0);
+            renderMacroEvents(obj.events);
+
+            // Enable download button if there are events
+            const eventCount = obj.events ? obj.events.length : 0;
+            if (eventCount > 0) {
+                $('btnMacroDownload').disabled = false;
+            }
+            return true;
+        }
+
+        function renderMacroEvents(events) {
+            const out = $('macroEventsOut');
+            if (!events || events.length === 0) {
+                out.textContent = '(No events recorded)';
+                $('macroEventCount').textContent = '0 events';
+                return;
+            }
+            out.textContent = JSON.stringify(events, null, 2);
+            $('macroEventCount').textContent = events.length + ' events (with timing)';
+        }
+
+        function downloadMacroEvents(obj) {
+            const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${obj.recording_id || Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        async function macroStart() {
+            const durationRaw = ($('macroDuration').value || '').trim();
+            const durationValue = durationRaw ? Number(durationRaw) : null;
+            const duration_ms = Number.isFinite(durationValue) ? Math.max(0, Math.round(durationValue)) : null;
+            const timedMode = duration_ms !== null && duration_ms > 0;
+
+            const body = {
+                window_id: getSelectedWindowId(),
+            };
+            if (timedMode) {
+                body.duration_ms = duration_ms;
+                beginMacroRecording(duration_ms);
+            }
+
+            const res = await fetch('/events/macro/start', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            const txt = await res.text();
+            if (!res.ok) {
+                clearMacroTimedState();
+                updateMacroStatusUI('idle', null);
+                alert('Start macro recording failed: ' + txt);
+                return;
+            }
+            try {
+                const obj = JSON.parse(txt);
+                
+                if (timedMode) {
+                    applyMacroResult(
+                        obj,
+                        (result, eventCount) => `Recorded ${eventCount} events in ${result.duration_ms}ms. Download as JSON?`,
+                    );
+                } else {
+                    // Async mode: recording started
+                    beginMacroRecording(null);
+                }
+            } catch (e) {
+                clearMacroTimedState();
+                updateMacroStatusUI('idle', null);
+                $('macroEventsOut').textContent = txt;
+            }
+        }
+
+        async function macroStop() {
+            const res = await fetch('/events/macro/stop', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ window_id: getSelectedWindowId() }),
+            });
+            const txt = await res.text();
+            if (!res.ok) {
+                alert('Stop macro recording failed: ' + txt);
+                return;
+            }
+            try {
+                const obj = JSON.parse(txt);
+                applyMacroResult(
+                    obj,
+                    (result, eventCount) => `Recorded ${eventCount} events in ${result.duration_ms}ms. Download as JSON?`,
+                );
+            } catch (e) {
+                $('macroEventsOut').textContent = txt;
+            }
+        }
+
+        $('btnMacroStart').onclick = macroStart;
+        $('btnMacroStop').onclick = macroStop;
+        $('btnMacroDownload').onclick = () => {
+            if (macroLastResult) {
+                downloadMacroEvents(macroLastResult);
+            }
+        };
+        updateMacroStatusUI('idle', null);
 
         // Keep the effective show flags visible.
         // Boot

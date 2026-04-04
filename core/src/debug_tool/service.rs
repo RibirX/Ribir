@@ -1,7 +1,8 @@
-//! Shared service functions for HTTP and MCP handlers.
+//! Shared service functions for HTTP handlers.
 //!
-//! These functions contain the core logic that both HTTP endpoints and MCP
-//! tools share.
+//! These functions contain the core logic for HTTP endpoints.
+#![cfg_attr(target_arch = "wasm32", allow(dead_code))]
+#![cfg_attr(target_arch = "wasm32", allow(unused_imports))]
 
 use std::sync::Arc;
 
@@ -10,9 +11,8 @@ use serde_json::Value;
 use tokio::sync::oneshot;
 
 use super::{
-  helpers,
   overlays::get_overlays,
-  server::DebugServerState,
+  runtime::DebugServerState,
   types::{DebugCommand, InjectEventsResult, InjectedUiEvent, InspectOptions, WindowInfo},
 };
 use crate::window::WindowId;
@@ -40,21 +40,42 @@ impl std::fmt::Display for ServiceError {
 
 pub type ServiceResult<T> = Result<T, ServiceError>;
 
+/// Platform-agnostic timeout helper.
+#[cfg(not(target_arch = "wasm32"))]
+async fn wait_with_timeout<T>(
+  duration: std::time::Duration, future: impl std::future::Future<Output = T>,
+) -> Option<T> {
+  tokio::time::timeout(duration, future).await.ok()
+}
+
+/// Platform-agnostic timeout helper.
+#[cfg(target_arch = "wasm32")]
+async fn wait_with_timeout<T>(
+  duration: std::time::Duration, future: impl std::future::Future<Output = T>,
+) -> Option<T> {
+  use futures::future::{Either, select};
+  match select(Box::pin(future), Box::pin(gloo_timers::future::sleep(duration))).await {
+    Either::Left((result, _)) => Some(result),
+    Either::Right((_, _)) => None,
+  }
+}
+
 /// Capture a screenshot, always requesting a fresh frame.
 pub async fn capture_screenshot_svc(state: &DebugServerState) -> ServiceResult<Arc<PixelImage>> {
   // Clone and mark current value as seen BEFORE requesting redraw.
-  // This ensures we wait for a genuinely NEW frame, not an old pending one.
   let mut rx = state.last_frame_rx.clone();
-  let _ = rx.borrow_and_update(); // Mark current value as seen
+  let _ = rx.borrow_and_update();
 
-  // Request a redraw to get the latest frame (with any overlays).
+  // Request a redraw to get the latest frame.
   let _ = state
     .command_tx
     .send(DebugCommand::RequestRedraw { window_id: None })
     .await;
 
-  // Wait with timeout (2s) for a new frame
-  let result = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+  // Wait with timeout (2s) for a new frame using cross-platform timer.
+  let timeout_duration = std::time::Duration::from_secs(2);
+
+  let frame_future = async {
     loop {
       if rx.changed().await.is_err() {
         return None;
@@ -63,12 +84,13 @@ pub async fn capture_screenshot_svc(state: &DebugServerState) -> ServiceResult<A
         return Some(img);
       }
     }
-  })
-  .await;
+  };
 
-  match result {
-    Ok(Some(img)) => Ok(img),
-    _ => {
+  let result = wait_with_timeout(timeout_duration, frame_future).await;
+
+  match result.flatten() {
+    Some(img) => Ok(img),
+    None => {
       // Fallback: if timeout, try returning cached frame if available
       if let Some(img) = state.last_frame_rx.borrow().clone() {
         Ok(img)
@@ -127,6 +149,7 @@ pub async fn get_windows_svc(state: &DebugServerState) -> ServiceResult<Vec<Wind
 }
 
 /// Get overlays for a window.
+#[allow(dead_code)]
 pub fn get_overlays_svc(window_id: WindowId) -> Vec<(crate::prelude::WidgetId, String)> {
   get_overlays(window_id)
 }
@@ -199,9 +222,4 @@ pub async fn inject_events_svc(
     Ok(Err(msg)) => Err(ServiceError::Internal(msg)),
     Err(_) => Err(ServiceError::Internal("Failed to receive response".into())),
   }
-}
-
-/// Parse options string into InspectOptions.
-pub fn parse_options(options_str: Option<&str>) -> InspectOptions {
-  helpers::parse_inspect_options(options_str)
 }
