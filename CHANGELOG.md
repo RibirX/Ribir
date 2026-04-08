@@ -10,6 +10,70 @@ For older versions:
 
 <!-- next-header -->
 
+## [0.4.0-alpha.63](https://github.com/RibirX/Ribir/releases/tag/v0.4.0-alpha.63) - 2026-04-08
+
+### 🎨 Features
+
+- **cli**: introduce a debug bridge server for WASM applications (\#940 @wjian23)
+- **core**: add diagnostic logging for non-finite layout sizes (\#937 @M-Adoo)
+- **core**: add into\_provider for Variant and ProviderCtx access for Event types (\#928 @M-Adoo)
+- **examples**: add a comprehensive Navigation Rail sandbox to the gallery (\#939 @M-Adoo)
+- **text**: add support for ellipsis overflow and text decorations (\#926 @wjian23)
+- **text**: replace internal text engine with Parley for advanced shaping and layout (\#926 @wjian23)
+- **theme**: implement Material 3 spring-based motion tokens and schemes (\#928 @M-Adoo)
+- **tools**: add offscreen rendering fallback for debug screenshots (\#930 @wjian23)
+- **tools**: add WASM debug support and macro recording capability (\#940 @wjian23)
+- **widgets**: add adaptive NavigationRail widget with M3 styling (\#928 @M-Adoo)
+- **widgets**: add Leading and Trailing label support to Switch widget (\#939 @M-Adoo)
+- **widgets**: add RichText widget for multi-style text rendering (\#926 @wjian23)
+- **widgets**: redesign gallery into a routed showroom with dedicated sections (\#937 @M-Adoo)
+- **widgets**: refine badge overlay anchoring and visibility in NavigationRail (\#939 @M-Adoo)
+
+### 🐛 Fixed
+
+- **core**: remove legacy port registry and MCP-related code (\#940 @wjian23)
+- **gpu**: handle transient WGPU surface errors to prevent panics (\#930 @wjian23)
+- **gpu**: resolve memory leak by removing extraneous clear-only pass (\#929 @wjian23)
+- **gpu**: update wgpu to 29.0.0 and fix breaking API changes (\#929 @wjian23)
+- **text**: update parley to 0.8.0 and remove macOS font workaround (\#932 @wjian23)
+- **text**: use read-fonts to extract SVG glyphs (\#933 @M-Adoo)
+- **themes**: prevent one-frame flashes on NavigationRail remount by seeding transition opacity (\#939 @M-Adoo)
+- **themes**: refine Material navigation rail motion and fix StateLayer overlay positioning (\#937 @M-Adoo)
+- **widgets**: stabilize base class mounting in stateful widgets using class\_list\! (\#931 @M-Adoo)
+
+### 🔄 Changed
+
+- **core**: re-export lightweight Arc and update performance guidelines for smart pointers (\#927 @M-Adoo)
+- **core**: refactor text-related components to use the new ribir\_text stack (\#926 @wjian23)
+- **core**: update debug tool to use WebP for screenshots (\#934 @M-Adoo)
+- **tools**: move Ribir skills into .agents directory (\#934 @M-Adoo)
+- **tools**: replace internal MCP server with skill-based documentation for AI agents (\#940 @wjian23)
+
+### ⚡ Performance
+
+- **gpu**: improve bitmap glyph rendering and atlas texture sampling via edge-bleeding (\#926 @wjian23)
+
+### 📚 Documentation
+
+- add architectural documentation for the gallery example (\#937 @M-Adoo)
+- clarify reuse vs key semantics in interactive widget design guide (\#928 @M-Adoo)
+- **tools**: remove obsolete skills directory instruction from AGENTS.md (\#938 @M-Adoo)
+- **widgets**: relocate interactive guide and add ribir-widget-creator skill (\#931 @M-Adoo)
+
+### 💥 Breaking
+
+- **core**: update text\_line\_height to use LineHeight type for relative/absolute support (\#926 @wjian23)
+- **painter**: switch image I/O to WebP and remove png and jpeg features (\#934 @M-Adoo)
+- **theme**: rename EXR\_LONG\* duration tokens to EXTRA\_LONG\* for M3 alignment (\#928 @M-Adoo)
+- **widgets**: refactor Badge content API to use semantic BadgeContent enum (\#928 @M-Adoo)
+
+<details>
+<summary>🔧 Internal</summary>
+
+- build(deps): 🤖 enable winit platform features (#941 @M-Adoo)
+
+</details>
+
 ## [0.4.0-alpha.62](https://github.com/RibirX/Ribir/releases/tag/v0.4.0-alpha.62) - 2026-03-24
 
 ### 🎨 Features
@@ -51,7 +115,7 @@ For older versions:
 <details>
 <summary>🔧 Internal</summary>
 
-- build(deps): update criterion requirement from 0.7.0 to 0.8.1 (#819 @app/dependabot)
+- build(deps): update criterion requirement from 0.7.0 to 0.8.1 (\#819 @app/dependabot)
 
 </details>
 
