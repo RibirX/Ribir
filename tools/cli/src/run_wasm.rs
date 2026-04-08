@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::Result;
 use clap::{CommandFactory, FromArgMatches, Parser};
+use ignore::gitignore::Gitignore;
 use notify_debouncer_mini::{DebounceEventResult, Debouncer, new_debouncer, notify::*};
 
 use crate::{
@@ -116,22 +117,32 @@ impl Wasm {
   fn auto_rebuild(&self) -> Debouncer<RecommendedWatcher> {
     let root_path = self.root_path().unwrap();
     let ignore_file = root_path.join(".gitignore");
+
+    // Build gitignore matcher using the `ignore` crate
+    // Gitignore::new() parses the .gitignore file and returns a matcher
+    // that resolves patterns relative to the gitignore file's parent directory.
+    let (gitignore, err) = Gitignore::new(&ignore_file);
+    if let Some(e) = err {
+      eprintln!("Warning: some gitignore patterns failed to parse: {}", e);
+    }
+
     let this = self.clone();
     let mut debouncer =
       new_debouncer(WATCH_DEBOUNCE_GAP, move |res: DebounceEventResult| match res {
         Ok(events) => {
-          let ignore = gitignore::File::new(Path::new(&ignore_file));
           let need_rebuild = events.iter().any(|e| {
-            if let Ok(ignore) = &ignore {
-              return !ignore.is_excluded(&e.path).unwrap_or(false);
-            }
-            true
+            // Use matched_path_or_any_parents because `/target/` pattern only
+            // matches the directory itself, not files within it. This method
+            // walks up parent directories to check if any ancestor is ignored.
+            !gitignore
+              .matched_path_or_any_parents(&e.path, false)
+              .is_ignore()
           });
           if need_rebuild {
             let _ = this.wasm_build();
           }
         }
-        Err(e) => println!("Error {:?}", e),
+        Err(e) => eprintln!("Watch error: {:?}", e),
       })
       .unwrap();
 
