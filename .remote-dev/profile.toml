@@ -1,0 +1,48 @@
+# remote-dev project profile configuration
+# ============================================================================
+# This file is managed by remote-dev and shared with your team (committed to Git).
+# It defines sync rules, deps cache settings, and lifecycle hooks.
+#
+# For personal overrides that shouldn't be committed:
+#   Create: .remote-dev/profile.local.toml
+#   Put personal AI auth sync entries there, not in this shared file
+#
+# To customize this file:
+#   1. Edit sync rules to add/remove projected paths
+#   2. Modify deps cache settings
+#   3. Enable/configure hooks for lifecycle events
+#   4. Use the configure-profile skill or ask your AI assistant for help
+#
+# Keep this header as a quick customization guide for future edits.
+# ============================================================================
+
+# Sync rules: eager-copy small files or directories into the sandbox HOME base layer
+[[sync]]
+local = ".remote-dev/.zshrc"
+remote = ".zshrc"
+
+[[sync]]
+local = ".remote-dev/.starship.toml"
+remote = ".config/starship.toml"
+
+# Built-in Rust deps cache for `.#dev-cargo-deps` / `target`
+# General Nix binary caches for shells/packages still belong in flake.nix nixConfig.
+[cache]
+managed = true  # Enable automatic Rust dependency caching when available
+
+# Lifecycle hooks: commands run at specific points.
+# Keep the default hook paths stable when you enable or customize them.
+[hooks]
+on_start = "bash .remote-dev/hooks/on-start.sh"
+warmup = "bash .remote-dev/hooks/warmup.sh"
+on_exit = "bash .remote-dev/hooks/on-exit.sh"
+
+# Additional sync examples (uncomment to use):
+# [[sync]]
+# path = "~/.gitconfig"  # Sync git config into sandbox HOME
+#
+# Additional write-back sync examples (uncomment to use):
+# [[sync]]
+# local = ".remote-dev/custom.env"
+# remote = ".config/custom/env"
+# write_back = true
