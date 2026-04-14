@@ -1,12 +1,13 @@
 use std::{
-  cell::{RefCell, UnsafeCell},
+  cell::{Cell, RefCell, UnsafeCell},
   convert::Infallible,
 };
 
 use ribir_algo::Rc;
 use rxrust::{
   context::LocalCtx,
-  observable::boxed::LocalBoxedObservable,
+  observable::{CoreObservable, ObservableType, boxed::LocalBoxedObservable},
+  observer::Observer,
   scheduler::LocalScheduler,
   subscription::{BoxedSubscription, IntoBoxedSubscription},
 };
@@ -34,10 +35,10 @@ impl<V: 'static> Pipe<V> {
   ///
   /// # Parameters
   /// - `trigger`: Observable stream of modification scopes
-  /// - `map_handler`: Function converting ModifyScope to output values
+  /// - `map_handler`: Function converting ModifyEffect to output values
   pub fn new(
     trigger: LocalBoxedObservable<'static, ModifyInfo, Infallible>,
-    map_handler: impl FnMut(ModifyInfo) -> V + 'static,
+    map_handler: impl FnMut(ModifyEffect) -> V + 'static,
   ) -> Self {
     let info = SubscribeInfo { effect: ModifyEffect::DATA, priority: None };
     let info: Rc<RefCell<SubscribeInfo>> = Rc::new(RefCell::new(info));
@@ -638,11 +639,11 @@ struct PipeWidgetContextObserver<O> {
   wnd: Rc<Window>,
 }
 
-impl<O> Observer<ModifyInfo, Infallible> for PipeWidgetContextObserver<O>
+impl<O> Observer<ModifyEffect, Infallible> for PipeWidgetContextObserver<O>
 where
-  O: Observer<ModifyInfo, Infallible>,
+  O: Observer<ModifyEffect, Infallible>,
 {
-  fn next(&mut self, value: ModifyInfo) {
+  fn next(&mut self, value: ModifyEffect) {
     let wid = self.pipe_node.dyn_info().host_id();
 
     // Initialize the build context for the duration of the observer callback.
@@ -664,7 +665,7 @@ where
 
 impl ObservableType for PipeOp {
   type Item<'a>
-    = ModifyInfo
+    = ModifyEffect
   where
     Self: 'a;
 
@@ -673,7 +674,7 @@ impl ObservableType for PipeOp {
 
 impl<O> CoreObservable<LocalCtx<O, LocalScheduler>> for PipeOp
 where
-  O: Observer<ModifyInfo, Infallible> + 'static,
+  O: Observer<ModifyEffect, Infallible> + 'static,
 {
   type Unsub = BoxedSubscription;
 
@@ -684,22 +685,45 @@ where
     let scope = info.effect;
     let priority = info.priority.take();
 
-    let source = self.source.filter(move |s| s.contains(scope));
-
     if let Some(priority) = priority {
       let pipe_node = priority.node.clone();
       let wnd = priority.wnd.clone();
+      let observer = PipeWidgetContextObserver { observer, pipe_node, wnd: wnd.clone() };
+      let pending = Rc::new(Cell::new(ModifyEffect::empty()));
 
-      let sampler = wnd
-        .frame_tick_stream()
-        .filter_map(|msg| matches!(msg, FrameMsg::NewFrame(_)).then_some(()))
-        .merge(Local::of(()));
+      let stream = self
+        .source
+        .map({
+          let pending = pending.clone();
+          move |value| {
+            pending.set(pending.get() | value.effect);
+          }
+        })
+        .throttle(
+          move |_| {
+            wnd
+              .frame_tick_stream()
+              .filter_map(|msg| matches!(msg, FrameMsg::NewFrame(_)).then_some(()))
+              .take(1)
+          },
+          ThrottleEdge::trailing(),
+        )
+        .merge(Local::of(()))
+        .filter_map(move |_| {
+          let effect = pending.replace(ModifyEffect::empty());
+          (!effect.is_empty()).then_some(effect)
+        })
+        .filter(move |s| s.contains(scope))
+        .priority(priority)
+        .box_it();
 
-      let stream = source.sample(sampler).priority(priority);
-      let observer = PipeWidgetContextObserver { observer, pipe_node, wnd };
       stream.subscribe_with(observer).into_boxed()
     } else {
-      source.subscribe_with(observer).into_boxed()
+      self
+        .source
+        .filter_map(move |s| s.effect.contains(scope).then_some(s.effect))
+        .subscribe_with(observer)
+        .into_boxed()
     }
   }
 }
@@ -1211,5 +1235,31 @@ mod tests {
     // refreshing the child widget of the pipe.
     *m_writer.write() += 1;
     wnd.draw_frame();
+  }
+
+  #[test]
+  fn pipe_flushes_last_async_modify_before_source_complete() {
+    reset_test_env!();
+
+    let source = Stateful::new(Size::zero());
+    let async_writer = source.clone_writer();
+
+    let widget = fn_widget! {
+      pipe!(*$read(source)).map(|size| fn_widget! {
+        @MockBox { size }
+      })
+    };
+
+    let wnd = TestWindow::from_widget(widget);
+    wnd.draw_frame();
+    wnd.assert_root_size(Size::zero());
+
+    AppCtx::spawn_local(async move {
+      *async_writer.write() = Size::new(16., 9.);
+    });
+    AppCtx::run_until_stalled();
+
+    wnd.draw_frame();
+    wnd.assert_root_size(Size::new(16., 9.));
   }
 }

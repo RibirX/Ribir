@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote_spanned};
+use quote::{ToTokens, quote, quote_spanned};
 use smallvec::SmallVec;
 use syn::{
   Stmt,
@@ -37,8 +37,8 @@ impl BodyExpr {
 }
 
 /// Public interface for processing watch bodies with optional context
-pub fn process_watch_body(
-  input: TokenStream, refs_ctx: Option<&mut DollarRefsCtx>,
+fn process_body_with_arg_ty(
+  input: TokenStream, refs_ctx: Option<&mut DollarRefsCtx>, arg_ty: TokenStream,
 ) -> Result<WatchBody> {
   let span = input.span();
 
@@ -60,11 +60,23 @@ pub fn process_watch_body(
   } else {
     let map_handler = quote_spanned! { span => {
       #refs
-      move |_: ModifyInfo| { #(#expr)* }
+      move |_: #arg_ty| { #(#expr)* }
     }};
 
     Ok(WatchBody { upstream: Upstreams::new(refs), map_handler })
   }
+}
+
+pub fn process_watch_body(
+  input: TokenStream, refs_ctx: Option<&mut DollarRefsCtx>,
+) -> Result<WatchBody> {
+  process_body_with_arg_ty(input, refs_ctx, quote!(ModifyInfo))
+}
+
+pub fn process_pipe_body(
+  input: TokenStream, refs_ctx: Option<&mut DollarRefsCtx>,
+) -> Result<WatchBody> {
+  process_body_with_arg_ty(input, refs_ctx, quote!(ModifyEffect))
 }
 
 /// Generates final output code from processed watch body
