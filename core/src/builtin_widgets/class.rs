@@ -518,12 +518,17 @@ fn attach_outer_stream_subscription(
   let stream = pipe!($read(stream_writer).class.current())
     .with_effect(ModifyEffect::FRAMEWORK)
     .into_observable();
-  let sampler = BuildCtx::get()
-    .window()
-    .frame_tick_stream()
-    .filter(|msg| matches!(msg, FrameMsg::NewFrame(_)));
+  let wnd = BuildCtx::get().window();
   let u = stream
-    .sample(sampler)
+    .throttle(
+      move |_| {
+        wnd
+          .frame_tick_stream()
+          .filter_map(|msg| matches!(msg, FrameMsg::NewFrame(_)).then_some(()))
+          .take(1)
+      },
+      ThrottleEdge::trailing(),
+    )
     .subscribe(move |_| {
       runtime.refresh_from_state(&callback_writer, &manager);
     })
@@ -713,12 +718,17 @@ where
   ) -> SubscriptionGuard<BoxedSubscription> {
     let wnd = AppCtx::get_window(self.wnd_id)
       .expect("This handle is not valid because the window is closed");
-    let sampler = wnd
-      .frame_tick_stream()
-      .filter(|msg| matches!(msg, FrameMsg::NewFrame(_)));
     let manager = self.clone();
     stream
-      .sample(sampler)
+      .throttle(
+        move |_| {
+          wnd
+            .frame_tick_stream()
+            .filter_map(|msg| matches!(msg, FrameMsg::NewFrame(_)).then_some(()))
+            .take(1)
+        },
+        ThrottleEdge::trailing(),
+      )
       .subscribe(move |current| {
         manager.update(current, &apply);
       })
@@ -1181,6 +1191,42 @@ mod tests {
     *w_cls.write() = MARGIN;
     wnd.draw_frame();
     wnd.assert_root_size(Size::splat(120.));
+  }
+
+  #[test]
+  fn pipe_class_flushes_last_async_modify_before_source_complete() {
+    reset_test_env!();
+
+    class_names!(ASYNC_CLASS_A, ASYNC_CLASS_B);
+
+    let mut classes = initd_classes();
+    classes.insert(ASYNC_CLASS_A, style_class! { margin: EdgeInsets::all(1.) });
+    classes.insert(ASYNC_CLASS_B, style_class! { margin: EdgeInsets::all(2.) });
+
+    let source = Stateful::new(Some(ASYNC_CLASS_A));
+    let async_writer = source.clone_writer();
+
+    let wnd = TestWindow::from_widget(fn_widget! {
+      let classes = classes.clone();
+      @Providers {
+        providers: smallvec![classes.into_provider()],
+        @Container {
+          hint_size: Size::new(100., 100.),
+          class: class_list![pipe!(*$read(source))],
+        }
+      }
+    });
+
+    wnd.draw_frame();
+    wnd.assert_root_size(Size::new(102., 102.));
+
+    AppCtx::spawn_local(async move {
+      *async_writer.write() = Some(ASYNC_CLASS_B);
+    });
+    AppCtx::run_until_stalled();
+
+    wnd.draw_frame();
+    wnd.assert_root_size(Size::new(104., 104.));
   }
 
   #[test]
