@@ -10,6 +10,13 @@ For older versions:
 
 <!-- next-header -->
 
+## [0.4.0-alpha.64](https://github.com/RibirX/Ribir/releases/tag/v0.4.0-alpha.64) - 2026-04-14
+
+### 🐛 Fixed
+
+- **cli**: replace deprecated gitignore crate with ignore to fix infinite rebuild loop (\#942 @wjian23)
+- **core**: ensure pipe emits final value on completion and accumulates multiple change effects (\#944 @wjian23)
+
 ## [0.4.0-alpha.63](https://github.com/RibirX/Ribir/releases/tag/v0.4.0-alpha.63) - 2026-04-08
 
 ### 🎨 Features
@@ -70,7 +77,7 @@ For older versions:
 <details>
 <summary>🔧 Internal</summary>
 
-- build(deps): 🤖 enable winit platform features (#941 @M-Adoo)
+- build(deps): 🤖 enable winit platform features (\#941 @M-Adoo)
 
 </details>
 
