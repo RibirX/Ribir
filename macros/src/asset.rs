@@ -65,6 +65,51 @@ use basic::{BinaryAsset, TextAsset};
 use image::ImageAsset;
 use svg::SvgAsset;
 
+const RIBIR_BUNDLE_MODE_ENV: &str = "RIBIR_BUNDLE_MODE";
+
+/// Controls how `asset!` chooses its runtime path strategy during compilation.
+///
+/// - `None`: normal build, generate absolute runtime paths.
+/// - `Debug` / `Release`: bundle build, write outputs into the matching
+///   `target/{debug|release}/assets/` dir and generate bundle-relative runtime
+///   paths.
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum BundleAssetMode {
+  None,
+  Debug,
+  Release,
+}
+
+impl BundleAssetMode {
+  fn from_env() -> syn::Result<Self> {
+    match std::env::var(RIBIR_BUNDLE_MODE_ENV) {
+      Ok(value) => match value.as_str() {
+        "" | "none" => Ok(Self::None),
+        "debug" => Ok(Self::Debug),
+        "release" | "1" => Ok(Self::Release),
+        other => Err(syn::Error::new(
+          proc_macro2::Span::call_site(),
+          format!(
+            "Invalid {RIBIR_BUNDLE_MODE_ENV} value '{other}', expected one of: none, debug, \
+             release"
+          ),
+        )),
+      },
+      Err(_) => Ok(Self::None),
+    }
+  }
+
+  fn asset_dir_name(&self) -> Option<&'static str> {
+    match self {
+      Self::None => None,
+      Self::Debug => Some("debug"),
+      Self::Release => Some("release"),
+    }
+  }
+
+  fn uses_bundle_runtime_path(&self) -> bool { !matches!(self, Self::None) }
+}
+
 // =============================================================================
 // Public API
 // =============================================================================
@@ -338,8 +383,8 @@ pub(crate) struct AssetContext {
   pub relative_output: String,
   /// Span for error reporting.
   pub input_span: proc_macro2::Span,
-  /// Whether building in bundle mode (PROFILE=bundle).
-  pub is_bundle: bool,
+  /// How runtime paths and asset output dirs should behave during bundling.
+  bundle_mode: BundleAssetMode,
   /// Whether embedding (include_asset!) vs runtime loading (asset!).
   pub embed: bool,
 }
@@ -378,7 +423,7 @@ impl AssetContext {
   pub fn runtime_path_tokens(&self, new_ext: Option<&str>) -> TokenStream {
     let relative = self.relative_output_with_ext(new_ext);
 
-    if self.is_bundle {
+    if self.bundle_mode.uses_bundle_runtime_path() {
       #[cfg(target_os = "macos")]
       {
         quote! {
@@ -422,7 +467,7 @@ impl AssetContext {
 fn prepare_asset_context(input: &LitStr, embed: bool) -> syn::Result<AssetContext> {
   let input_path = input.value();
   let span = input.span();
-  let is_bundle = std::env::var("RIBIR_BUNDLE_MODE").is_ok();
+  let bundle_mode = BundleAssetMode::from_env()?;
 
   let abs_input = resolve_caller_relative_path(&input_path, span)?;
 
@@ -445,9 +490,12 @@ fn prepare_asset_context(input: &LitStr, embed: bool) -> syn::Result<AssetContex
   let path_hash = hash_path(&abs_input_str);
   let hashed_filename = format!("{path_hash}_{filename}");
 
-  // Get the Cargo profile (debug/release) from PROFILE env var set by Cargo
-
-  let cargo_profile = std::env::var("PROFILE").unwrap_or_else(|_| "debug".into());
+  // Bundle builds pass an explicit assets dir mode because PROFILE is not
+  // guaranteed to be available to proc-macro execution.
+  let cargo_profile = bundle_mode
+    .asset_dir_name()
+    .map(str::to_owned)
+    .unwrap_or_else(|| std::env::var("PROFILE").unwrap_or_else(|_| "debug".into()));
 
   let (manifest_path, workspace_opt) = get_workspace_base(span)?;
   let root = workspace_opt.unwrap_or(manifest_path);
@@ -472,7 +520,7 @@ fn prepare_asset_context(input: &LitStr, embed: bool) -> syn::Result<AssetContex
     abs_output,
     relative_output,
     input_span: span,
-    is_bundle,
+    bundle_mode,
     embed,
   })
 }
@@ -601,4 +649,64 @@ fn find_workspace_root(start: &Path) -> Option<PathBuf> {
     cur = p.parent();
   }
   None
+}
+
+#[cfg(test)]
+mod tests {
+  use std::sync::Mutex;
+
+  use super::{BundleAssetMode, RIBIR_BUNDLE_MODE_ENV};
+
+  static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+  fn with_bundle_mode_env<T>(value: Option<&str>, f: impl FnOnce() -> T) -> T {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let old = std::env::var(RIBIR_BUNDLE_MODE_ENV).ok();
+
+    match value {
+      Some(value) => unsafe { std::env::set_var(RIBIR_BUNDLE_MODE_ENV, value) },
+      None => unsafe { std::env::remove_var(RIBIR_BUNDLE_MODE_ENV) },
+    }
+
+    let result = f();
+
+    match old {
+      Some(value) => unsafe { std::env::set_var(RIBIR_BUNDLE_MODE_ENV, value) },
+      None => unsafe { std::env::remove_var(RIBIR_BUNDLE_MODE_ENV) },
+    }
+
+    result
+  }
+
+  #[test]
+  fn bundle_asset_mode_defaults_to_none() {
+    with_bundle_mode_env(None, || {
+      assert_eq!(BundleAssetMode::from_env().unwrap(), BundleAssetMode::None);
+    });
+  }
+
+  #[test]
+  fn bundle_asset_mode_accepts_explicit_profile_dirs() {
+    with_bundle_mode_env(Some("debug"), || {
+      assert_eq!(BundleAssetMode::from_env().unwrap(), BundleAssetMode::Debug);
+    });
+    with_bundle_mode_env(Some("release"), || {
+      assert_eq!(BundleAssetMode::from_env().unwrap(), BundleAssetMode::Release);
+    });
+    with_bundle_mode_env(Some("none"), || {
+      assert_eq!(BundleAssetMode::from_env().unwrap(), BundleAssetMode::None);
+    });
+  }
+
+  #[test]
+  fn bundle_asset_mode_rejects_unknown_values() {
+    with_bundle_mode_env(Some("bundle"), || {
+      let err = BundleAssetMode::from_env().unwrap_err();
+      assert!(
+        err
+          .to_string()
+          .contains("Invalid RIBIR_BUNDLE_MODE value")
+      );
+    });
+  }
 }
