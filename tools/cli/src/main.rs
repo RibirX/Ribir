@@ -117,7 +117,7 @@ fn main() {
 
       let res = cmd.exec(matches);
       if let Err(err) = res {
-        tracing::error!("{}", err);
+        tracing::error!("{:?}", err);
         std::process::exit(1);
       }
     }

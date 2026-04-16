@@ -1,6 +1,7 @@
 /// Forked and modified from Tauri CLI
 /// https://github.com/tauri-apps/tauri/tree/dev/crates/tauri-cli
 use std::{
+  collections::HashSet,
   env, fs,
   path::{Path, PathBuf},
   process::Command,
@@ -32,6 +33,8 @@ use crate::{
   },
 };
 
+// Passed through to the asset proc-macro so bundle builds can explicitly choose
+// the debug/release asset output dir instead of relying on PROFILE there.
 const RIBIR_BUNDLE_MODE_ENV: &str = "RIBIR_BUNDLE_MODE";
 
 pub fn bundle() -> Box<dyn CliCommand> { Box::new(BundleCmd {}) }
@@ -296,6 +299,52 @@ fn has_bundle_profile(toml_path: &PathBuf) -> Result<bool> {
   )
 }
 
+fn profile_inherits_from(toml_path: &Path, profile: &str) -> Result<Option<String>> {
+  let cargo_toml: CargoTomlBundle = read_toml(&toml_path.to_path_buf())?;
+  Ok(
+    cargo_toml
+      .profile
+      .and_then(|p| p.as_table().cloned())
+      .and_then(|profiles| profiles.get(profile).cloned())
+      .and_then(|profile_cfg| {
+        profile_cfg
+          .as_table()
+          .and_then(|cfg| cfg.get("inherits"))
+          .and_then(|v| v.as_str())
+          .map(str::to_owned)
+      }),
+  )
+}
+
+fn resolve_asset_dir_name(profile: &str, manifests: &[PathBuf]) -> Result<String> {
+  fn resolve(
+    profile: &str, manifests: &[PathBuf], visited: &mut HashSet<String>,
+  ) -> Result<String> {
+    match profile {
+      "dev" | "debug" => return Ok("debug".to_string()),
+      "release" => return Ok("release".to_string()),
+      _ => {}
+    }
+
+    if !visited.insert(profile.to_string()) {
+      bail!("Circular Cargo profile inheritance detected while resolving '{profile}'");
+    }
+
+    for manifest in manifests {
+      if let Some(inherits) = profile_inherits_from(manifest, profile)? {
+        return resolve(&inherits, manifests, visited);
+      }
+    }
+
+    bail!(
+      "Unable to resolve asset output directory for profile '{profile}'. Define \
+       `[profile.{profile}] inherits = \"dev\"|\"release\"` in Cargo.toml."
+    );
+  }
+
+  resolve(profile, manifests, &mut HashSet::new())
+}
+
 fn bundle_setting_from_config(
   config: BundleConfig, config_dir: &Path, package_settings: CargoPackageSettings,
 ) -> Result<BundleSettings> {
@@ -475,6 +524,20 @@ fn bundle_setting_from_config(
 }
 
 impl Bundle {
+  fn cargo_target_root(&self) -> Result<PathBuf> {
+    if let Some(target_dir) = std::env::var_os("CARGO_TARGET_DIR") {
+      let target_dir = PathBuf::from(target_dir);
+      if target_dir.is_absolute() {
+        Ok(target_dir)
+      } else {
+        Ok(env::current_dir()?.join(target_dir))
+      }
+    } else {
+      let cargo_metadata = get_cargo_metadata()?;
+      Ok(cargo_metadata.target_directory)
+    }
+  }
+
   fn resolve_profile(&self) -> Result<String> {
     if let Some(profile) = &self.profile {
       return Ok(profile.clone());
@@ -497,27 +560,49 @@ impl Bundle {
 
   fn get_profile_dir(&self, profile: &str) -> Result<PathBuf> {
     let dir_name = if profile == "dev" { "debug" } else { profile };
+    Ok(self.cargo_target_root()?.join(dir_name))
+  }
 
-    let base_target = if let Some(target_dir) = std::env::var_os("CARGO_TARGET_DIR") {
-      PathBuf::from(target_dir)
-    } else {
-      let cargo_metadata = get_cargo_metadata()?;
-      cargo_metadata.target_directory
-    };
+  fn asset_dir_name_for_profile(&self, profile: &str) -> Result<String> {
+    let package_path = CargoSettings::toml_path(&env::current_dir()?).expect("no cargo settings");
+    let workspace_toml_path = get_workspace_dir()?.join("Cargo.toml");
 
-    Ok(base_target.join(dir_name))
+    let mut manifests = vec![package_path.clone()];
+    if workspace_toml_path.exists() && workspace_toml_path != package_path {
+      manifests.push(workspace_toml_path);
+    }
+
+    resolve_asset_dir_name(profile, &manifests)
+  }
+
+  fn get_assets_dir(&self, profile: &str) -> Result<PathBuf> {
+    Ok(
+      self
+        .cargo_target_root()?
+        .join(self.asset_dir_name_for_profile(profile)?)
+        .join("assets"),
+    )
+  }
+
+  fn get_bundle_output_dir(&self, profile: &str) -> Result<PathBuf> {
+    Ok(
+      self
+        .target_dir
+        .clone()
+        .unwrap_or(self.get_profile_dir(profile)?)
+        .join("bundle"),
+    )
   }
 
   fn clean_bundle_artifacts(&self, profile: &str) -> Result<()> {
-    let profile_dir = self.get_profile_dir(profile)?;
-    let assets_dir = profile_dir.join("assets");
+    let assets_dir = self.get_assets_dir(profile)?;
+    let bundle_dir = self.get_bundle_output_dir(profile)?;
 
     if assets_dir.exists() {
       println!("Cleaning assets directory: {}", assets_dir.display());
       fs::remove_dir_all(&assets_dir)?;
     }
 
-    let bundle_dir = profile_dir.join("bundle");
     if bundle_dir.exists() {
       println!("Cleaning bundle directory: {}", bundle_dir.display());
       fs::remove_dir_all(&bundle_dir)?;
@@ -534,9 +619,11 @@ impl Bundle {
       .as_ref()
       .expect("no package settings");
 
+    let asset_dir_mode = self.asset_dir_name_for_profile(profile)?;
+
     println!(
-      "Building package '{}' with profile '{}' ({}=1)",
-      cargo_package_settings.name, profile, RIBIR_BUNDLE_MODE_ENV
+      "Building package '{}' with profile '{}' ({}={})",
+      cargo_package_settings.name, profile, RIBIR_BUNDLE_MODE_ENV, asset_dir_mode
     );
 
     let mut cmd = Command::new("cargo");
@@ -555,7 +642,7 @@ impl Bundle {
       }
     }
 
-    cmd.env(RIBIR_BUNDLE_MODE_ENV, "1");
+    cmd.env(RIBIR_BUNDLE_MODE_ENV, &asset_dir_mode);
 
     let status = cmd.status()?;
     if !status.success() {
@@ -566,8 +653,7 @@ impl Bundle {
   }
 
   fn detect_assets(&self, profile: &str) -> Result<Option<PathBuf>> {
-    let profile_dir = self.get_profile_dir(profile)?;
-    let assets_dir = profile_dir.join("assets");
+    let assets_dir = self.get_assets_dir(profile)?;
 
     if !assets_dir.exists() {
       return Ok(None);
@@ -940,7 +1026,29 @@ impl CargoPackageSettings {
 
 #[cfg(test)]
 mod tests {
-  use crate::util::windows_version::normalize_windows_version;
+  use std::{
+    fs,
+    path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
+  };
+
+  use crate::{bundle::resolve_asset_dir_name, util::windows_version::normalize_windows_version};
+
+  fn temp_manifest_dir(name: &str) -> PathBuf {
+    let nanos = SystemTime::now()
+      .duration_since(UNIX_EPOCH)
+      .unwrap()
+      .as_nanos();
+    let dir = std::env::temp_dir().join(format!("ribir_cli_bundle_tests_{name}_{nanos}"));
+    fs::create_dir_all(&dir).unwrap();
+    dir
+  }
+
+  fn write_manifest(dir: &Path, contents: &str) -> PathBuf {
+    let manifest = dir.join("Cargo.toml");
+    fs::write(&manifest, contents).unwrap();
+    manifest
+  }
 
   #[test]
   fn normalize_windows_version_prerelease_numeric() {
@@ -958,5 +1066,69 @@ mod tests {
   fn normalize_windows_version_stable() {
     let normalized = normalize_windows_version("1.2.0").unwrap();
     assert_eq!(normalized, "1.2.0.65535");
+  }
+
+  #[test]
+  fn resolve_asset_dir_name_uses_release_or_debug_base_profile() {
+    let dir = temp_manifest_dir("asset_dir");
+    let manifest = write_manifest(
+      &dir,
+      r#"
+        [package]
+        name = "bundle-test"
+        version = "0.1.0"
+        edition = "2021"
+
+        [profile.bundle]
+        inherits = "release"
+
+        [profile.dev_like]
+        inherits = "dev"
+
+        [profile.size_optimized]
+        inherits = "bundle"
+      "#,
+    );
+
+    assert_eq!(
+      resolve_asset_dir_name("bundle", std::slice::from_ref(&manifest)).unwrap(),
+      "release"
+    );
+    assert_eq!(
+      resolve_asset_dir_name("size_optimized", std::slice::from_ref(&manifest)).unwrap(),
+      "release"
+    );
+    assert_eq!(resolve_asset_dir_name("dev_like", &[manifest]).unwrap(), "debug");
+
+    fs::remove_dir_all(dir).unwrap();
+  }
+
+  #[test]
+  fn resolve_asset_dir_name_rejects_circular_profiles() {
+    let dir = temp_manifest_dir("asset_dir_cycle");
+    let manifest = write_manifest(
+      &dir,
+      r#"
+        [package]
+        name = "bundle-test"
+        version = "0.1.0"
+        edition = "2021"
+
+        [profile.a]
+        inherits = "b"
+
+        [profile.b]
+        inherits = "a"
+      "#,
+    );
+
+    let err = resolve_asset_dir_name("a", &[manifest]).unwrap_err();
+    assert!(
+      err
+        .to_string()
+        .contains("Circular Cargo profile inheritance")
+    );
+
+    fs::remove_dir_all(dir).unwrap();
   }
 }

@@ -338,8 +338,16 @@ pub fn part_reader(input: TokenStream) -> TokenStream {
 ///
 /// # Bundling for Distribution
 ///
-/// Include the `assets/` folder alongside your executable:
-/// - **macOS**: `YourApp.app/Contents/MacOS/assets/`
+/// In normal builds, `asset!` expands to an absolute path under
+/// `target/{profile}/assets/`.
+///
+/// When `ribir-cli bundle` drives the build, it sets `RIBIR_BUNDLE_MODE` to the
+/// resolved base asset profile (`debug` or `release`). In that mode, `asset!`
+/// still writes processed files to `target/{debug|release}/assets/`, but the
+/// generated runtime code switches to bundle-relative lookups.
+///
+/// Include the `assets/` folder inside your application bundle:
+/// - **macOS**: `YourApp.app/Contents/Resources/assets/`
 /// - **Windows/Linux**: Same directory as executable
 ///
 /// # Panics
