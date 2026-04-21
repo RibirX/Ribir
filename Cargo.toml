@@ -55,22 +55,22 @@ homepage = "https://ribir.org"
 keywords = ["gui", "ui", "declarative", "compose-ui"]
 license = "MIT"
 readme = "README.md"
-version = "0.4.0-alpha.64"
+version = "0.4.0-alpha.65"
 rust-version = "1.92.0"
 
 [workspace.dependencies]
-ribir_algo = { path = "algo", version = "0.4.0-alpha.64" }
-ribir_core = { path = "core", version = "0.4.0-alpha.64", default-features = false }
-ribir_gpu = { path = "gpu", version = "0.4.0-alpha.64" }
-ribir_types = { path = "types", version = "0.4.0-alpha.64" }
-ribir_macros = { path = "macros", version = "0.4.0-alpha.64" }
-ribir_painter = { path = "painter", version = "0.4.0-alpha.64" }
-ribir_text = { path = "text", version = "0.4.0-alpha.64" }
-ribir_widgets = { path = "widgets", version = "0.4.0-alpha.64" }
-ribir_material = { path = "themes/material", version = "0.4.0-alpha.64" }
-ribir_slim = { path = "themes/ribir_slim", version = "0.4.0-alpha.64" }
-ribir_dev_helper = { path = "dev-helper", version = "0.4.0-alpha.64" }
-ribir = { path = "ribir", version = "0.4.0-alpha.64" }
+ribir_algo = { path = "algo", version = "0.4.0-alpha.65" }
+ribir_core = { path = "core", version = "0.4.0-alpha.65", default-features = false }
+ribir_gpu = { path = "gpu", version = "0.4.0-alpha.65" }
+ribir_types = { path = "types", version = "0.4.0-alpha.65" }
+ribir_macros = { path = "macros", version = "0.4.0-alpha.65" }
+ribir_painter = { path = "painter", version = "0.4.0-alpha.65" }
+ribir_text = { path = "text", version = "0.4.0-alpha.65" }
+ribir_widgets = { path = "widgets", version = "0.4.0-alpha.65" }
+ribir_material = { path = "themes/material", version = "0.4.0-alpha.65" }
+ribir_slim = { path = "themes/ribir_slim", version = "0.4.0-alpha.65" }
+ribir_dev_helper = { path = "dev-helper", version = "0.4.0-alpha.65" }
+ribir = { path = "ribir", version = "0.4.0-alpha.65" }
 ahash = "0.8.11"
 arboard = "3.2.0"
 bitflags = "2.6.0"

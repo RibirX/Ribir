@@ -10,6 +10,17 @@ For older versions:
 
 <!-- next-header -->
 
+## [0.4.0-alpha.65](https://github.com/RibirX/Ribir/releases/tag/v0.4.0-alpha.65) - 2026-04-21
+
+### 🐛 Fixed
+
+- **cli**: resolve base profiles for custom cargo profiles and improve error logging (\#945 @wjian23)
+- **macros**: support RIBIR\_BUNDLE\_MODE for consistent asset resolution during bundling (\#945 @wjian23)
+
+### 📚 Documentation
+
+- **macros**: clarify asset path behavior during application bundling (\#945 @wjian23)
+
 ## [0.4.0-alpha.64](https://github.com/RibirX/Ribir/releases/tag/v0.4.0-alpha.64) - 2026-04-14
 
 ### 🐛 Fixed
