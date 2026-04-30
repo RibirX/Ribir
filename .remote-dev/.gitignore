@@ -1,0 +1,8 @@
+*
+!.gitignore
+!profile.toml
+!.zshrc
+!.bashrc
+!.starship.toml
+!hooks/
+!hooks/**
